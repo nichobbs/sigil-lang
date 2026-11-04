@@ -149,7 +149,7 @@ async function main() {
         const out = compileProgram(prog, res);
         hr('Wasm backend (pure numeric core)');
         for (const f of out.fns) {
-          if (f.compilable) console.log(`COMPILED      ${pad(f.name, 16)} ${f.repr}${f.widenedFromChecker ? `  (${f.widenedFromChecker})` : ''}`);
+          if (f.compilable) console.log(`COMPILED      ${pad(f.name, 16)} ${f.repr}${f.hasBase ? `  [memory: ${f.inputBytes}B input + ${f.scratchBytes}B scratch]` : ''}${f.widenedFromChecker ? `  (${f.widenedFromChecker})` : ''}`);
           else console.log(`NOT COMPILABLE ${pad(f.name, 15)} ${f.reason}`);
         }
         if (outFile) {

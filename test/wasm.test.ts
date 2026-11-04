@@ -200,11 +200,8 @@ describe('wasm backend: invoicing example', () => {
     expect(WebAssembly.validate(new Uint8Array(out.bytes))).toBe(true);
   });
 
-  it('gross and price-invoice are not compilable (lists), with a reason', () => {
-    for (const n of ['gross', 'price-invoice']) {
-      expect(rep(n).compilable).toBe(false);
-      expect(rep(n).reason).toMatch(/list/);
-    }
+  it('gross and price-invoice (lists) compile; see test/wasm-lists.test.ts', () => {
+    for (const n of ['gross', 'price-invoice']) expect(rep(n).compilable, rep(n).reason).toBe(true);
   });
 
   it('receipt (strings) and issue-invoice (capabilities) are not compilable', () => {
@@ -219,9 +216,9 @@ describe('wasm backend: invoicing example', () => {
     expect(d.mismatches).toEqual([]);
   });
 
-  it('only discount is exported', async () => {
+  it('only the compilable functions (and the list memory) are exported', async () => {
     const ex = await instantiate(out.bytes);
-    expect(Object.keys(ex)).toEqual(['discount']);
+    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'memory', 'price-invoice']);
   });
 });
 
@@ -253,8 +250,7 @@ describe('wasm backend: numeric fixture', () => {
   });
 
   it('refuses what is outside the subset, with reasons', () => {
-    expect(rep('sum-line').compilable).toBe(false);
-    expect(rep('sum-line').reason).toMatch(/list/);
+    expect(rep('sum-line').compilable, rep('sum-line').reason).toBe(true); // lists compile now
     expect(rep('uses-unsafe').compilable).toBe(false);
     expect(rep('uses-unsafe').reason).toMatch(/unsafe-div.*not compilable.*not proved/);
     expect(rep('passes-record').compilable).toBe(false);

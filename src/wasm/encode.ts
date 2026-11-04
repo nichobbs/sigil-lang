@@ -84,7 +84,18 @@ export const OP = {
   i64ExtendI32S: 0xac,
   i32WrapI64: 0xa7,
   call: 0x10,
+  block: 0x02,
+  loop: 0x03,
+  br: 0x0c,
+  brIf: 0x0d,
+  i64Load: 0x29,
+  i64Store: 0x37,
+  void: 0x40,
 };
+
+/** i64.load / i64.store with an 8-byte-aligned immediate offset (address operand is an i32 on the stack). */
+export const i64Load = (off: number) => [OP.i64Load, 3, ...uleb(off)];
+export const i64Store = (off: number) => [OP.i64Store, 3, ...uleb(off)];
 
 export const localGet = (i: number) => [OP.localGet, ...uleb(i)];
 export const localSet = (i: number) => [OP.localSet, ...uleb(i)];
@@ -98,7 +109,8 @@ export interface WasmFunc {
   body: number[]; // instructions, without the final `end`
 }
 
-export function buildModule(funcs: WasmFunc[]): Uint8Array {
+/** `memPages`: when set, the module defines one linear memory of that many 64KiB pages and exports it as "memory". */
+export function buildModule(funcs: WasmFunc[], memPages?: number): Uint8Array {
   const header = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
   if (!funcs.length) return Uint8Array.from(header);
 
@@ -124,7 +136,8 @@ export function buildModule(funcs: WasmFunc[]): Uint8Array {
     ...header,
     ...section(1, vec(types)),
     ...section(3, vec(typeIdx.map((t) => uleb(t)))),
-    ...section(7, vec(funcs.map((f, i) => [...utf8(f.name), 0x00, ...uleb(i)]))),
+    ...(memPages ? section(5, vec([[0x00, ...uleb(memPages)]])) : []),
+    ...section(7, vec([...funcs.map((f, i) => [...utf8(f.name), 0x00, ...uleb(i)]), ...(memPages ? [[...utf8('memory'), 0x02, 0x00]] : [])])),
     ...section(10, vec(code)),
   ]);
 }

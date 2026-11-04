@@ -33,7 +33,7 @@ npx tsx src/cli.ts wasm examples/invoicing [out.wasm]   # which functions compil
 - Mutation testing to measure whether the human-reviewable spec actually constrains the implementation.
 - Five surface syntaxes for the same AST, with a token comparison and a fragility experiment.
 
-## Wasm backend (pure numeric core)
+## Wasm backend (numeric core and bounded lists)
 
 `src/wasm/` hand-encodes a `.wasm` binary (no wabt) for functions that are pure and numeric. Because the interval analysis has already proved no overflow and a non-zero divisor, the emitted code is plain wrapping `i32`/`i64` arithmetic with no overflow or zero checks. `div-floor` is real floor division (Wasm `div_s` truncates, so it adds a sign-aware correction).
 
@@ -42,13 +42,23 @@ Covered:
 - Expressions: literals, variables and field reads, `let`, `do`, `if`, `match` on enums (must be exhaustive, no payload binders), `add sub mul div-floor neg min max`, binary `= < <= > >=`, `and or not`.
 - Every `Int` in a function uses the checker's derived repr (`i32` or `i64`). The checker counts parameter ranges and literals as well as arithmetic results (this was a gap the Wasm work found); the backend keeps a defensive check that widens to `i64` and reports it if the two ever disagree.
 - Direct calls between compiled functions (scalar arguments, any order of definition, no recursion). Callees are compiled first; a caller is at least as wide as its callees, and `i32`/`i64` are converted at the call boundary (narrowing is lossless because the checker has proved each argument is in the callee's parameter range). A call to a function that is not compilable makes the caller not compilable, with the callee's reason.
+- Lists (`(List T min max)` where `T` is Int, Bool, an enum, or a record of those): `len`, `sum`, `map`, `filter` and `(list a b ...)`, with the `map`/`filter` lambda inlined into a loop over memory. Lists can be let-bound and passed to other compiled functions. A list can be a parameter or an intermediate value, not a result, and not nested. See "Lists and memory" below.
 - A function compiles only if it has no `needs`, no `requires`, no checker errors, and every non-`ensures` obligation is proved.
 
-Not covered (reported as "not compilable" with the reason, never miscompiled): lists and `sum`/`map`/`filter`/`len`, strings and `text`, `Result`/`try`/`ok`/`err`, capabilities and effects, record construction or record results, calls that pass a whole record as an argument, lambdas, `bigint` repr, comparisons with more than two arguments, and `requires`. `ensures` clauses are specifications and are not emitted as runtime checks. There is no linking, memory, host ABI or optimisation.
+Not covered (reported as "not compilable" with the reason, never miscompiled): list results, nested lists, lists of strings, reading a `Str` field of a list element, strings and `text`, `Result`/`try`/`ok`/`err`, capabilities and effects, record construction or record results, calls that pass a whole record as an argument, lambdas, `bigint` repr, comparisons with more than two arguments, and `requires`. `ensures` clauses are specifications and are not emitted as runtime checks. There is no linking, host ABI or optimisation.
 
-On the invoicing example: `discount` compiles; `gross` and `price-invoice` (list parameter), `receipt` (strings) and `issue-invoice` (capabilities) do not. `test/wasm.test.ts` also compiles a numeric fixture with a price-style `mul`/`div-floor`/`match` computation.
+On the invoicing example: `discount`, `gross` and `price-invoice` compile; `receipt` (strings) and `issue-invoice` (capabilities) do not. `test/wasm.test.ts` also compiles a numeric fixture with a price-style `mul`/`div-floor`/`match` computation.
 
-Differential testing: each compilable function is run on the reference interpreter and on the Wasm module with 400 seeded, boundary-biased inputs and the results must be identical, including negative numerators and negative divisors for `div-floor`. A mutated compiler (`divMode: 'trunc'`) is shown to be caught by the same test. This checks agreement with the interpreter on sampled inputs; it is not a proof of compiler correctness.
+### Lists and memory
+
+- ABI: a list parameter is two `i32` arguments `(ptr, len)` into the exported `memory`. A function that uses lists, directly or through a callee, takes one more trailing `i32`: the start of its scratch memory. `src/wasm/abi.ts` (`lowerArgs`, `callCompiled`, `writeList`, `readList`) marshals Sigil values, checks each length against the declared `min..max`, and passes the scratch base.
+- Layout: an element is `stride` consecutive 8-byte little-endian `i64` slots, one per scalar field in declaration order (`Int` sign-extended, `Bool` 0/1, enum case index). A scalar element has stride 1. `Str` fields of a record element are not stored, so compiled code cannot read them (a read is refused). Slots are 8 bytes whatever the function's `i32`/`i64` repr, so a list can be passed between functions of different widths.
+- Memory map: inputs from address 16, each reserving its declared maximum (`max * stride * 8`), then scratch. `map`, `filter` and `list` get scratch at static offsets from the base (`map` output `max * 8`, `filter` output `max * stride * 8`), so there is no dynamic allocation and the whole need is a compile-time number: `FnReport.inputBytes` / `scratchBytes`, module `memPages`. A callee's scratch starts above everything its caller has allocated. On `gross`: 3200 bytes of input (200 lines of unit and qty), 1600 bytes of scratch, one page.
+- Limits: a function is refused if inputs plus scratch exceed 16 MiB (a list type with an absurd declared maximum), or if a list argument could be longer than the callee's declared maximum.
+- Arithmetic: loops run `len <= max` times, and the checker has already bounded `sum` (length times element range) and every lambda-body intermediate, so loop code is plain wrapping `i32`/`i64` with no overflow checks, as for scalars.
+- Trust: the compiled code assumes `min <= len <= max` and elements within their declared ranges, as it assumes scalar arguments are in range. `lowerArgs` checks lengths (not element ranges). A caller that passes a longer list through the raw exports can write past the reserved scratch (the engine's own bounds check traps only at the end of the memory).
+
+Differential testing: each compilable function is run on the reference interpreter and on the Wasm module with 400 seeded, boundary-biased inputs and the results must be identical, including negative numerators and negative divisors for `div-floor`. A mutated compiler (`divMode: 'trunc'`) is shown to be caught by the same test. This checks agreement with the interpreter on sampled inputs; it is not a proof of compiler correctness. `test/wasm-lists.test.ts` does the same for lists (`gross`, `price-invoice`, and `filter`/`len`/`sum`/`map`/`list` fixtures) with lengths from `min` to `max` (200 for invoices) and extreme element values.
 
 ## Findings
 
