@@ -102,6 +102,10 @@ export const OP = {
 export const i64Load = (off: number) => [OP.i64Load, 3, ...uleb(off)];
 export const i64Store = (off: number) => [OP.i64Store, 3, ...uleb(off)];
 
+/** i32.load / i32.store with a 4-byte-aligned immediate offset. */
+export const i32Load = (off: number) => [OP.i32Load, 2, ...uleb(off)];
+export const i32Store = (off: number) => [OP.i32Store, 2, ...uleb(off)];
+
 export const localGet = (i: number) => [OP.localGet, ...uleb(i)];
 export const localSet = (i: number) => [OP.localSet, ...uleb(i)];
 export const call = (i: number) => [OP.call, ...uleb(i)];

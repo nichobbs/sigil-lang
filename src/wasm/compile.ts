@@ -25,7 +25,7 @@ import { Expr, FnDef, Program, asDeclassify, resolveType } from '../ast.js';
 import { CAP_OPS } from '../caps.js';
 import { CheckResult, FnEvidence } from '../check.js';
 import { Repr, reprFor } from '../interval.js';
-import { I32, I64, IntOps, OP, TypeTable, ValType, WasmFunc, WasmImport, blockTypeOf, buildModule, call, i64Load, i64Store, localGet, localSet } from './encode.js';
+import { I32, I64, IntOps, OP, TypeTable, ValType, WasmFunc, WasmImport, blockTypeOf, buildModule, call, i32Load, i32Store, i64Load, i64Store, localGet, localSet } from './encode.js';
 import {
   ElemLayout, Kind, ListShape, MAX_MEMORY_BYTES, MEM_BASE, NotCompilable, SLOT, Scalar, Shape, flatLeaves, intLeaves, shapeJson, layoutOf, listsOf, magnitudes, nleaves, no, sameShape, shapeOf, showShape, wtypes,
 } from './shape.js';
@@ -66,7 +66,7 @@ export interface CompileOptions {
   /** Test hook for mutation testing the compiler itself: 'trunc' emits plain div_s (WRONG for negatives). */
   divMode?: 'floor' | 'trunc';
   /** Test hook: deliberately miscompile one construct, so the differential tests can be shown to catch it. */
-  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-handle-swapped' | 'emit-dropped';
+  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-handle-swapped' | 'emit-dropped' | 'sort-inverted' | 'sort-left-tail-dropped' | 'fold-init-dropped';
 }
 
 export interface CompileResult {
@@ -750,6 +750,13 @@ class FnGen {
         return this.genSort(e);
       case 'fold':
         return this.genFold(e);
+      case 'take':
+      case 'drop':
+        return this.genTakeDrop(e);
+      case 'at':
+        return this.genAt(e);
+      case 'append':
+        return this.genAppend(e);
       case 'len':
         return this.genLen(e);
       case 'list':
@@ -887,11 +894,187 @@ class FnGen {
         return { c: [...c, ...(this.R.vt === 'i32' ? [OP.i32WrapI64] : [])], shape: { t: 'int' } };
     }
   }
-  protected genSort(_e: Extract<Expr, { k: 'call' }>): G {
-    return no('sort (not yet supported by the Wasm backend)');
+  // --- fold, sort and the list builtins ----------------------------------------------------------
+  /** `(fold xs T init (fn (acc x) body))`: a loop whose accumulator lives in locals. */
+  protected genFold(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 4 || e.kw.length) no('fold expects (fold list Type init (fn (acc x) body))');
+    const tE = e.args[1];
+    if (tE.k !== 'var' || tE.path.length || !this.prog.types.has(tE.name)) return no('fold: the second argument must be a declared type name');
+    const src = this.listArg(e.args[0], 'fold');
+    const lam = this.lambda(e.args[3], 2, 'fold');
+    const T = shapeOf(this.prog, { k: 'named', name: tE.name }, `fold accumulator ${tE.name}`, SHAPE_OPTS);
+    if (listsOf(T).length) no('fold: the accumulator type holds a list');
+    const init = this.gen(e.args[2], T);
+    if (!sameShape(init.shape, T)) no(`fold: the initial value is ${showShape(init.shape)} but the accumulator is ${showShape(T)}`);
+    const acc = this.allocLeaves(T);
+    const i = this.alloc('i32');
+    const { binding, load } = this.bindElem(src.lv, i);
+    const body = this.withScope(
+      new Map<string, Binding>([
+        [lam.params[0], { shape: T, locals: acc }],
+        [lam.params[1], binding],
+      ]),
+      () => this.gen(lam.body, T),
+    );
+    if (!sameShape(body.shape, T)) no(`fold: the step is ${showShape(body.shape)} but the accumulator is ${showShape(T)}`);
+    return { c: [...src.c, ...(this.opts.mutation === 'fold-init-dropped' ? [...init.c, ...this.dropAll(T), ...this.zero(T)] : init.c), ...this.setAll(acc), ...this.loop(src.lv.len, i, [...load, ...body.c, ...this.setAll(acc)]), ...this.getAll(acc)], shape: T };
   }
-  protected genFold(_e: Extract<Expr, { k: 'call' }>): G {
-    return no('fold (not yet supported by the Wasm backend)');
+
+  /** `block loop { if !cond break; body; continue }` */
+  private whileLoop(cond: number[], body: number[]): number[] {
+    return [OP.block, OP.void, OP.loop, OP.void, ...cond, I32.eqz, OP.brIf, 1, ...body, OP.br, 0, OP.end, OP.end];
+  }
+  private copyElem(dst: number, src: number, stride: number): number[] {
+    const c: number[] = [];
+    for (let k = 0; k < stride; k++) c.push(...localGet(dst), ...localGet(src), ...i64Load(k * SLOT), ...i64Store(k * SLOT));
+    return c;
+  }
+
+  /**
+   * `(sort xs (fn (a b) before))`: the interpreter's stable top-down merge sort, with the same split points
+   * (left = floor(m/2)) and the same comparisons in the same order, using an explicit stack in scratch memory.
+   */
+  protected genSort(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 2 || e.kw.length) no('sort expects (sort list (fn (a b) before))');
+    const src = this.listArg(e.args[0], 'sort');
+    const lam = this.lambda(e.args[1], 2, 'sort');
+    const sk = src.lv.shape;
+    const L = sk.layout;
+    const bytes = sk.max * L.stride * SLOT;
+    const depth = Math.ceil(Math.log2(Math.max(2, sk.max))) + 2;
+    const frames = 2 * depth + 2;
+    const offA = this.allocScratch(bytes, 'sort');
+    const offB = this.allocScratch(bytes, 'sort');
+    const offS = this.allocScratch(frames * 12, 'sort');
+    const [A, B, S] = [this.alloc('i32'), this.alloc('i32'), this.alloc('i32')];
+    const n = src.lv.len;
+    const [sp, lo, hi, mid, st, i, j, k, t] = Array.from({ length: 9 }, () => this.alloc('i32'));
+    const aLV: ListLocals = { ptr: A, len: n, shape: sk };
+    const bj = this.bindElem(aLV, j); // a = r[j]
+    const bi = this.bindElem(aLV, i); // b = l[i]
+    const before = this.withScope(
+      new Map<string, Binding>([
+        [lam.params[0], bj.binding],
+        [lam.params[1], bi.binding],
+      ]),
+      () => this.gen(lam.body),
+    );
+    if (before.shape.t !== 'bool') no(`sort comparator must return Bool, got ${showShape(before.shape)}`);
+    const at = (base: number, idx: number): number[] => this.elemAddr(base, idx, L.stride);
+    const push = (a: number[], b: number[], c: number[]): number[] => {
+      const f = [...localGet(S), ...localGet(sp), ...I32.const(12n), I32.mul, I32.add];
+      return [...f, ...a, ...i32Store(0), ...f, ...b, ...i32Store(4), ...f, ...c, ...i32Store(8), ...localGet(sp), ...I32.const(1n), I32.add, ...localSet(sp)];
+    };
+    const lg = (x: number) => localGet(x);
+    const c1 = I32.const(1n);
+    const da = this.alloc('i32'); // scratch destination address
+    const sa = this.alloc('i32'); // scratch source address
+    const mergeStep = (fromLeft: boolean): number[] => {
+      // copy A[idx] -> B[k]; idx++ ; k++
+      const idx = fromLeft ? i : j;
+      return [...at(B, k), ...localSet(da), ...at(A, idx), ...localSet(sa), ...this.copyElem(da, sa, L.stride), ...lg(idx), ...c1, I32.add, ...localSet(idx), ...lg(k), ...c1, I32.add, ...localSet(k)];
+    };
+    const merge: number[] = [
+      ...lg(lo), ...lg(hi), ...lg(lo), I32.sub, ...I32.const(2n), I32.divS, I32.add, ...localSet(mid),
+      ...lg(lo), ...localSet(i), ...lg(mid), ...localSet(j), ...lg(lo), ...localSet(k),
+      ...this.whileLoop([...lg(i), ...lg(mid), I32.ltS, ...lg(j), ...lg(hi), I32.ltS, I32.and], [...bj.load, ...bi.load, ...before.c, ...(this.opts.mutation === 'sort-inverted' ? [I32.eqz] : []), OP.if, OP.void, ...mergeStep(false), OP.else, ...mergeStep(true), OP.end]),
+      ...(this.opts.mutation === 'sort-left-tail-dropped' ? [] : this.whileLoop([...lg(i), ...lg(mid), I32.ltS], mergeStep(true))),
+      ...this.whileLoop([...lg(j), ...lg(hi), I32.ltS], mergeStep(false)),
+      // copy B[lo..hi) back to A
+      ...lg(lo), ...localSet(t),
+      ...this.whileLoop([...lg(t), ...lg(hi), I32.ltS], [...at(A, t), ...localSet(da), ...at(B, t), ...localSet(sa), ...this.copyElem(da, sa, L.stride), ...lg(t), ...c1, I32.add, ...localSet(t)]),
+    ];
+    const main = this.whileLoop(
+      [...lg(sp), ...I32.const(0n), I32.ne],
+      [
+        ...lg(sp), ...c1, I32.sub, ...localSet(sp),
+        ...lg(S), ...lg(sp), ...I32.const(12n), I32.mul, I32.add, ...localSet(t),
+        ...lg(t), ...i32Load(0), ...localSet(lo), ...lg(t), ...i32Load(4), ...localSet(hi), ...lg(t), ...i32Load(8), ...localSet(st),
+        ...lg(hi), ...lg(lo), I32.sub, ...c1, I32.gtS, OP.if, OP.void,
+        ...lg(st), I32.eqz, OP.if, OP.void,
+        ...lg(lo), ...lg(hi), ...lg(lo), I32.sub, ...I32.const(2n), I32.divS, I32.add, ...localSet(mid),
+        ...push(lg(lo), lg(hi), c1), ...push(lg(mid), lg(hi), I32.const(0n)), ...push(lg(lo), lg(mid), I32.const(0n)),
+        OP.else, ...merge, OP.end,
+        OP.end,
+      ],
+    );
+    const c = [
+      ...src.c,
+      ...this.baseAddr(offA), ...localSet(A), ...this.baseAddr(offB), ...localSet(B), ...this.baseAddr(offS), ...localSet(S),
+      ...I32.const(0n), ...localSet(t),
+      ...this.whileLoop([...lg(t), ...lg(n), I32.ltS], [...at(A, t), ...localSet(da), ...at(src.lv.ptr, t), ...localSet(sa), ...this.copyElem(da, sa, L.stride), ...lg(t), ...c1, I32.add, ...localSet(t)]),
+      ...I32.const(0n), ...localSet(sp),
+      ...push(I32.const(0n), lg(n), I32.const(0n)),
+      ...main,
+      ...lg(A), ...lg(n),
+    ];
+    return { c, shape: { t: 'list', layout: L, min: sk.min, max: sk.max } };
+  }
+
+  /** take / drop: a view of the same memory, no copy. */
+  private genTakeDrop(e: Extract<Expr, { k: 'call' }>): G {
+    const take = e.fn === 'take';
+    if (e.args.length !== 2 || e.kw.length) no(`${e.fn} expects 2 arguments`);
+    const src = this.listArg(e.args[0], e.fn);
+    const R = this.R;
+    const nn = this.int(this.gen(e.args[1]), e.fn);
+    const kk = this.alloc(R.vt);
+    const k = this.alloc('i32');
+    const lenR = [...localGet(src.lv.len), ...(R.vt === 'i64' ? [OP.i64ExtendI32U] : [])];
+    // k = clamp(n, 0, len)
+    const clamp = [
+      ...nn, ...localSet(kk),
+      ...localGet(kk), ...R.const(0n), R.ltS, OP.if, 0x7f, ...I32.const(0n), OP.else,
+      ...localGet(kk), ...lenR, R.gtS, OP.if, 0x7f, ...localGet(src.lv.len), OP.else, ...localGet(kk), ...(R.vt === 'i64' ? [OP.i32WrapI64] : []), OP.end, OP.end,
+      ...localSet(k),
+    ];
+    const L = src.lv.shape.layout;
+    const out: ListShape = { t: 'list', layout: L, min: 0, max: src.lv.shape.max };
+    const c = take
+      ? [...src.c, ...clamp, ...localGet(src.lv.ptr), ...localGet(k)]
+      : [...src.c, ...clamp, ...localGet(src.lv.ptr), ...localGet(k), ...I32.const(BigInt(L.stride * SLOT)), I32.mul, I32.add, ...localGet(src.lv.len), ...localGet(k), I32.sub];
+    return { c, shape: out };
+  }
+
+  /** `(at xs i default)`: the element at a 0-based index, or the default (all three arguments are evaluated). */
+  private genAt(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 3 || e.kw.length) no('at expects 3 arguments');
+    const src = this.listArg(e.args[0], 'at');
+    const R = this.R;
+    const L = src.lv.shape.layout;
+    const idx = this.alloc(R.vt);
+    const iCode = [...this.int(this.gen(e.args[1]), 'at'), ...localSet(idx)];
+    const d = this.gen(e.args[2], L.elem);
+    if (!sameShape(d.shape, L.elem)) no(`at: the default is ${showShape(d.shape)} but the elements are ${showShape(L.elem)}`);
+    const dl = this.spill(d);
+    const lenR = [...localGet(src.lv.len), ...(R.vt === 'i64' ? [OP.i64ExtendI32U] : [])];
+    const i32i = this.alloc('i32');
+    const ea = this.alloc('i32');
+    const load: number[] = [...localGet(idx), ...(R.vt === 'i64' ? [OP.i32WrapI64] : []), ...localSet(i32i), ...this.elemAddr(src.lv.ptr, i32i, L.stride), ...localSet(ea)];
+    for (const l of L.leaves) load.push(...localGet(ea), ...i64Load(l.slot * SLOT), ...this.fromSlot(l.kind));
+    const inRange = [...localGet(idx), ...R.const(0n), R.geS, ...localGet(idx), ...lenR, R.ltS, I32.and];
+    return { c: [...src.c, ...iCode, ...dl.c, ...inRange, OP.if, ...this.bt(L.elem), ...load, OP.else, ...this.getAll(dl.locals), OP.end], shape: L.elem };
+  }
+
+  /** `(append xs x)`: a copy with the element at the end (length grows by one). */
+  private genAppend(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 2 || e.kw.length) no('append expects 2 arguments');
+    const src = this.listArg(e.args[0], 'append');
+    const L = src.lv.shape.layout;
+    const x = this.gen(e.args[1], L.elem);
+    if (!sameShape(x.shape, L.elem)) no(`append: the element is ${showShape(x.shape)} but the list holds ${showShape(L.elem)}`);
+    const xs = this.spill(x);
+    const off = this.allocScratch((src.lv.shape.max + 1) * L.stride * SLOT, 'append');
+    const [p, i, da, sa] = [this.alloc('i32'), this.alloc('i32'), this.alloc('i32'), this.alloc('i32')];
+    const copy = [...this.elemAddr(p, i, L.stride), ...localSet(da), ...this.elemAddr(src.lv.ptr, i, L.stride), ...localSet(sa), ...this.copyElem(da, sa, L.stride)];
+    const c = [
+      ...src.c, ...xs.c, ...this.baseAddr(off), ...localSet(p),
+      ...this.loop(src.lv.len, i, copy),
+      ...this.elemAddr(p, src.lv.len, L.stride), ...localSet(da),
+      ...this.storeElem(da, L, xs.locals),
+      ...localGet(p), ...localGet(src.lv.len), ...I32.const(1n), I32.add,
+    ];
+    return { c, shape: { t: 'list', layout: L, min: src.lv.shape.min + 1, max: src.lv.shape.max + 1 } };
   }
 
   // --- strings: opaque i32 handles into a host-owned table -----------------------------
