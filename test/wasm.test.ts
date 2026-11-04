@@ -75,6 +75,26 @@ const FIXTURE = `
   (out Pct)
   (match p (Free 0) (Pro 10) (Enterprise 20)))
 
+(fn quote
+  (in (p Plan) (it Item))
+  (out Cents)
+  (div-floor (mul (mul it.unit it.qty) (sub 100 (line-price-pct p))) 100))
+
+(fn chain
+  (in (a (Int -1000 1000)) (b (Int 1 7)))
+  (out (Int -1000 1001))
+  (add (floor-pos a b) 1))
+
+(fn uses-unsafe
+  (in (a (Int 0 100)))
+  (out (Int 0 100))
+  (unsafe-div a 1))
+
+(fn passes-record
+  (in (p Plan) (it Item))
+  (out Cents)
+  (line-price p it))
+
 (fn unsafe-div
   (in (a (Int 0 100)) (b (Int 0 5)))
   (out (Int 0 100))
@@ -188,7 +208,7 @@ describe('wasm backend: invoicing example', () => {
   });
 
   it('receipt (strings) and issue-invoice (capabilities) are not compilable', () => {
-    expect(rep('receipt').compilable).toBe(false);
+  const COMPILABLE = ['line-price', 'floor-pos', 'floor-neg', 'mixed', 'pred', 'tier-of', 'wide', 'calls-other', 'quote', 'chain'];
     expect(rep('receipt').reason).toMatch(/str/);
     expect(rep('issue-invoice').compilable).toBe(false);
     expect(rep('issue-invoice').reason).toMatch(/capabilit/);
@@ -235,10 +255,27 @@ describe('wasm backend: numeric fixture', () => {
   it('refuses what is outside the subset, with reasons', () => {
     expect(rep('sum-line').compilable).toBe(false);
     expect(rep('sum-line').reason).toMatch(/list/);
-    expect(rep('calls-other').compilable).toBe(false);
-    expect(rep('calls-other').reason).toMatch(/user function/);
+    expect(rep('uses-unsafe').compilable).toBe(false);
+    expect(rep('uses-unsafe').reason).toMatch(/unsafe-div.*not compilable.*not proved/);
+    expect(rep('passes-record').compilable).toBe(false);
+    expect(rep('passes-record').reason).toMatch(/record|scalar/);
     expect(rep('unsafe-div').compilable).toBe(false);
     expect(rep('unsafe-div').reason).toMatch(/not proved/);
+  });
+
+  it('calls between compiled functions, across widths, agree with the interpreter', async () => {
+    // calls-other: i32 -> i32.  quote: i64 caller of an i32 callee (arg wrapped, result extended).
+    // chain: floor division (with negative numerators) inside a caller.
+    expect(rep('calls-other').compilable).toBe(true);
+    expect(rep('calls-other').repr).toBe('i32');
+    expect(rep('quote').compilable).toBe(true);
+    expect(rep('quote').repr).toBe('i64');
+    expect(rep('chain').compilable).toBe(true);
+    const ex = await instantiate(out.bytes);
+    const q = ex['quote'] as (p: number, unit: bigint, qty: bigint) => bigint;
+    expect(q(1, 999n, 3n)).toBe(2697n); // same hand computation as line-price
+    const c = ex['chain'] as (a: number, b: number) => number;
+    expect([c(-7, 2), c(7, 2), c(-1000, 7)]).toEqual([-3, 4, -142]);
   });
 
   it('known floor-division values (negative numerators and divisors)', async () => {

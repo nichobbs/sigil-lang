@@ -81,6 +81,9 @@ export const OP = {
   localGet: 0x20,
   localSet: 0x21,
   i64ExtendI32U: 0xad,
+  i64ExtendI32S: 0xac,
+  i32WrapI64: 0xa7,
+  call: 0x10,
 };
 
 export const localGet = (i: number) => [OP.localGet, ...uleb(i)];
