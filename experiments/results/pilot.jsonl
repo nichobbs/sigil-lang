@@ -40,3 +40,11 @@
 {"task":"B3","lang":"ts","model":"sonnet","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":85945,"tools":2,"ms":35738,"failures":[]}
 {"task":"B4","lang":"sigil","model":"sonnet","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":97644,"tools":3,"ms":30938,"failures":[]}
 {"task":"B4","lang":"ts","model":"sonnet","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":85651,"tools":3,"ms":41086,"failures":[]}
+{"task":"C2","lang":"sigil","model":"sonnet","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":94813,"tools":2,"ms":28366,"failures":[]}
+{"task":"C3","lang":"sigil","model":"sonnet","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":95708,"tools":2,"ms":17119,"failures":[]}
+{"task":"C4","lang":"sigil","model":"sonnet","run":1,"passed":41,"total":41,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":96507,"tools":2,"ms":23462,"failures":[]}
+{"task":"C1","lang":"ts","model":"sonnet","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":86345,"tools":4,"ms":51477,"failures":[]}
+{"task":"C2","lang":"ts","model":"sonnet","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":85416,"tools":7,"ms":47845,"failures":[]}
+{"task":"C3","lang":"ts","model":"sonnet","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":86007,"tools":6,"ms":46742,"failures":[]}
+{"task":"C4","lang":"ts","model":"sonnet","run":1,"passed":41,"total":41,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":85295,"tools":3,"ms":44913,"failures":[]}
+{"task":"C1","lang":"sigil","model":"sonnet","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":106784,"tools":3,"ms":92458,"failures":[]}

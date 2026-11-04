@@ -1,0 +1,74 @@
+; B1 document service: reference implementation (Sigil).
+
+(type Id      (Int 0 9007199254740991))
+(type Size    (Int 0 1000000))
+(type Role    (var Viewer Editor Admin))
+(type Status  (var Draft Published Deleted))
+(type Op      (var Update Delete Publish))
+(type DocError (var NotAllowed Gone TooLong AlreadyPublished EmptyBody StoreFailed))
+
+(type Actor   (rec (id Id) (role Role)))
+(type Doc     (rec (id Id) (owner Id) (title Str :pii) (size Size) (status Status)))
+(type Request (rec (op Op) (title Str :pii) (size Size)))
+(type Receipt (rec (doc Id) (status Status) (size Size)))
+(type Applied (rec (actor Id) (doc Id) (op Op)))
+(type Refused (rec (actor Id) (doc Id) (op Op) (reason DocError)))
+
+(fn authorised
+  (in (a Actor) (d Doc) (op Op))
+  (out Bool)
+  (match a.role
+    (Viewer false)
+    (Editor (and (= a.id d.owner) (not (= op Publish))))
+    (Admin true)))
+
+(fn check
+  (in (a Actor) (d Doc) (r Request))
+  (out (Result Bool DocError))
+  (if (not (authorised a d r.op))
+    (err NotAllowed)
+    (if (= d.status Deleted)
+      (err Gone)
+      (match r.op
+        (Update (if (> r.size 50000) (err TooLong) (ok true)))
+        (Delete (ok true))
+        (Publish (if (= d.status Published)
+                   (err AlreadyPublished)
+                   (if (= d.size 0) (err EmptyBody) (ok true))))))))
+
+(fn apply
+  (in (d Doc) (r Request))
+  (out Doc)
+  (match r.op
+    (Update (Doc d.id d.owner r.title r.size d.status))
+    (Delete (Doc d.id d.owner d.title d.size Deleted))
+    (Publish (Doc d.id d.owner d.title d.size Published))))
+
+(fn handle-request
+  (in (actor Actor) (doc Doc) (req Request))
+  (out (Result Receipt DocError))
+  (needs store:docs audit)
+  (match (check actor doc req)
+    (err e (do (emit audit (Refused actor.id doc.id req.op e))
+               (err e)))
+    (ok _ (let [nd (apply doc req)]
+            (try (put store:docs doc.id nd) :on-err StoreFailed)
+            (emit audit (Applied actor.id doc.id req.op))
+            (ok (Receipt nd.id nd.status nd.size))))))
+
+(program docs
+  (targets server browser)
+  (entry handle-request
+    (bind store:docs (store (ns "docs/docs") (mode append)))
+    (bind audit      (audit))))
+
+; View model for the UI: what this actor may do with this document. Pure; the renderer is trusted shell code.
+(type View (rec (id Id) (title Str :pii) (size Size) (status Status) (can-update Bool) (can-delete Bool) (can-publish Bool)))
+
+(fn doc-view
+  (in (a Actor) (d Doc))
+  (out View)
+  (View d.id d.title d.size d.status
+        (and (authorised a d Update) (not (= d.status Deleted)))
+        (and (authorised a d Delete) (not (= d.status Deleted)))
+        (and (authorised a d Publish) (not (= d.status Deleted)) (not (= d.status Published)) (> d.size 0))))
