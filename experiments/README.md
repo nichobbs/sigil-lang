@@ -254,3 +254,11 @@ E2 is B3 (audited refund) plus ticket PAY-310, which touches several functions a
 - Sigil costs about 15% more tokens per change run (the language spec is in every brief), as in earlier rounds.
 - None of the runs wrote tests of their own beyond the provided scenarios; the Sigil runs relied on `verify --fast` and the updated properties, the TS runs on the 12 scenario tests.
 - Conclusion so far for change tasks (E1 and E2): no correctness difference at this program size; the remaining Sigil case rests on adversarial and untrusted-agent settings, not on change safety.
+
+### Correction: solution size with the TS tests counted (2026-11-05)
+
+The size figures above (Sigil about 1.36x TS) counted only `solution.ts` and `app.sigil`. In Sigil the ranges, flow labels, scenarios and properties are part of the language and checker, whereas the TS arm needs tests to reach a comparable level of assurance, so `solution-size.ts` now also reports the TS delivery including the tests the TS agents wrote themselves (`*.test.ts`, excluding the harness-provided `scenarios.*`).
+
+Geometric mean Sigil/TS size over the 10 tasks (o200k_base tokens, scored m1 runs): 1.36 code only, **0.42 with the TS agents' own tests** (Sonnet 1.47 to 0.66, Haiku 1.27 to 0.35). Per task the ratio with tests ranges from 0.22 to 1.20 (only C2 is above 1).
+
+Caveats: the agent-written tests are uneven (Haiku wrote much more than Sonnet) and are not verified to enforce everything the Sigil checker enforces, so 0.42 is more likely an overstatement of Sigil's advantage than an exact figure; the true like-for-like number needs a fixed minimum test set (for instance the harness scenarios, about 2.8-3.0k tokens on E1/E2 as generated JSON plus a runner, which is verbose and not representative of hand-written tests). The whole-run token totals in the E1 and E2 tables (Sigil about 15% more) are dominated by the language spec in the brief and exclude all of this; they measure the cost of producing the program, not the size of what is delivered. Both views should be read together.
