@@ -1,0 +1,81 @@
+; A2 ledger postings: reference implementation (Sigil).
+
+(type Cents      (Int 0 1000000000000))
+(type Balance    (Int -50000 1000000000000))
+(type Amount     (Int 1 100000000))
+(type AcctId     (Int 0 9007199254740991))
+(type AcctKind   (var Checking Savings))
+(type AcctStatus (var Open Frozen))
+(type PostingKind (var Credit Debit Fee))
+(type PostingError (var AcctFrozen Insufficient OverLimit StoreFailed))
+
+(type Account (rec (id AcctId) (kind AcctKind) (status AcctStatus) (balance Balance :internal) (spent Cents :internal)))
+(type Posting (rec (kind PostingKind) (amount Amount)))
+(type Receipt (rec (acct AcctId) (balance Balance :internal)))
+(type PostingApplied  (rec (acct AcctId) (kind PostingKind) (amount Amount) (balance Balance :internal)))
+(type PostingRejected (rec (acct AcctId) (reason PostingError)))
+
+(fn overdraft-limit
+  (in (k AcctKind))
+  (out (Int 0 50000))
+  (match k (Checking 50000) (Savings 0)))
+
+(fn is-frozen
+  (in (a Account))
+  (out Bool)
+  (= a.status Frozen))
+
+(fn over-limit
+  (in (a Account) (p Posting))
+  (out Bool)
+  (> (add a.spent p.amount) 200000))
+
+(fn would-overdraw
+  (in (a Account) (p Posting))
+  (out Bool)
+  (< (sub a.balance p.amount) (neg (overdraft-limit a.kind))))
+
+(fn reject
+  (in (a Account) (why PostingError))
+  (out (Result Receipt PostingError))
+  (needs audit)
+  (do (emit audit (PostingRejected a.id why))
+      (err why)))
+
+(fn accept
+  (in (a Account) (p Posting) (nb Balance) (ns Cents))
+  (out (Result Receipt PostingError))
+  (needs store:ledger audit)
+  (let [n (Account a.id a.kind a.status nb ns)]
+    (try (put store:ledger a.id n) :on-err StoreFailed)
+    (emit audit (PostingApplied a.id p.kind p.amount nb))
+    (ok (Receipt a.id nb))))
+
+(fn apply-posting
+  (in (acct Account) (posting Posting))
+  (out (Result Receipt PostingError))
+  (needs store:ledger audit)
+  (match posting.kind
+    (Credit (accept acct posting (min 1000000000000 (add acct.balance posting.amount)) acct.spent))
+    (Debit
+      (if (is-frozen acct)
+        (reject acct AcctFrozen)
+        (if (over-limit acct posting)
+          (reject acct OverLimit)
+          (if (would-overdraw acct posting)
+            (reject acct Insufficient)
+            (accept acct posting
+                    (max -50000 (sub acct.balance posting.amount))
+                    (min 1000000000000 (add acct.spent posting.amount)))))))
+    (Fee
+      (if (is-frozen acct)
+        (reject acct AcctFrozen)
+        (if (would-overdraw acct posting)
+          (reject acct Insufficient)
+          (accept acct posting (max -50000 (sub acct.balance posting.amount)) acct.spent))))))
+
+(program ledger
+  (targets server browser)
+  (entry apply-posting
+    (bind store:ledger (store (ns "ledger/accounts") (mode append)))
+    (bind audit        (audit))))
