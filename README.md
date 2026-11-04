@@ -2,7 +2,7 @@
 
 A prototype of a programming language intended for AI agents only: token-efficient to produce, secure by construction, verifiable, explainable, and reviewable without a human reading the source. Humans review a readable intent layer (scenarios, glossary, policy), not code.
 
-This repo is a feasibility prototype in TypeScript, not a compiler. There is no Wasm backend.
+This repo is a feasibility prototype in TypeScript, not a full compiler. The only code generation is a narrow Wasm backend for the pure numeric core (see below).
 
 ## Layers
 
@@ -16,10 +16,11 @@ This repo is a feasibility prototype in TypeScript, not a compiler. There is no 
 
 ```
 npm install
-npm test                 # vitest, 48 tests
+npm test                 # vitest
 npm run check            # interval analysis, capabilities, information flow
 npm run verify           # check + scenarios + properties + privacy + mutation adequacy
 npm run compare          # syntax token comparison + single-token-deletion fragility
+npx tsx src/cli.ts wasm examples/invoicing [out.wasm]   # which functions compile to Wasm, and why not
 ```
 
 ## What is implemented
@@ -31,6 +32,22 @@ npm run compare          # syntax token comparison + single-token-deletion fragi
 - Scenario compiler: Gherkin-style feature files bound to actions through a glossary; decision-table exhaustiveness; property tests; privacy scenarios (static flow matrix plus dynamic two-run noninterference with a vacuity check); open questions surfaced to humans.
 - Mutation testing to measure whether the human-reviewable spec actually constrains the implementation.
 - Five surface syntaxes for the same AST, with a token comparison and a fragility experiment.
+
+## Wasm backend (pure numeric core)
+
+`src/wasm/` hand-encodes a `.wasm` binary (no wabt) for functions that are pure and numeric. Because the interval analysis has already proved no overflow and a non-zero divisor, the emitted code is plain wrapping `i32`/`i64` arithmetic with no overflow or zero checks. `div-floor` is real floor division (Wasm `div_s` truncates, so it adds a sign-aware correction).
+
+Covered:
+- Parameters of ranged `Int`, `Bool`, enums (as an `i32` index) and records of those (flattened to one scalar parameter per field). Results: `Int`, `Bool`, enum.
+- Expressions: literals, variables and field reads, `let`, `do`, `if`, `match` on enums (must be exhaustive, no payload binders), `add sub mul div-floor neg min max`, binary `= < <= > >=`, `and or not`.
+- Every `Int` in a function uses the checker's derived repr (`i32` or `i64`). The checker only tracks arithmetic results, not parameters or literals, so the backend widens to `i64` when a parameter range or literal needs it and records that in the report.
+- A function compiles only if it has no `needs`, no `requires`, no checker errors, and every non-`ensures` obligation is proved.
+
+Not covered (reported as "not compilable" with the reason, never miscompiled): lists and `sum`/`map`/`filter`/`len`, strings and `text`, `Result`/`try`/`ok`/`err`, capabilities and effects, record construction or record results, calls between functions, lambdas, `bigint` repr, comparisons with more than two arguments, and `requires`. `ensures` clauses are specifications and are not emitted as runtime checks. There is no linking, memory, host ABI or optimisation.
+
+On the invoicing example: `discount` compiles; `gross` and `price-invoice` (list parameter), `receipt` (strings) and `issue-invoice` (capabilities) do not. `test/wasm.test.ts` also compiles a numeric fixture with a price-style `mul`/`div-floor`/`match` computation.
+
+Differential testing: each compilable function is run on the reference interpreter and on the Wasm module with 400 seeded, boundary-biased inputs and the results must be identical, including negative numerators and negative divisors for `div-floor`. A mutated compiler (`divMode: 'trunc'`) is shown to be caught by the same test. This checks agreement with the interpreter on sampled inputs; it is not a proof of compiler correctness.
 
 ## Findings
 
@@ -52,7 +69,7 @@ npm run compare          # syntax token comparison + single-token-deletion fragi
 
 ## Not implemented
 
-Relational proofs through lists (no model of `sum`/`map`/`filter`), recursion and folds, declassifiers, covert-channel analysis (timing, size), capability-row inference, Wasm codegen, proof that a validator's `Ok` implies its predicate, and anything about an OS (deferred).
+Relational proofs through lists (no model of `sum`/`map`/`filter`), recursion and folds, declassifiers, covert-channel analysis (timing, size), capability-row inference, Wasm codegen beyond the numeric core, proof that a validator's `Ok` implies its predicate, and anything about an OS (deferred).
 
 ## Layout
 

@@ -3,7 +3,8 @@
 // sigil verify  <dir>   check + scenarios + properties + privacy + mutation adequacy
 // sigil compare <dir>   token-cost comparison of alternative surface syntaxes
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { compileProgram } from './wasm/compile.js';
 import { join } from 'node:path';
 import { CheckResult, check, errors } from './check.js';
 import { runMutation } from './mutate.js';
@@ -87,7 +88,7 @@ async function openEnsures(prog: Program, res: CheckResult): Promise<SmtResult[]
 }
 
 async function main() {
-  const [cmd, dir = 'examples/invoicing'] = process.argv.slice(2);
+  const [cmd, dir = 'examples/invoicing', outFile] = process.argv.slice(2);
   try {
     switch (cmd) {
       case 'check': {
@@ -138,8 +139,23 @@ async function main() {
         console.log(formatFragility(fragilityExperiment(prog, pol)));
         break;
       }
+      case 'wasm': {
+        const { prog, pol } = load(dir);
+        const res = check(prog, pol);
+        const out = compileProgram(prog, res);
+        hr('Wasm backend (pure numeric core)');
+        for (const f of out.fns) {
+          if (f.compilable) console.log(`COMPILED      ${pad(f.name, 16)} ${f.repr}${f.widenedFromChecker ? `  (${f.widenedFromChecker})` : ''}`);
+          else console.log(`NOT COMPILABLE ${pad(f.name, 15)} ${f.reason}`);
+        }
+        if (outFile) {
+          writeFileSync(outFile, out.bytes);
+          console.log(`\nwrote ${out.bytes.length} bytes to ${outFile}`);
+        }
+        break;
+      }
       default:
-        console.log('usage: sigil <check|verify|compare> <example-dir>');
+        console.log('usage: sigil <check|verify|compare|wasm> <example-dir> [out.wasm]');
         process.exit(2);
     }
   } catch (e) {
