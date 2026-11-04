@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest';
+import { check, errors } from '../src/check.js';
+import { Host, Interp } from '../src/interp.js';
+import { parsePolicy, parseProgram } from '../src/parse.js';
+
+const POLICY = '(policy)';
+const run = (app: string) => check(parseProgram(app), parsePolicy(POLICY));
+const TYPES = `
+(type Cents (Int 0 1000000000000000))
+(type Qty   (Int 0 1000))
+`;
+
+describe('fold: bounded iteration with a declared accumulator type', () => {
+  const OK = `${TYPES}
+(fn total (in (xs (List Qty 0 50))) (out Cents)
+  (fold xs Cents 0 (fn (acc x) (add acc x))))`;
+
+  it('proves the accumulator stays in its declared type when the body provably preserves it', () => {
+    const bad = `${TYPES}
+(fn total (in (xs (List Qty 0 50))) (out Cents)
+  (fold xs Cents 0 (fn (acc x) (min (add acc x) 1000000000000000))))`;
+    expect(errors(run(bad))).toEqual([]);
+    const ob = run(bad).evidence.get('total')!.obligations.filter((o) => o.desc.includes('fold'));
+    expect(ob.length).toBe(2);
+    expect(ob.every((o) => o.status === 'proved')).toBe(true);
+  });
+
+  it('flags an unclamped step as unproved (the invariant is not inductive)', () => {
+    const ob = run(OK).evidence.get('total')!.obligations.find((o) => o.desc.includes('fold step'))!;
+    expect(ob.status).toBe('unproved');
+  });
+
+  it('rejects an unknown accumulator type and a one-parameter lambda', () => {
+    expect(errors(run(`${TYPES}(fn f (in (xs (List Qty 0 5))) (out Cents) (fold xs Nope 0 (fn (acc x) acc)))`)).map((d) => d.code)).toContain('E-type');
+    expect(errors(run(`${TYPES}(fn f (in (xs (List Qty 0 5))) (out Cents) (fold xs Cents 0 (fn (x) x)))`)).map((d) => d.code)).toContain('E-lambda');
+  });
+
+  it('runs: sums, handles the empty list and enforces the type on each step at run time', () => {
+    const prog = parseProgram(OK);
+    const it = new Interp(prog, new Host(1));
+    expect(it.callFn('total', [[1n, 2n, 3n]])).toBe(6n);
+    expect(it.callFn('total', [[]])).toBe(0n);
+    const bad = parseProgram(`${TYPES}(fn f (in (xs (List Qty 0 5))) (out Cents) (fold xs Cents 0 (fn (acc x) (sub acc x))))`);
+    expect(() => new Interp(bad, new Host(1)).callFn('f', [[1n]])).toThrow(/fold step 0/);
+  });
+
+  it('carries records as accumulator state (running totals with a counter)', () => {
+    const app = `${TYPES}
+(type Acc (rec (sum Cents) (n Qty)))
+(fn stats (in (xs (List Qty 0 50))) (out Acc)
+  (fold xs Acc (Acc 0 0)
+    (fn (a x) (Acc (min (add a.sum x) 1000000000000000) (min (add a.n 1) 1000)))))`;
+    expect(errors(run(app))).toEqual([]);
+    const it = new Interp(parseProgram(app), new Host(1));
+    const out = it.callFn('stats', [[5n, 7n]]) as { fields: Record<string, bigint> };
+    expect(out.fields).toEqual({ sum: 12n, n: 2n });
+  });
+
+  it('propagates labels from the list into the result (a secret folded into a public field is E-flow)', () => {
+    const base = `${TYPES}
+(type Row (rec (secret Qty :secret) (v Qty)))
+(type Out (rec (q Qty)))`;
+    const leak = run(`${base}
+(fn f (in (rs (List Row 0 5))) (out Out) (Out (fold rs Qty 0 (fn (acc r) (min (add acc r.secret) 1000)))))`);
+    expect(errors(leak).map((d) => d.code)).toContain('E-flow');
+    const fine = run(`${base}
+(fn f (in (rs (List Row 0 5))) (out Out) (Out (fold rs Qty 0 (fn (acc r) (min (add acc r.v) 1000)))))`);
+    expect(errors(fine)).toEqual([]);
+  });
+});

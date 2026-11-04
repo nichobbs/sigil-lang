@@ -393,6 +393,26 @@ export class Interp {
       };
       return name === 'map' ? xs.map(run) : xs.filter((x) => run(x) === true);
     }
+    if (name === 'fold') {
+      // (fold xs T init (fn (acc x) body)): T is the accumulator's declared type, checked on every step.
+      const [xsE, tE, initE, fE] = e.args;
+      if (e.args.length !== 4 || tE.k !== 'var' || !this.prog.types.has(tE.name)) throw new RuntimeFault('fold: expected (fold list Type init (fn (acc x) body))');
+      const xs = this.eval(xsE, env);
+      if (!Array.isArray(xs)) throw new RuntimeFault('fold: expected a list');
+      const c = this.lambda(fE, env);
+      if (c.params.length !== 2) throw new RuntimeFault('fold: lambda needs two parameters (acc x)');
+      const T: Type = { k: 'named', name: tE.name };
+      let acc = this.eval(initE, env);
+      this.checkType(acc, T, 'fold initial value');
+      xs.forEach((x, i) => {
+        const env2 = new Map(c.env);
+        env2.set(c.params[0], acc);
+        env2.set(c.params[1], x);
+        acc = this.eval(c.body, env2);
+        this.checkType(acc, T, `fold step ${i}`);
+      });
+      return acc;
+    }
     // short-circuit logic
     if (name === 'and') {
       for (const a of e.args) if (this.eval(a, env) !== true) return false;

@@ -55,7 +55,7 @@ Clauses in order: `in`, `out`, then optional `needs`, `declassifies`, `requires`
 | `(do e1 e2)` | evaluate in order, value of last |
 | `(if c a b)` | `c` must be Bool; both branches required |
 | `(match e (Case body)... )` | on an enum: one arm per case. On a Result: `(ok v body)` and `(err e body)`, both required. Binder is optional for enum arms |
-| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map` or `filter` |
+| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map` or `filter`. `fold` takes a two-parameter lambda `(fn (acc x) body)` |
 | `(try e :on-err Case)` | `e` is a Result: Ok gives its value, Err returns `(err Case)` from the whole function (function must return a Result with enum Err containing `Case`) |
 | `(ok e)` `(err e)` | build a Result |
 
@@ -69,6 +69,7 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | `sum` | 1 list of Int | Int |
 | `len` | 1 list | Int |
 | `map` `filter` | list, lambda | list (`filter` length becomes 0..max) |
+| `fold` | list, Type, init, `(fn (acc x) body)` | a value of Type. Loops over the list in order; `Type` (a declared type name, e.g. `Cents` or a record) is the accumulator's invariant: `init` and every step result must fit it (checked as obligations and at run time), and inside the body `acc` is assumed to be any value of Type. Clamp with `min`/`max` so each step provably fits. Not yet compiled to Wasm |
 | `list` | n | list of exactly n elements |
 | `=` | 2 | Bool, structural equality on any values |
 | `< <= > >=` | 2 or more | Bool, chained: `(<= 0 x 100)` |
@@ -96,7 +97,7 @@ Ranges are interval-based and path-insensitive: `if` conditions do not narrow ra
 (fn clamp-sub (in (a Cents) (b Cents)) (out Cents) (max 0 (sub a b)))
 ```
 
-Patterns. There is no mutable state: pass state in as parameters and return updated values by building a new record. Authorization is a `match` on a role enum returning `Err`. Counting and totalling use `filter`, `map`, `len`, `sum`.
+Patterns. There is no mutable state: pass state in as parameters and return updated values by building a new record. Authorization is a `match` on a role enum returning `Err`. Counting and totalling use `filter`, `map`, `len`, `sum`; anything stateful across a list (running totals, caps on a running balance, first match) uses `fold`, with a record type as the accumulator when you need several values: `(fold xs Acc (Acc 0 0) (fn (a x) (Acc (min (add a.sum x) 1000000000000000) (min (add a.n 1) 1000))))`.
 
 ```sigil
 (type Role (var Admin Member))

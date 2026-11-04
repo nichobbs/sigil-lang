@@ -621,7 +621,7 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   };
   const labOf = (xs: AV[]) => L.joinAll(xs.map(flatten));
   // Evaluate arguments first so one arity slip does not hide every other mistake in the call.
-  const higherOrder = name === 'map' || name === 'filter';
+  const higherOrder = name === 'map' || name === 'filter' || name === 'fold';
   const xs: AV[] = higherOrder ? [] : e.args.map((a) => evalExpr(a, env, ctx));
 
   switch (name) {
@@ -696,6 +696,38 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       if (name === 'map') return mk({ len: l.len, elem: r, lab: l.lab });
       const hi = l.len === undefined || l.len === 'top' ? I.TOP : I.range(0n, l.len.hi);
       return mk({ len: hi, elem: l.elem, lab: L.join(l.lab, flatten(r)) });
+    }
+    case 'fold': {
+      // (fold xs T init (fn (acc x) body)): T is the loop invariant. The initial value and every step result must
+      // fit T (obligations); inside the body acc is assumed to be any value of T. The result is any value of T.
+      if (!ar(4)) return topAV();
+      const [xsE, tE, initE, f] = e.args;
+      if (tE.k !== 'var' || tE.path.length || !ctx.prog.types.has(tE.name)) {
+        diag(ctx, 'error', 'E-type', `fold: second argument must be the name of a declared type for the accumulator, in ${printExpr(e)}`);
+        return topAV();
+      }
+      if (f.k !== 'lam' || f.params.length !== 2) {
+        diag(ctx, 'error', 'E-lambda', 'fold needs a two-parameter lambda (fn (acc x) body) as fourth argument');
+        return topAV();
+      }
+      const l = evalExpr(xsE, env, ctx);
+      const init = evalExpr(initE, env, ctx);
+      const T: Type = { k: 'named', name: tE.name };
+      conforms(ctx, init, T, `fold initial value (${tE.name})`);
+      const base = absOfType(ctx.prog, T, tE.name, 'fold accumulator');
+      let lab = L.join(flatten(init), l.lab);
+      const step = (c: Ctx): AV => {
+        const env2 = new Map(env);
+        env2.set(f.params[0], mapLabels(base, (x) => L.join(x, lab)));
+        env2.set(f.params[1], l.elem ?? topAV());
+        return evalExpr(f.body, env2, c);
+      };
+      const quiet = { ...ctx, report: false };
+      for (let i = 0; i < 2; i++) lab = L.join(lab, flatten(step(quiet))); // labels only join, so two passes reach the fixpoint
+      const r = step(ctx);
+      conforms(ctx, r, T, `fold step result (${tE.name})`);
+      const lab2 = L.join(lab, flatten(r));
+      return mapLabels(base, (x) => L.join(x, lab2));
     }
     case 'text':
       return mk({ lab: labOf(xs) });
