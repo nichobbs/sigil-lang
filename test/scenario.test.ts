@@ -25,7 +25,10 @@ describe('feature parser', () => {
     expect(f.examples[0].steps.map((s) => s.kind)).toEqual(['given', 'given', 'when', 'then']);
     expect(f.always[0].text).toBe('The price is never negative and never more than the undiscounted total.');
     expect(f.privacy[0].text).toContain('Changing it must not change anything sent anywhere else.');
-    expect(f.unresolved[0].text).toContain('audit event');
+    expect(f.unresolved).toHaveLength(0); // every open question has been answered
+    // the Unresolved form still parses
+    const g = parseFeature(`Feature: X\n\n  Unresolved: Is this a question?\n              Yes it is.\n`);
+    expect(g.unresolved[0].text).toContain('Is this a question?');
   });
 });
 
@@ -35,8 +38,8 @@ describe('suite on the invoicing example', () => {
     for (const r of out.results) expect(r, `${r.kind}: ${r.title}`).toMatchObject({ status: 'pass' });
     expect(out.results.map((r) => r.kind).sort()).toEqual(['always', ...Array(7).fill('example'), 'privacy', 'rule']);
   });
-  it('surfaces the spec gap as an unresolved question rather than guessing', () => {
-    expect(out.unresolved).toHaveLength(1);
+  it('has no open questions left once all have been answered', () => {
+    expect(out.unresolved).toHaveLength(0);
   });
   it('turns the unproved interval obligation into tested evidence', () => {
     expect(out.ensuresStats.get('price-invoice#0')).toBeGreaterThan(500);
@@ -55,7 +58,13 @@ describe('closed spec gaps are pinned by scenarios', () => {
     expect(r.message).toContain('the email body is');
   });
   it('a missing audit emit fails the audit example', () => {
-    const r = failing(APP.replace('    (emit audit (Issued inv.id))\n', ''), 'Issuing an invoice records an audit event');
+    const r = failing(APP.replace('(ok r (do (emit audit (Issued inv.id))\n                (ok inv)))', '(ok r (ok inv))'), 'Issuing an invoice records an audit event');
+    expect(r.status).toBe('fail');
+  });
+  it('a missing audit event on mail failure fails its example', () => {
+    const src = APP.replace('(err e (do (emit audit (ReceiptFailed inv.id))\n                 (err MailFailed)))', '(err e (err MailFailed))');
+    expect(src).not.toBe(APP);
+    const r = failing(src, 'If the email fails the invoice is kept and the failure is reported');
     expect(r.status).toBe('fail');
   });
 });
