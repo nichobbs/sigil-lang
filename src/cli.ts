@@ -220,11 +220,13 @@ async function main() {
         const { prog, pol } = load(dir);
         const res = check(prog, pol);
         const out = compileProgram(prog, res);
-        hr('Wasm backend (pure numeric core)');
+        hr('Wasm backend');
         for (const f of out.fns) {
-          if (f.compilable) console.log(`COMPILED      ${pad(f.name, 16)} ${f.repr}${f.hasBase ? `  [memory: ${f.inputBytes}B input + ${f.scratchBytes}B scratch]` : ''}${f.widenedFromChecker ? `  (${f.widenedFromChecker})` : ''}`);
+          if (f.compilable) console.log(`COMPILED      ${pad(f.name, 16)} ${f.repr}${f.entry ? '  [program entry]' : ''}${f.needs ? `  [needs ${f.needs.join(' ')}]` : ''}${f.hasBase ? `  [memory: ${f.inputBytes}B input + ${f.scratchBytes}B scratch]` : ''}${f.widenedFromChecker ? `  (${f.widenedFromChecker})` : ''}`);
           else console.log(`NOT COMPILABLE ${pad(f.name, 15)} ${f.reason}`);
         }
+        const nOk = out.fns.filter((f) => f.compilable).length;
+        console.log(`\n${nOk}/${out.fns.length} functions, ${out.entries.length}/${new Set(prog.entries).size} program entries compile; ${out.abi.effects.length} host effect import(s), ${out.abi.strings.length} string literal(s)`);
         if (outFile) {
           writeFileSync(outFile, out.bytes);
           console.log(`\nwrote ${out.bytes.length} bytes to ${outFile}`);

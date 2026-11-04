@@ -2,7 +2,7 @@
 
 A prototype of a programming language intended for AI agents only: token-efficient to produce, secure by construction, verifiable, explainable, and reviewable without a human reading the source. Humans review a readable intent layer (scenarios, glossary, policy), not code.
 
-This repo is a feasibility prototype in TypeScript, not a full compiler. The only code generation is a narrow Wasm backend for the pure numeric core (see below).
+This repo is a feasibility prototype in TypeScript, not a full compiler. The only code generation is a Wasm backend (see below) that now compiles whole reference-app entry points as well as numeric helpers.
 
 Terms such as mutant, survivor, trap and hidden case are defined in `docs/GLOSSARY.md`.
 
@@ -36,7 +36,7 @@ npx tsx src/cli.ts wasm examples/invoicing [out.wasm]   # which functions compil
 - Mutation testing to measure whether the human-reviewable spec actually constrains the implementation.
 - Five surface syntaxes for the same AST, with a token comparison and a fragility experiment.
 
-## Wasm backend (numeric core and bounded lists)
+## Wasm backend (numeric core, lists, records, Results, strings, effects, entry points)
 
 `src/wasm/` hand-encodes a `.wasm` binary (no wabt) for functions that are pure and numeric. Because the interval analysis has already proved no overflow and a non-zero divisor, the emitted code is plain wrapping `i32`/`i64` arithmetic with no overflow or zero checks. `div-floor` is real floor division (Wasm `div_s` truncates, so it adds a sign-aware correction).
 
@@ -51,6 +51,8 @@ Covered:
 Not covered (reported as "not compilable" with the reason, never miscompiled): list results, nested lists, lists of strings, reading a `Str` field of a list element, strings and `text`, `Result`/`try`/`ok`/`err`, capabilities and effects, record construction or record results, calls that pass a whole record as an argument, lambdas, `bigint` repr, comparisons with more than two arguments, and `requires`. `ensures` clauses are specifications and are not emitted as runtime checks. There is no linking, host ABI or optimisation.
 
 On the invoicing example: `discount`, `gross` and `price-invoice` compile; `receipt` (strings) and `issue-invoice` (capabilities) do not. `test/wasm.test.ts` also compiles a numeric fixture with a price-style `mul`/`div-floor`/`match` computation.
+
+Language-gap work (branch `wasm/language-gaps`): records and Results are flattened to multi-value leaves; `Str` values are opaque i32 handles resolved by host imports (`str_eq`, `str_concat`, `str_int`, `str_money`, `str_chars`, `str_from_chars`); capability calls (`needs`) are imported host functions (`put$k`, `post$k`, `emit$k`, `fresh$k`) with the ABI documented in `src/wasm/abi.ts` and a `sigil.abi` custom section, and `src/wasm/host.ts` adapts them onto the interpreter `Host`; program entry points are exported; `fold`, `sort` (the interpreter's stable top-down merge sort, same split points and comparison direction), `take`, `drop`, `at` and `append` compile too. `npx tsx experiments/wasm-coverage.ts` prints per-task function and entry-point counts (`--reasons` lists refusals). Still refused with a reason: functions with `requires`, `get`, `=` on lists, `text` of non-scalars, `chars` without `:max`, Results whose type cannot be inferred from context, nested lists, and anything the checker does not prove.
 
 ### Lists and memory
 

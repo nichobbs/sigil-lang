@@ -56,6 +56,12 @@ export function showVal(v: Val): string {
   }
 }
 
+/** `(money cents)`: "$12.34" (shared with the Wasm host adapter so both render identically). */
+export function moneyStr(c: bigint): string {
+  const abs = c < 0n ? -c : c;
+  return `${c < 0n ? '-' : ''}$${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`;
+}
+
 export function eqVal(a: Val, b: Val): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -509,11 +515,8 @@ export class Interp {
       }
       case 'text':
         return a.map((x) => (typeof x === 'string' ? x : showVal(x))).join('');
-      case 'money': {
-        const c = this.num(a[0], 'money');
-        const abs = c < 0n ? -c : c;
-        return `${c < 0n ? '-' : ''}$${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`;
-      }
+      case 'money':
+        return moneyStr(this.num(a[0], 'money'));
       case 'list':
         return a;
       case '=':

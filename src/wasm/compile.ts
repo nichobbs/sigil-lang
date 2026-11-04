@@ -1,51 +1,48 @@
-// Wasm backend for the pure numeric core of Sigil.
+// Wasm backend for Sigil.
 //
-// Lists: a list parameter is passed as (ptr, len) into an exported linear memory; elements are
-// fixed-stride arrays of 8-byte slots (one per scalar field). len, sum, map, filter and `list` compile to
-// loops over memory with the lambda inlined. Scratch memory is laid out statically from the list types'
-// declared maximum lengths (no dynamic allocation).
+// Values are flattened into Wasm "leaves" (see shape.ts): scalars are one leaf, records are the concatenation of their
+// fields, a Result is a tag leaf plus the leaves of both payloads, a list is a (ptr, len) pair into linear memory.
+// Functions take their parameters' leaves and return their result's leaves with multi-value returns.
+//
+// Lists: elements are fixed-stride arrays of 8-byte slots (one per scalar leaf). len, sum, map, filter and `list`
+// compile to loops over memory with the lambda inlined. Scratch memory is laid out statically from the list types'
+// declared maximum lengths (no dynamic allocation); a list returned from a function lives in the callee's scratch,
+// which the caller then reserves.
 //
 // Scope (everything else is reported "not compilable" with a reason, never miscompiled):
-//   params   : ranged Int, Bool, enum, and records of those (flattened to scalar params)
-//   result   : ranged Int, Bool, enum
-//   body     : int/bool literals, variables and field reads, let/do, if, match on enums,
-//              add sub mul div-floor neg min max, = < <= > >=, and or not
-//   function must have: no `needs`, no `requires`, no checker errors, every non-`ensures`
-//   obligation proved by the interval analysis (so overflow and zero-divisor are excluded).
+//   types    : ranged Int, Bool, enum, Unit, records, Result, lists of scalars/records (no nested lists)
+//   body     : literals, variables and field reads, let/do, if, match on enums and Results, `try ... :on-err`,
+//              record construction, (ok e) (err e), calls to compiled functions, map filter sum len list,
+//              add sub mul div-floor neg min max, = < <= > >=, and or not (short-circuit, as in the interpreter)
+//   function must have: no `requires`, no checker errors, every non-`ensures` obligation proved by the interval
+//   analysis (so overflow and zero-divisor are excluded).
 //
 // The point of the exercise: the checker has already proved there is no overflow and no zero
 // divisor, so the emitted code is plain wrapping i32/i64 arithmetic with NO checks.
 // (`ensures` clauses are specifications; they are not emitted.)
 
-import { Expr, FnDef, Program, Type, resolveType } from '../ast.js';
+import { Expr, FnDef, Program, asDeclassify, resolveType } from '../ast.js';
 import { CAP_OPS } from '../caps.js';
 import { CheckResult, FnEvidence } from '../check.js';
 import { Repr, reprFor } from '../interval.js';
-import { uleb } from './encode.js';
-import { I32, I64, IntOps, OP, ValType, WasmFunc, blockType, buildModule, i64Load, i64Store, localGet, localSet } from './encode.js';
+import { I32, I64, IntOps, OP, TypeTable, ValType, WasmFunc, WasmImport, blockTypeOf, buildModule, call, i32Load, i32Store, i64Load, i64Store, localGet, localSet } from './encode.js';
+import {
+  ElemLayout, Kind, ListShape, MAX_MEMORY_BYTES, MEM_BASE, NotCompilable, SLOT, Scalar, Shape, flatLeaves, intLeaves, shapeJson, layoutOf, listsOf, magnitudes, nleaves, no, sameShape, shapeOf, showShape, wtypes,
+} from './shape.js';
 
-/** Memory layout of one list element: `stride` 8-byte slots, one per scalar leaf (string fields are omitted). */
-export interface ElemLayout {
-  stride: number;
-  leaves: { path: string; kind: Kind; slot: number }[];
-  key: string;
-}
-export type Kind = { t: 'int' } | { t: 'bool' } | { t: 'enum'; cases: string[] } | { t: 'list'; layout: ElemLayout; min: number; max: number };
-
-/** Inputs plus scratch above this many bytes are refused (a list type with an absurd declared maximum). */
-export const MAX_MEMORY_BYTES = 16 * 1024 * 1024;
-export const MEM_BASE = 16; // inputs start here (keeps address 0 unused)
-export const SLOT = 8;
+export type { ElemLayout, Kind, Shape };
+export { MAX_MEMORY_BYTES, MEM_BASE, SLOT };
 
 export interface Leaf {
-  path: string; // '' for a scalar parameter, else 'field' or 'field.sub' inside a record parameter
-  kind: Kind;
+  path: string; // '' for a scalar parameter, else 'field' or 'field.sub' (Result sides: '#tag', 'ok', 'err')
+  kind: Shape;
   lo?: bigint;
   hi?: bigint;
 }
 export interface ParamSpec {
   name: string;
-  type: Type;
+  type: import('../ast.js').Type;
+  shape: Shape;
   leaves: Leaf[];
 }
 
@@ -57,95 +54,111 @@ export interface FnReport {
   repr?: 'i32' | 'i64'; // representation actually used for every Int in the function
   widenedFromChecker?: string; // set when the checker's repr was too narrow for parameters/literals
   params?: ParamSpec[];
-  result?: Kind;
+  result?: Shape;
   hasBase?: boolean; // takes a trailing i32 scratch-base parameter and uses linear memory
   inputBytes?: number; // bytes reserved for list parameters (from MEM_BASE), at their declared maximum lengths
   scratchBytes?: number; // statically bounded scratch needed above the inputs (including callees)
+  entry?: boolean; // listed in a `program` entry form
+  needs?: string[]; // capability handles the function (and its callees) use
 }
 
 export interface CompileOptions {
   /** Test hook for mutation testing the compiler itself: 'trunc' emits plain div_s (WRONG for negatives). */
   divMode?: 'floor' | 'trunc';
+  /** Test hook: deliberately miscompile one construct, so the differential tests can be shown to catch it. */
+  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-handle-swapped' | 'emit-dropped' | 'sort-inverted' | 'sort-left-tail-dropped' | 'fold-init-dropped';
 }
 
 export interface CompileResult {
   bytes: Uint8Array;
   fns: FnReport[];
-  memPages?: number; // 64KiB pages of the exported "memory" (only when some function uses lists)
+  memPages?: number; // 64KiB pages of the exported "memory" (only when some function uses memory)
+  entries: string[]; // compiled functions listed in a `program` entry form
+  abi: AbiDescriptor;
+}
+
+/** Self-describing ABI data; also embedded in the module as the custom section `sigil.abi` (JSON). */
+export interface AbiDescriptor {
+  version: 1;
+  /** String literal table: literal i is host string handle i + 1 (handle 0 is the empty string). */
+  strings: string[];
+  /** Capability handle table: the first argument of a host effect import is an index into this list. */
+  handles: string[];
+  /** Host effect imports (module "host"), one per distinct operation and argument shape. */
+  effects: EffectDesc[];
+}
+export interface EffectDesc {
+  import: string;
+  op: string; // put | post | emit | fresh
+  args: Shape[]; // shapes of the arguments after the handle; their leaves are the import's parameters
 }
 
 /** What a caller needs to know about a compiled callee. */
 export interface Callee {
-  index: number;
+  index: number; // position among the module's defined functions
   vt: ValType; // int representation of the callee
-  params: Kind[];
-  result: Kind;
+  params: Shape[];
+  result: Shape;
   hasBase: boolean;
   need: number; // scratch bytes the callee uses above its base
 }
 export type CalleeResolver = (name: string) => Callee | string; // string = reason it cannot be called
 
-class NotCompilable extends Error {}
-const no = (reason: string): never => {
-  throw new NotCompilable(reason);
-};
+/** The function needs scratch memory (and so a trailing base parameter): compile it again with one. */
+class NeedBase extends Error {}
 
-const sameCases = (a: string[], b: string[]) => a.length === b.length && a.every((c, i) => c === b[i]);
-const sameKind = (a: Kind, b: Kind): boolean =>
-  a.t === b.t && (a.t !== 'enum' || sameCases(a.cases, (b as typeof a).cases)) && (a.t !== 'list' || a.layout.key === (b as typeof a).layout.key);
-const showKind = (k: Kind) => (k.t === 'enum' ? `enum(${k.cases.join('|')})` : k.t === 'list' ? `list(${k.layout.key})` : k.t);
+
+const SHAPE_OPTS = { strings: true };
 
 // ---------------------------------------------------------------------------
-// Types
+// Module-level registries shared by all functions of one compilation
 // ---------------------------------------------------------------------------
 
-function kindOfType(prog: Program, t: Type, what: string): Kind {
-  const r = resolveType(prog, t);
-  switch (r.k) {
-    case 'int':
-      return { t: 'int' };
-    case 'bool':
-      return { t: 'bool' };
-    case 'enum':
-      return { t: 'enum', cases: r.cases };
-    default:
-      return no(`${what} has type ${r.k}, which is outside the numeric subset (Int, Bool, enum)`);
+interface ImportReg {
+  desc: WasmImport;
+  effect?: EffectDesc;
+  used: boolean;
+}
+class Registry {
+  imports: ImportReg[] = [];
+  strings: string[] = []; // string literal i is host handle i + 1
+  enumBlocks = new Map<string, number>(); // enum cases registered as consecutive literals: first handle
+  handles: string[] = [];
+  /** Pass 2: the import set is fixed, so nothing may be added. */
+  constructor(public frozen = false) {}
+  importIndex(name: string): number {
+    return this.imports.findIndex((i) => i.desc.name === name);
+  }
+  literal(s: string): number {
+    if (s === '') return 0;
+    let i = this.strings.indexOf(s);
+    if (i < 0) {
+      i = this.strings.length;
+      this.strings.push(s);
+    }
+    return i + 1;
+  }
+  /** Handle of the first of `cases.length` consecutive literals holding the case names. */
+  enumBlock(cases: string[]): number {
+    const key = cases.join('|');
+    let h = this.enumBlocks.get(key);
+    if (h === undefined) {
+      h = this.strings.length + 1;
+      this.strings.push(...cases);
+      this.enumBlocks.set(key, h);
+    }
+    return h;
   }
 }
-
-function leavesOf(prog: Program, t: Type, path: string, what: string): Leaf[] {
-  const r = resolveType(prog, t);
-  if (r.k === 'rec') return r.fields.flatMap((f) => leavesOf(prog, f.type, path ? `${path}.${f.name}` : f.name, `${what}.${f.name}`));
-  const kind = kindOfType(prog, r, what);
-  return [r.k === 'int' ? { path, kind, lo: r.lo, hi: r.hi } : { path, kind }];
+interface Ctx {
+  types: TypeTable;
+  reg: Registry;
+  importBase: number;
 }
 
-/** Layout of a list element. Record fields of type Str are not stored (compiled code cannot read them). */
-function layoutOf(prog: Program, elem: Type, what: string): ElemLayout {
-  const leaves: { path: string; kind: Kind; slot: number }[] = [];
-  const walkT = (t: Type, path: string, w: string) => {
-    const x = resolveType(prog, t);
-    if (x.k === 'rec') {
-      for (const f of x.fields) walkT(f.type, path ? `${path}.${f.name}` : f.name, `${w}.${f.name}`);
-    } else if (x.k === 'str' && path) {
-      return; // opaque field: not stored, and any read of it is refused
-    } else if (x.k === 'list') {
-      no(`${w} is a nested list (not supported)`);
-    } else {
-      leaves.push({ path, kind: kindOfType(prog, x, w), slot: leaves.length });
-    }
-  };
-  walkT(elem, '', what);
-  if (!leaves.length) no(`${what} has no scalar fields`);
-  return { stride: leaves.length, leaves, key: leaves.map((l) => `${l.path}:${showKind(l.kind)}`).join(',') };
-}
-
-function listKind(prog: Program, t: Extract<ReturnType<typeof resolveType>, { k: 'list' }>, what: string): Kind {
-  const layout = layoutOf(prog, t.elem, `${what} element`);
-  const bytes = t.max * layout.stride * SLOT;
-  if (!Number.isFinite(t.max) || t.max < 0 || bytes > MAX_MEMORY_BYTES) no(`${what}: list maximum length ${t.max} needs ${bytes} bytes, over the ${MAX_MEMORY_BYTES} byte limit`);
-  return { t: 'list', layout, min: t.min, max: t.max };
-}
+// ---------------------------------------------------------------------------
+// Expression walk helpers
+// ---------------------------------------------------------------------------
 
 /** Sub-expression walk (including lambda bodies). */
 function walk(e: Expr, f: (e: Expr) => void): void {
@@ -181,64 +194,24 @@ function walk(e: Expr, f: (e: Expr) => void): void {
 }
 
 // ---------------------------------------------------------------------------
-// Expression walk helpers
-// ---------------------------------------------------------------------------
-
-function literals(e: Expr, out: bigint[]): void {
-  switch (e.k) {
-    case 'int':
-      out.push(e.v);
-      return;
-    case 'call':
-      e.args.forEach((a) => literals(a, out));
-      e.kw.forEach((a) => literals(a.value, out));
-      return;
-    case 'let':
-      e.binds.forEach((b) => literals(b.value, out));
-      e.body.forEach((b) => literals(b, out));
-      return;
-    case 'match':
-      literals(e.scrut, out);
-      e.arms.forEach((a) => literals(a.body, out));
-      return;
-    case 'if':
-      literals(e.cond, out);
-      literals(e.then, out);
-      literals(e.else, out);
-      return;
-    case 'lam':
-      literals(e.body, out);
-      return;
-    case 'do':
-      e.body.forEach((b) => literals(b, out));
-      return;
-    case 'try':
-      literals(e.expr, out);
-      return;
-    default:
-      return;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Code generation for one function
 // ---------------------------------------------------------------------------
 
-/** A list value: two i32 locals (pointer, length) plus its static bounds. */
-interface ListVal {
+/** A generated value: code that leaves all of the value's leaves on the stack, and its shape. */
+interface G {
+  c: number[];
+  shape: Shape;
+}
+/** A named value: one local per leaf. */
+interface Binding {
+  shape: Shape;
+  locals: number[];
+}
+interface ListLocals {
   ptr: number;
   len: number;
-  kind: Extract<Kind, { t: 'list' }>;
+  shape: ListShape;
 }
-interface G {
-  c: number[]; // for a list value: stack-neutral code that leaves the list's ptr/len locals set
-  kind: Kind;
-  lv?: ListVal;
-}
-type Binding =
-  | { b: 'val'; local: number; kind: Kind }
-  | { b: 'rec'; leaves: Map<string, { local: number; kind: Kind }> }
-  | { b: 'list'; lv: ListVal };
 
 class FnGen {
   locals: ValType[] = [];
@@ -247,11 +220,14 @@ class FnGen {
   baseLocal = -1; // i32 scratch base (trailing parameter), when the function uses memory
   frame = 0; // bytes of scratch allocated so far (static offsets from the base)
   need = 0; // max scratch bytes needed, including callees
+  retShape: Shape = { t: 'unit' };
+  touched = new Set<string>(); // host imports this function uses
   constructor(
-    private prog: Program,
-    private R: IntOps,
-    private opts: CompileOptions,
-    private callee: CalleeResolver,
+    protected prog: Program,
+    protected R: IntOps,
+    protected opts: CompileOptions,
+    protected callee: CalleeResolver,
+    protected ctx: Ctx,
   ) {}
 
   alloc(vt: ValType): number {
@@ -259,16 +235,58 @@ class FnGen {
     return this.nParams + this.locals.length - 1;
   }
 
-  private enumCaseIndex(name: string): { kind: Kind; idx: number } | undefined {
-    const hits: string[][] = [];
-    for (const t of this.prog.types.values()) {
-      if (t.k === 'enum' && t.cases.includes(name) && !hits.some((h) => sameCases(h, t.cases))) hits.push(t.cases);
+  // --- leaves -------------------------------------------------------------------
+  protected wt(s: Shape): ValType[] {
+    return wtypes(s, this.R.vt);
+  }
+  protected bt(s: Shape): number[] {
+    return blockTypeOf(this.wt(s), this.ctx.types);
+  }
+  protected allocLeaves(s: Shape): number[] {
+    return this.wt(s).map((t) => this.alloc(t));
+  }
+  /** Pop the leaves on the stack into these locals (the last leaf is on top). */
+  protected setAll(locals: number[]): number[] {
+    const c: number[] = [];
+    for (let i = locals.length - 1; i >= 0; i--) c.push(...localSet(locals[i]));
+    return c;
+  }
+  protected getAll(locals: number[]): number[] {
+    return locals.flatMap((l) => localGet(l));
+  }
+  protected dropAll(s: Shape): number[] {
+    return Array.from({ length: nleaves(s) }, () => OP.drop);
+  }
+  protected zero(s: Shape): number[] {
+    return this.wt(s).flatMap((t) => (t === 'i64' ? I64.const(0n) : I32.const(0n)));
+  }
+  protected spill(g: G): { c: number[]; locals: number[] } {
+    const locals = this.allocLeaves(g.shape);
+    return { c: [...g.c, ...this.setAll(locals)], locals };
+  }
+  /** Narrow a binding to a (possibly nested) record field. */
+  protected select(b: Binding, path: string[], what: string): Binding {
+    let { shape, locals } = b;
+    for (const seg of path) {
+      if (shape.t !== 'rec') return no(`field access .${seg} on non-record ${what}`);
+      let off = 0;
+      let found = false;
+      for (const f of shape.fields) {
+        const n = nleaves(f.shape);
+        if (f.name === seg) {
+          shape = f.shape;
+          locals = locals.slice(off, off + n);
+          found = true;
+          break;
+        }
+        off += n;
+      }
+      if (!found) return no(`no field ${what}.${seg} (a Str field of a list element is not stored)`);
     }
-    if (hits.length > 1) return no(`enum case ${name} belongs to more than one enum type (ambiguous)`);
-    return hits.length ? { kind: { t: 'enum', cases: hits[0] }, idx: hits[0].indexOf(name) } : undefined;
+    return { shape, locals };
   }
 
-  private lookup(name: string): Binding | undefined {
+  protected lookup(name: string): Binding | undefined {
     for (let i = this.scopes.length - 1; i >= 0; i--) {
       const b = this.scopes[i].get(name);
       if (b) return b;
@@ -276,49 +294,49 @@ class FnGen {
     return undefined;
   }
 
-  private int(g: G, what: string): number[] {
-    if (g.kind.t !== 'int') no(`${what}: expected Int, got ${showKind(g.kind)}`);
-    return g.c;
-  }
-  private bool(g: G, what: string): number[] {
-    if (g.kind.t !== 'bool') no(`${what}: expected Bool, got ${showKind(g.kind)}`);
-    return g.c;
-  }
-  private vtOf(k: Kind): ValType {
-    if (k.t === 'list') return no('internal: a list has no single wasm type');
-    return k.t === 'int' ? this.R.vt : 'i32';
+  private enumCaseIndex(name: string): { shape: Shape; idx: number } | undefined {
+    const hits: string[][] = [];
+    for (const t of this.prog.types.values()) {
+      if (t.k === 'enum' && t.cases.includes(name) && !hits.some((h) => h.length === t.cases.length && h.every((c, i) => c === t.cases[i]))) hits.push(t.cases);
+    }
+    if (hits.length > 1) return no(`enum case ${name} belongs to more than one enum type (ambiguous)`);
+    return hits.length ? { shape: { t: 'enum', cases: hits[0] }, idx: hits[0].indexOf(name) } : undefined;
   }
 
-  private scalar(g: G, what: string): G {
-    if (g.kind.t === 'list') no(`${what}: a list value is not allowed here`);
-    return g;
+  protected int(g: G, what: string): number[] {
+    if (g.shape.t !== 'int') no(`${what}: expected Int, got ${showShape(g.shape)}`);
+    return g.c;
+  }
+  protected bool(g: G, what: string): number[] {
+    if (g.shape.t !== 'bool') no(`${what}: expected Bool, got ${showShape(g.shape)}`);
+    return g.c;
   }
 
+  // --- scratch memory --------------------------------------------------------------
   /** Reserve `bytes` of scratch at a static offset from the base; returns that offset. */
-  private allocScratch(bytes: number, what: string): number {
-    if (this.baseLocal < 0) no(`internal: ${what} needs scratch memory but the function has no base`);
+  protected allocScratch(bytes: number, what: string): number {
+    if (this.baseLocal < 0) throw new NeedBase();
     const off = this.frame;
     this.frame += bytes;
     this.need = Math.max(this.need, this.frame);
     if (MEM_BASE + this.need > MAX_MEMORY_BYTES) no(`${what}: scratch of ${this.need} bytes exceeds the ${MAX_MEMORY_BYTES} byte limit`);
     return off;
   }
-
-  private baseAddr(off: number): number[] {
+  protected baseAddr(off: number): number[] {
     return [...localGet(this.baseLocal), ...I32.const(BigInt(off)), I32.add];
   }
 
-  /** Convert a value on the stack to its 8-byte slot form (i64). */
-  private toSlot(k: Kind): number[] {
+  /** Convert a value of the slot kind on the stack to its 8-byte slot form (i64). */
+  protected toSlot(k: Scalar): number[] {
     return k.t === 'int' ? (this.R.vt === 'i64' ? [] : [OP.i64ExtendI32S]) : [OP.i64ExtendI32U];
   }
   /** Convert an i64 slot value on the stack to the function's representation of `k`. */
-  private fromSlot(k: Kind): number[] {
+  protected fromSlot(k: Scalar): number[] {
     return k.t === 'int' && this.R.vt === 'i64' ? [] : [OP.i32WrapI64];
   }
 
   /** `for i in 0..len { body }` */
-  private loop(len: number, i: number, body: number[]): number[] {
+  protected loop(len: number, i: number, body: number[]): number[] {
     return [
       ...I32.const(0n), ...localSet(i),
       OP.block, OP.void, OP.loop, OP.void,
@@ -330,30 +348,51 @@ class FnGen {
     ];
   }
 
+  /** Address of element `i` of a list: ptr + i * stride * 8. */
+  protected elemAddr(ptr: number, i: number, stride: number): number[] {
+    return [...localGet(ptr), ...localGet(i), ...I32.const(BigInt(stride * SLOT)), I32.mul, I32.add];
+  }
+
   /** Bind a lambda parameter to the element at index `i`; returns the binding and the code that loads it. */
-  private bindElem(lv: ListVal, i: number): { binding: Binding; load: number[] } {
-    const L = lv.kind.layout;
+  protected bindElem(lv: ListLocals, i: number): { binding: Binding; load: number[] } {
+    const L = lv.shape.layout;
     const ea = this.alloc('i32');
-    const load: number[] = [...localGet(lv.ptr), ...localGet(i), ...I32.const(BigInt(L.stride * SLOT)), I32.mul, I32.add, ...localSet(ea)];
-    const leaves = new Map<string, { local: number; kind: Kind }>();
+    const load: number[] = [...this.elemAddr(lv.ptr, i, L.stride), ...localSet(ea)];
+    const locals: number[] = [];
     for (const l of L.leaves) {
-      const local = this.alloc(this.vtOf(l.kind));
+      const local = this.alloc(l.kind.t === 'int' ? this.R.vt : 'i32');
       load.push(...localGet(ea), ...i64Load(l.slot * SLOT), ...this.fromSlot(l.kind), ...localSet(local));
-      leaves.set(l.path, { local, kind: l.kind });
+      locals.push(local);
     }
-    const only = leaves.get('');
-    return { binding: only && L.leaves.length === 1 ? { b: 'val', local: only.local, kind: only.kind } : { b: 'rec', leaves }, load };
+    return { binding: { shape: L.elem, locals }, load };
   }
 
-  private listArg(e: Expr, what: string): G & { lv: ListVal } {
+  /** Store a spilled element value (locals, one per layout leaf) at the address held in local `addr`. */
+  protected storeElem(addr: number, layout: ElemLayout, vals: number[], slotBase = 0): number[] {
+    const c: number[] = [];
+    layout.leaves.forEach((l, k) => c.push(...localGet(addr), ...localGet(vals[k]), ...this.toSlot(l.kind), ...i64Store((slotBase + l.slot) * SLOT)));
+    return c;
+  }
+
+  protected listArg(e: Expr, what: string): { c: number[]; lv: ListLocals } {
     const g = this.gen(e);
-    if (g.kind.t !== 'list' || !g.lv) return no(`${what}: expected a list, got ${showKind(g.kind)}`);
-    return g as G & { lv: ListVal };
+    if (g.shape.t !== 'list') return no(`${what}: expected a list, got ${showShape(g.shape)}`);
+    const sp = this.spill(g);
+    return { c: sp.c, lv: { ptr: sp.locals[0], len: sp.locals[1], shape: g.shape } };
   }
 
-  private lambda(e: Expr, what: string): Extract<Expr, { k: 'lam' }> {
-    if (e.k !== 'lam' || e.params.length !== 1) return no(`${what} needs a one-parameter lambda`);
+  protected lambda(e: Expr, n: number, what: string): Extract<Expr, { k: 'lam' }> {
+    if (e.k !== 'lam' || e.params.length !== n) return no(`${what} needs a ${n}-parameter lambda`);
     return e;
+  }
+
+  protected withScope<T>(m: Map<string, Binding>, f: () => T): T {
+    this.scopes.push(m);
+    try {
+      return f();
+    } finally {
+      this.scopes.pop();
+    }
   }
 
   /** map / filter: the lambda is inlined into a loop over the source list. */
@@ -361,185 +400,250 @@ class FnGen {
     const name = isMap ? 'map' : 'filter';
     if (e.args.length !== 2 || e.kw.length) no(`${name} expects 2 arguments`);
     const src = this.listArg(e.args[0], name);
-    const lam = this.lambda(e.args[1], name);
-    const sk = src.lv.kind;
-    const outStride = isMap ? 1 : sk.layout.stride;
-    const off = this.allocScratch(sk.max * outStride * SLOT, name);
+    const lam = this.lambda(e.args[1], 1, name);
+    const sk = src.lv.shape;
     const p = this.alloc('i32');
     const i = this.alloc('i32');
     const { binding, load } = this.bindElem(src.lv, i);
-    this.scopes.push(new Map([[lam.params[0], binding]]));
-    let body: G;
-    try {
-      body = this.scalar(this.gen(lam.body), `${name} lambda result`);
-    } finally {
-      this.scopes.pop();
-    }
-    const pre = [...src.c, ...this.baseAddr(off), ...localSet(p)];
+    // filter copies whole elements, so its output can be reserved before the body is generated
+    const fOff = isMap ? 0 : this.allocScratch(sk.max * sk.layout.stride * SLOT, name);
+    const body = this.withScope(new Map([[lam.params[0], binding]]), () => this.gen(lam.body));
     if (isMap) {
-      const k = body.kind;
-      const outLayout: ElemLayout = { stride: 1, leaves: [{ path: '', kind: k, slot: 0 }], key: `:${showKind(k)}` };
-      const store = [...localGet(p), ...localGet(i), ...I32.const(BigInt(SLOT)), I32.mul, I32.add, ...body.c, ...this.toSlot(k), ...i64Store(0)];
-      const lv: ListVal = { ptr: p, len: src.lv.len, kind: { t: 'list', layout: outLayout, min: sk.min, max: sk.max } };
-      return { c: [...pre, ...this.loop(src.lv.len, i, [...load, ...store])], kind: lv.kind, lv };
+      const layout = layoutOf(body.shape, 'map lambda result');
+      // The output goes above everything the body (and its callees) may use, so it is never overwritten per iteration.
+      this.frame = Math.max(this.frame, this.need);
+      const off = this.allocScratch(sk.max * layout.stride * SLOT, name);
+      const vals = this.allocLeaves(body.shape);
+      const ea = this.alloc('i32');
+      const store = [...body.c, ...this.setAll(vals), ...this.elemAddr(p, i, layout.stride), ...localSet(ea), ...this.storeElem(ea, layout, vals)];
+      const out: ListShape = { t: 'list', layout, min: sk.min, max: sk.max };
+      return { c: [...src.c, ...this.baseAddr(off), ...localSet(p), ...this.loop(src.lv.len, i, [...load, ...store]), ...localGet(p), ...localGet(src.lv.len)], shape: out };
     }
-    if (body.kind.t !== 'bool') no(`filter lambda must return Bool, got ${showKind(body.kind)}`);
+    if (body.shape.t !== 'bool') no(`filter lambda must return Bool, got ${showShape(body.shape)}`);
+    const off = fOff;
     const j = this.alloc('i32');
     const da = this.alloc('i32');
-    const w = BigInt(outStride * SLOT);
-    const copy: number[] = [...localGet(p), ...localGet(j), ...I32.const(w), I32.mul, I32.add, ...localSet(da)];
-    const srcAddr = [...localGet(src.lv.ptr), ...localGet(i), ...I32.const(w), I32.mul, I32.add];
-    for (let k = 0; k < outStride; k++) copy.push(...localGet(da), ...srcAddr, ...i64Load(k * SLOT), ...i64Store(k * SLOT));
+    const L = sk.layout;
+    const copy: number[] = [...this.elemAddr(p, j, L.stride), ...localSet(da)];
+    for (let k = 0; k < L.stride; k++) copy.push(...localGet(da), ...this.elemAddr(src.lv.ptr, i, L.stride), ...i64Load(k * SLOT), ...i64Store(k * SLOT));
     copy.push(...localGet(j), ...I32.const(1n), I32.add, ...localSet(j));
-    const lv: ListVal = { ptr: p, len: j, kind: { t: 'list', layout: sk.layout, min: 0, max: sk.max } };
+    const out: ListShape = { t: 'list', layout: L, min: 0, max: sk.max };
     return {
-      c: [...pre, ...I32.const(0n), ...localSet(j), ...this.loop(src.lv.len, i, [...load, ...body.c, OP.if, OP.void, ...copy, OP.end])],
-      kind: lv.kind,
-      lv,
+      c: [...src.c, ...this.baseAddr(off), ...localSet(p), ...I32.const(0n), ...localSet(j), ...this.loop(src.lv.len, i, [...load, ...body.c, OP.if, OP.void, ...copy, OP.end]), ...localGet(p), ...localGet(j)],
+      shape: out,
     };
   }
 
   private genSum(e: Extract<Expr, { k: 'call' }>): G {
     if (e.args.length !== 1 || e.kw.length) no('sum expects 1 argument');
     const src = this.listArg(e.args[0], 'sum');
-    const L = src.lv.kind.layout;
-    if (L.stride !== 1 || L.leaves[0].kind.t !== 'int') no(`sum needs a list of Int, got ${showKind(src.lv.kind)}`);
+    const L = src.lv.shape.layout;
+    if (L.elem.t !== 'int') no(`sum needs a list of Int, got ${showShape(src.lv.shape)}`);
     const acc = this.alloc(this.R.vt);
     const i = this.alloc('i32');
-    const elem = [...localGet(src.lv.ptr), ...localGet(i), ...I32.const(BigInt(SLOT)), I32.mul, I32.add, ...i64Load(0), ...this.fromSlot({ t: 'int' })];
+    const elem = [...this.elemAddr(src.lv.ptr, i, 1), ...i64Load(0), ...this.fromSlot({ t: 'int' })];
     return {
       c: [...src.c, ...this.R.const(0n), ...localSet(acc), ...this.loop(src.lv.len, i, [...localGet(acc), ...elem, this.R.add, ...localSet(acc)]), ...localGet(acc)],
-      kind: { t: 'int' },
+      shape: { t: 'int' },
     };
   }
 
   private genLen(e: Extract<Expr, { k: 'call' }>): G {
     if (e.args.length !== 1 || e.kw.length) no('len expects 1 argument');
     const src = this.listArg(e.args[0], 'len');
-    return { c: [...src.c, ...localGet(src.lv.len), ...(this.R.vt === 'i64' ? [OP.i64ExtendI32U] : [])], kind: { t: 'int' } };
+    return { c: [...src.c, ...localGet(src.lv.len), ...(this.R.vt === 'i64' ? [OP.i64ExtendI32U] : [])], shape: { t: 'int' } };
   }
 
-  /** `(list a b c)` of scalars, built in scratch memory. */
+  /** `(list a b c)` of scalars or records, built in scratch memory. */
   private genListLit(e: Extract<Expr, { k: 'call' }>): G {
     if (e.kw.length) no('keyword arguments to list');
     if (!e.args.length) no('empty (list) has no element type');
-    const gs = e.args.map((a) => this.scalar(this.gen(a), 'list element'));
-    const k = gs[0].kind;
-    for (const g of gs) if (!sameKind(g.kind, k)) no(`list elements differ: ${showKind(k)} vs ${showKind(g.kind)}`);
-    const off = this.allocScratch(gs.length * SLOT, 'list');
+    const gs = e.args.map((a) => this.gen(a));
+    const sh = gs[0].shape;
+    for (const g of gs) if (!sameShape(g.shape, sh)) no(`list elements differ: ${showShape(sh)} vs ${showShape(g.shape)}`);
+    const layout = layoutOf(sh, 'list element');
+    const off = this.allocScratch(gs.length * layout.stride * SLOT, 'list');
     const p = this.alloc('i32');
     const n = this.alloc('i32');
     const c = [...this.baseAddr(off), ...localSet(p), ...I32.const(BigInt(gs.length)), ...localSet(n)];
-    gs.forEach((g, idx) => c.push(...localGet(p), ...g.c, ...this.toSlot(k), ...i64Store(idx * SLOT)));
-    const layout: ElemLayout = { stride: 1, leaves: [{ path: '', kind: k, slot: 0 }], key: `:${showKind(k)}` };
-    const lv: ListVal = { ptr: p, len: n, kind: { t: 'list', layout, min: gs.length, max: gs.length } };
-    return { c, kind: lv.kind, lv };
+    gs.forEach((g, idx) => {
+      const sp = this.spill(g);
+      c.push(...sp.c, ...this.storeElem(p, layout, sp.locals, idx * layout.stride));
+    });
+    c.push(...localGet(p), ...localGet(n));
+    return { c, shape: { t: 'list', layout, min: gs.length, max: gs.length } };
   }
 
-  gen(e: Expr): G {
+  // --- expressions ---------------------------------------------------------------
+  /** `expect` is the shape the context requires (needed for `(ok e)` / `(err e)`, whose other side is not inferable). */
+  gen(e: Expr, expect?: Shape): G {
     const R = this.R;
     switch (e.k) {
       case 'int':
-        return { c: R.const(e.v), kind: { t: 'int' } };
+        return { c: R.const(e.v), shape: { t: 'int' } };
       case 'bool':
-        return { c: I32.const(e.v ? 1n : 0n), kind: { t: 'bool' } };
+        return { c: I32.const(e.v ? 1n : 0n), shape: { t: 'bool' } };
       case 'str':
-        return no('string literal');
+        return this.genStr(e.v);
       case 'var': {
         const b = this.lookup(e.name);
         if (b) {
-          if (b.b === 'list') {
-            if (e.path.length) no(`field access .${e.path.join('.')} on list ${e.name}`);
-            return { c: [], kind: b.lv.kind, lv: b.lv };
-          }
-          if (b.b === 'val') {
-            if (e.path.length) no(`field access .${e.path.join('.')} on non-record ${e.name}`);
-            return { c: localGet(b.local), kind: b.kind };
-          }
-          const leaf = b.leaves.get(e.path.join('.'));
-          if (!leaf) return no(`${e.name}${e.path.length ? '.' + e.path.join('.') : ''} is not a scalar field (whole records are not first-class here)`);
-          return { c: localGet(leaf.local), kind: leaf.kind };
+          const s = this.select(b, e.path, e.name);
+          return { c: this.getAll(s.locals), shape: s.shape };
         }
         if (!e.path.length) {
           const ec = this.enumCaseIndex(e.name);
-          if (ec) return { c: I32.const(BigInt(ec.idx)), kind: ec.kind };
+          if (ec) return { c: I32.const(BigInt(ec.idx)), shape: ec.shape };
         }
-        return no(`unbound or non-scalar name ${e.name}`);
+        return no(`unbound name ${e.name}${e.path.length ? '.' + e.path.join('.') : ''}`);
       }
       case 'let': {
         const scope = new Map<string, Binding>();
-        this.scopes.push(scope);
-        try {
+        return this.withScope(scope, () => {
           const pre: number[] = [];
           for (const b of e.binds) {
             const g = this.gen(b.value); // compiled before the name is visible, as in the interpreter
-            if (g.kind.t === 'list' && g.lv) {
-              pre.push(...g.c);
-              scope.set(b.name, { b: 'list', lv: g.lv });
-              continue;
-            }
-            const local = this.alloc(this.vtOf(g.kind));
-            pre.push(...g.c, ...localSet(local));
-            scope.set(b.name, { b: 'val', local, kind: g.kind });
+            const sp = this.spill(g);
+            pre.push(...sp.c);
+            scope.set(b.name, { shape: g.shape, locals: sp.locals });
           }
-          const body = this.seq(e.body);
+          const body = this.seq(e.body, expect);
           return { ...body, c: [...pre, ...body.c] };
-        } finally {
-          this.scopes.pop();
-        }
+        });
       }
       case 'do':
-        return this.seq(e.body);
+        return this.seq(e.body, expect);
       case 'if': {
         const c = this.bool(this.gen(e.cond), 'if condition');
-        const t = this.gen(e.then);
-        const f = this.gen(e.else);
-        this.scalar(t, 'if branch');
-        this.scalar(f, 'if branch');
-        if (!sameKind(t.kind, f.kind)) no(`if branches differ: ${showKind(t.kind)} vs ${showKind(f.kind)}`);
-        return { c: [...c, OP.if, blockType(this.vtOf(t.kind)), ...t.c, OP.else, ...f.c, OP.end], kind: t.kind };
+        const t = this.gen(e.then, expect);
+        const f = this.gen(e.else, expect ?? t.shape);
+        if (!sameShape(t.shape, f.shape)) no(`if branches differ: ${showShape(t.shape)} vs ${showShape(f.shape)}`);
+        return { c: [...c, OP.if, ...this.bt(t.shape), ...t.c, OP.else, ...f.c, OP.end], shape: t.shape };
       }
       case 'match':
-        return this.genMatch(e);
+        return this.genMatch(e, expect);
       case 'lam':
-        return no('lambda');
+        return no('lambda outside map, filter, fold or sort');
       case 'try':
-        return no('try (Result / early return)');
+        return this.genTry(e);
       case 'call':
-        return this.genCall(e);
+        return this.genCall(e, expect);
     }
   }
 
-  /** Sequence of pure expressions: earlier ones are compiled and dropped, the last is the value. */
-  private seq(es: Expr[]): G {
-    const gs = es.map((x) => this.gen(x));
-    const drops = gs.slice(0, -1).flatMap((g) => (g.kind.t === 'list' ? g.c : [...g.c, 0x1a]));
-    return { ...gs[gs.length - 1], c: [...drops, ...gs[gs.length - 1].c] };
+  /** Sequence of expressions: earlier ones are compiled and dropped, the last is the value. */
+  protected seq(es: Expr[], expect?: Shape): G {
+    const gs = es.map((x, i) => this.gen(x, i === es.length - 1 ? expect : undefined));
+    const drops = gs.slice(0, -1).flatMap((g) => [...g.c, ...this.dropAll(g.shape)]);
+    return { c: [...drops, ...gs[gs.length - 1].c], shape: gs[gs.length - 1].shape };
   }
 
-  private genMatch(e: Extract<Expr, { k: 'match' }>): G {
+  private genMatch(e: Extract<Expr, { k: 'match' }>, expect?: Shape): G {
     const s = this.gen(e.scrut);
-    if (s.kind.t !== 'enum') return no(`match on ${showKind(s.kind)} (only enums are supported)`);
-    const cases = s.kind.cases;
+    if (s.shape.t === 'result') return this.genMatchResult(e, s, expect);
+    if (s.shape.t !== 'enum') return no(`match on ${showShape(s.shape)} (only enums and Results are supported)`);
+    const cases = s.shape.cases;
     const seen = new Set<string>();
     const arms = e.arms
       .filter((a) => {
-        if (!cases.includes(a.tag)) no(`match arm ${a.tag} is not a case of ${showKind(s.kind)}`);
+        if (!cases.includes(a.tag)) no(`match arm ${a.tag} is not a case of ${showShape(s.shape)}`);
         if (a.bind !== null) no(`match arm ${a.tag} binds a payload, but enum cases carry none`);
         if (seen.has(a.tag)) return false; // first arm wins, as in the interpreter
         seen.add(a.tag);
         return true;
       })
-      .map((a) => ({ idx: cases.indexOf(a.tag), g: this.gen(a.body) }));
+      .map((a) => ({ idx: cases.indexOf(a.tag), g: this.gen(a.body, expect) }));
     if (seen.size !== cases.length) no(`non-exhaustive match (missing ${cases.filter((c) => !seen.has(c)).join(', ')})`);
-    const kind = arms[0].g.kind;
-    for (const a of arms) this.scalar(a.g, 'match arm');
-    for (const a of arms) if (!sameKind(a.g.kind, kind)) no(`match arms differ: ${showKind(kind)} vs ${showKind(a.g.kind)}`);
+    const shape = arms[0].g.shape;
+    for (const a of arms) if (!sameShape(a.g.shape, shape)) no(`match arms differ: ${showShape(shape)} vs ${showShape(a.g.shape)}`);
     const tmp = this.alloc('i32');
-    const bt = blockType(this.vtOf(kind));
+    const bt = this.bt(shape);
     const chain = (i: number): number[] =>
-      i === arms.length - 1 ? arms[i].g.c : [...localGet(tmp), ...I32.const(BigInt(arms[i].idx)), I32.eq, OP.if, bt, ...arms[i].g.c, OP.else, ...chain(i + 1), OP.end];
-    return { c: [...s.c, ...localSet(tmp), ...chain(0)], kind };
+      i === arms.length - 1 ? arms[i].g.c : [...localGet(tmp), ...I32.const(BigInt(arms[i].idx)), I32.eq, OP.if, ...bt, ...arms[i].g.c, OP.else, ...chain(i + 1), OP.end];
+    return { c: [...s.c, ...localSet(tmp), ...chain(0)], shape };
+  }
+
+  private genMatchResult(e: Extract<Expr, { k: 'match' }>, s: G, expect?: Shape): G {
+    const rs = s.shape as Extract<Shape, { t: 'result' }>;
+    const sp = this.spill(s);
+    const nok = nleaves(rs.ok);
+    const okLocals = sp.locals.slice(1, 1 + nok);
+    const errLocals = sp.locals.slice(1 + nok);
+    const arm = (tag: 'ok' | 'err'): G => {
+      const a = e.arms.find((x) => x.tag === tag);
+      if (!a) return no(`non-exhaustive match on Result (missing ${tag})`);
+      const m = new Map<string, Binding>();
+      if (a.bind) m.set(a.bind, tag === 'ok' ? { shape: rs.ok, locals: okLocals } : { shape: rs.err, locals: errLocals });
+      return this.withScope(m, () => this.gen(a.body, expect));
+    };
+    for (const a of e.arms) if (a.tag !== 'ok' && a.tag !== 'err') no(`match arm ${a.tag} is not ok or err`);
+    const ok = arm('ok');
+    const err = arm('err');
+    if (!sameShape(ok.shape, err.shape)) no(`match arms differ: ${showShape(ok.shape)} vs ${showShape(err.shape)}`);
+    const [first, second] = this.opts.mutation === 'result-arms-swapped' ? [ok, err] : [err, ok];
+    return { c: [...sp.c, ...localGet(sp.locals[0]), OP.if, ...this.bt(err.shape), ...first.c, OP.else, ...second.c, OP.end], shape: ok.shape };
+  }
+
+  /** `(try e :on-err Case)`: Ok gives its value; Err returns `(err Case)` from the whole function. */
+  private genTry(e: Extract<Expr, { k: 'try' }>): G {
+    const ret = this.retShape;
+    if (ret.t !== 'result') return no('try in a function that does not return a Result');
+    if (ret.err.t !== 'enum') return no('try needs the function result to be a Result with an enum Err');
+    const idx = ret.err.cases.indexOf(e.onErr);
+    if (idx < 0) return no(`try :on-err ${e.onErr} is not a case of the function's Err type`);
+    const g = this.gen(e.expr);
+    if (g.shape.t !== 'result') return no(`try applied to ${showShape(g.shape)}, not a Result`);
+    const sp = this.spill(g);
+    const early = [...I32.const(1n), ...this.zero(ret.ok), ...I32.const(BigInt(idx)), OP.return];
+    const guard = this.opts.mutation === 'try-fallthrough' ? [] : [...localGet(sp.locals[0]), OP.if, OP.void, ...early, OP.end];
+    return { c: [...sp.c, ...guard, ...this.getAll(sp.locals.slice(1, 1 + nleaves(g.shape.ok)))], shape: g.shape.ok };
+  }
+
+  /** Record construction `(T a b c)` or `(T :f1 a :f2 b)`. Fields are evaluated in declared order, as in the interpreter. */
+  private genRecord(e: Extract<Expr, { k: 'call' }>): G {
+    const shape = shapeOf(this.prog, { k: 'named', name: e.fn }, `type ${e.fn}`, SHAPE_OPTS);
+    if (shape.t !== 'rec') return no(`${e.fn} is not a record type`);
+    let c: number[] = [];
+    if (e.args.length) {
+      if (e.kw.length) return no('mixed positional and keyword fields');
+      if (e.args.length !== shape.fields.length) return no(`${e.fn} has ${shape.fields.length} field(s) but is built with ${e.args.length}`);
+      shape.fields.forEach((f, i) => {
+        const g = this.gen(e.args[i], f.shape);
+        if (!sameShape(g.shape, f.shape)) no(`field ${e.fn}.${f.name} is ${showShape(f.shape)} but the value is ${showShape(g.shape)}`);
+        c = [...c, ...g.c];
+      });
+    } else {
+      for (const f of shape.fields) {
+        const k = e.kw.find((x) => x.name === f.name);
+        if (!k) return no(`${e.fn}: missing field ${f.name}`);
+        const g = this.gen(k.value, f.shape);
+        if (!sameShape(g.shape, f.shape)) no(`field ${e.fn}.${f.name} is ${showShape(f.shape)} but the value is ${showShape(g.shape)}`);
+        c = [...c, ...g.c];
+      }
+    }
+    return { c, shape };
+  }
+
+  /** Convert the leaves on the stack between integer representations (a no-op when no Int leaf is involved). */
+  protected convert(shape: Shape, from: ValType, to: ValType): number[] {
+    if (from === to) return [];
+    const ints = intLeaves(shape);
+    if (!ints.some((x) => x)) return [];
+    const locals = wtypes(shape, from).map((t) => this.alloc(t));
+    const c = this.setAll(locals);
+    locals.forEach((l, k) => c.push(...localGet(l), ...(ints[k] ? (from === 'i64' ? [OP.i32WrapI64] : [OP.i64ExtendI32S]) : [])));
+    return c;
+  }
+
+  private checkBounds(got: Shape, want: Shape, what: string) {
+    if (got.t === 'list' && want.t === 'list') {
+      // The callee sizes its scratch from its own parameter maximum, so the argument must not be longer.
+      if (got.max > want.max) no(`${what} may have up to ${got.max} elements but the parameter allows ${want.max}`);
+    } else if (got.t === 'rec' && want.t === 'rec') got.fields.forEach((f, i) => this.checkBounds(f.shape, want.fields[i].shape, what));
+    else if (got.t === 'result' && want.t === 'result') {
+      this.checkBounds(got.ok, want.ok, what);
+      this.checkBounds(got.err, want.err, what);
+    }
   }
 
   /** Direct call to another compiled Sigil function. Ints are converted between the two functions' widths. */
@@ -549,43 +653,91 @@ class FnGen {
     if (e.kw.length) return no(`keyword arguments to ${e.fn}`);
     if (e.args.length !== info.params.length) return no(`${e.fn} expects ${info.params.length} argument(s)`);
     // The checker has proved each argument lies in the callee's parameter range, so narrowing is lossless.
-    const conv = (from: ValType, to: ValType): number[] => (from === to ? [] : from === 'i64' ? [OP.i32WrapI64] : [OP.i64ExtendI32S]);
     const c: number[] = [];
     e.args.forEach((a, i) => {
-      const g = this.gen(a);
-      if (!sameKind(g.kind, info.params[i])) no(`argument ${i + 1} of ${e.fn} is ${showKind(g.kind)}, expected ${showKind(info.params[i])}`);
-      if (g.kind.t === 'list') {
-        // The callee sizes its scratch from its own parameter maximum, so the argument must not be longer.
-        const want = info.params[i] as Extract<Kind, { t: 'list' }>;
-        if (g.kind.max > want.max) no(`argument ${i + 1} of ${e.fn} may have up to ${g.kind.max} elements but the parameter allows ${want.max}`);
-        c.push(...g.c, ...localGet(g.lv!.ptr), ...localGet(g.lv!.len));
-      } else {
-        c.push(...g.c, ...(g.kind.t === 'int' ? conv(this.R.vt, info.vt) : []));
-      }
+      const g = this.gen(a, info.params[i]);
+      if (!sameShape(g.shape, info.params[i])) no(`argument ${i + 1} of ${e.fn} is ${showShape(g.shape)}, expected ${showShape(info.params[i])}`);
+      this.checkBounds(g.shape, info.params[i], `argument ${i + 1} of ${e.fn}`);
+      c.push(...g.c, ...this.convert(g.shape, this.R.vt, info.vt));
     });
     if (info.hasBase) {
-      if (this.baseLocal < 0) no('internal: caller has no scratch base');
+      if (this.baseLocal < 0) throw new NeedBase();
       c.push(...this.baseAddr(this.frame)); // callee scratch starts after everything allocated so far
       this.need = Math.max(this.need, this.frame + info.need);
       if (MEM_BASE + this.need > MAX_MEMORY_BYTES) no(`call to ${e.fn}: scratch of ${this.need} bytes exceeds the ${MAX_MEMORY_BYTES} byte limit`);
     }
-    c.push(OP.call, ...uleb(info.index));
-    if (info.result.t === 'int') c.push(...conv(info.vt, this.R.vt));
-    return { c, kind: info.result };
+    c.push(...call(info.index + this.ctx.importBase), ...this.convert(info.result, info.vt, this.R.vt));
+    // A list in the result lives in the callee's scratch: keep it reserved so later allocations cannot overwrite it.
+    if (info.hasBase && listsOf(info.result).length) this.frame += info.need;
+    return { c, shape: info.result };
   }
 
-  private genCall(e: Extract<Expr, { k: 'call' }>): G {
+  /** `a and b ...` / `a or b ...`, short-circuit (operands may have effects or return early). */
+  private genShort(e: Extract<Expr, { k: 'call' }>): G {
+    const isAnd = e.fn === 'and';
+    if (!e.args.length) return { c: I32.const(isAnd ? 1n : 0n), shape: { t: 'bool' } };
+    const parts = e.args.map((a) => this.bool(this.gen(a), e.fn));
+    const build = (i: number): number[] => {
+      if (i === parts.length - 1) return parts[i];
+      return isAnd
+        ? [...parts[i], OP.if, 0x7f, ...build(i + 1), OP.else, ...I32.const(0n), OP.end]
+        : [...parts[i], OP.if, 0x7f, ...I32.const(1n), OP.else, ...build(i + 1), OP.end];
+    };
+    return { c: build(0), shape: { t: 'bool' } };
+  }
+
+  /** Structural equality, leaf by leaf (inactive Result payloads are zero, so every leaf can be compared). */
+  protected genEq(a: G, b: G): G {
+    if (!sameShape(a.shape, b.shape)) return no(`= on ${showShape(a.shape)} and ${showShape(b.shape)}`);
+    if (listsOf(a.shape).length) return no('= on a value containing a list');
+    const sa = this.spill(a);
+    const sb = this.spill(b);
+    const c = [...sa.c, ...sb.c];
+    const leafT = this.eqLeaves(a.shape);
+    let first = true;
+    leafT.forEach((k, i) => {
+      c.push(...localGet(sa.locals[i]), ...localGet(sb.locals[i]), ...this.eqLeaf(k));
+      if (!first) c.push(I32.and);
+      first = false;
+    });
+    if (first) c.push(...I32.const(1n)); // no leaves (Unit): equal
+    return { c, shape: { t: 'bool' } };
+  }
+  protected eqLeaves(s: Shape): ('int' | 'i32' | 'str')[] {
+    switch (s.t) {
+      case 'unit':
+        return [];
+      case 'int':
+        return ['int'];
+      case 'str':
+        return ['str'];
+      case 'rec':
+        return s.fields.flatMap((f) => this.eqLeaves(f.shape));
+      case 'result':
+        return ['i32', ...this.eqLeaves(s.ok), ...this.eqLeaves(s.err)];
+      default:
+        return ['i32'];
+    }
+  }
+  protected eqLeaf(k: 'int' | 'i32' | 'str'): number[] {
+    if (k === 'str') return this.opts.mutation === 'str-eq-true' ? [OP.drop, OP.drop, ...I32.const(1n)] : call(this.imp('str_eq', ['i32', 'i32'], ['i32']));
+    return [k === 'int' ? this.R.eq : I32.eq];
+  }
+
+  protected genCall(e: Extract<Expr, { k: 'call' }>, expect?: Shape): G {
     const R = this.R;
     const name = e.fn;
-    if (name in CAP_OPS) return no(`capability operation ${name}`);
-    if (this.prog.types.has(name)) return no(`record construction ${name}`);
+    const dc = asDeclassify(e);
+    if (dc) return this.gen(dc.expr, expect); // identity at runtime: labels are static
+    if (name in CAP_OPS) return this.genCap(e);
+    if (this.prog.types.has(name)) return this.genRecord(e);
     if (this.prog.fns.has(name)) return this.genUserCall(e);
     if (e.kw.length) return no(`keyword arguments to ${name}`);
     const need = (n: number) => {
       if (e.args.length !== n) no(`${name} expects ${n} argument(s)`);
     };
-    const INT: Kind = { t: 'int' };
-    const BOOL: Kind = { t: 'bool' };
+    const INT: Shape = { t: 'int' };
+    const BOOL: Shape = { t: 'bool' };
 
     switch (name) {
       case 'map':
@@ -595,25 +747,52 @@ class FnGen {
       case 'sum':
         return this.genSum(e);
       case 'sort':
-        return no('sort (not yet supported by the Wasm backend)');
+        return this.genSort(e);
       case 'fold':
-        return no('fold (not yet supported by the Wasm backend)');
+        return this.genFold(e);
+      case 'take':
+      case 'drop':
+        return this.genTakeDrop(e);
+      case 'at':
+        return this.genAt(e);
+      case 'append':
+        return this.genAppend(e);
       case 'len':
         return this.genLen(e);
       case 'list':
         return this.genListLit(e);
+      case 'ok':
+      case 'err': {
+        need(1);
+        if (!expect || expect.t !== 'result') return no(`(${name} ...) here has no known Result type (it is not the function result, a record field or an argument)`);
+        const side = name === 'ok' ? expect.ok : expect.err;
+        const g = this.gen(e.args[0], side);
+        if (!sameShape(g.shape, side)) return no(`(${name} ...) carries ${showShape(g.shape)} but the Result expects ${showShape(side)}`);
+        const flip = this.opts.mutation === 'tag-flip';
+        return name === 'ok'
+          ? { c: [...I32.const(flip ? 1n : 0n), ...g.c, ...this.zero(expect.err)], shape: expect }
+          : { c: [...I32.const(flip ? 0n : 1n), ...this.zero(expect.ok), ...g.c], shape: expect };
+      }
+      case 'text':
+        return this.genText(e);
+      case 'money':
+        return this.genMoney(e);
+      case 'chars':
+        return this.genChars(e);
+      case 'from-chars':
+        return this.genFromChars(e);
       case 'add':
       case 'sub':
       case 'mul': {
         need(2);
         const a = this.int(this.gen(e.args[0]), name);
         const b = this.int(this.gen(e.args[1]), name);
-        return { c: [...a, ...b, name === 'add' ? R.add : name === 'sub' ? R.sub : R.mul], kind: INT };
+        return { c: [...a, ...b, name === 'add' ? R.add : name === 'sub' ? R.sub : R.mul], shape: INT };
       }
       case 'neg': {
         need(1);
         const a = this.int(this.gen(e.args[0]), name);
-        return { c: [...R.const(0n), ...a, R.sub], kind: INT };
+        return { c: [...R.const(0n), ...a, R.sub], shape: INT };
       }
       case 'div-floor':
       case 'min':
@@ -626,52 +805,360 @@ class FnGen {
         const prefix = [...a, ...b, ...localSet(ty), ...localSet(tx)];
         const x = localGet(tx);
         const y = localGet(ty);
-        if (name === 'min') return { c: [...prefix, ...x, ...y, ...x, ...y, R.ltS, OP.select], kind: INT };
-        if (name === 'max') return { c: [...prefix, ...x, ...y, ...x, ...y, R.gtS, OP.select], kind: INT };
+        if (name === 'min') return { c: [...prefix, ...x, ...y, ...x, ...y, R.ltS, OP.select], shape: INT };
+        if (name === 'max') return { c: [...prefix, ...x, ...y, ...x, ...y, R.gtS, OP.select], shape: INT };
         // div-floor. The checker has proved the divisor is non-zero and |x| < 2^(w-1), so neither
         // the zero-divide trap nor the INT_MIN / -1 trap can occur. div_s truncates toward zero;
         // floor = trunc - 1 when the remainder is non-zero and its sign differs from the divisor's.
-        if (this.opts.divMode === 'trunc') return { c: [...prefix, ...x, ...y, R.divS], kind: INT };
+        if (this.opts.divMode === 'trunc') return { c: [...prefix, ...x, ...y, R.divS], shape: INT };
         const tr = this.alloc(R.vt);
         const r = localGet(tr);
         const flag = [...r, ...R.const(0n), R.ne, ...r, ...y, R.xor, ...R.const(0n), R.ltS, I32.and];
         return {
           c: [...prefix, ...x, ...y, R.divS, ...x, ...y, R.remS, ...localSet(tr), ...flag, ...(R.vt === 'i64' ? [OP.i64ExtendI32U] : []), R.sub],
-          kind: INT,
+          shape: INT,
         };
       }
       case '<':
       case '<=':
       case '>':
       case '>=': {
-        if (e.args.length !== 2) return no(`${name} with ${e.args.length} arguments (only binary comparison is supported)`);
-        const a = this.int(this.gen(e.args[0]), name);
-        const b = this.int(this.gen(e.args[1]), name);
-        return { c: [...a, ...b, name === '<' ? R.ltS : name === '<=' ? R.leS : name === '>' ? R.gtS : R.geS], kind: BOOL };
+        if (e.args.length < 2) return no(`${name} with ${e.args.length} argument(s)`);
+        const op = name === '<' ? R.ltS : name === '<=' ? R.leS : name === '>' ? R.gtS : R.geS;
+        if (e.args.length === 2) return { c: [...this.int(this.gen(e.args[0]), name), ...this.int(this.gen(e.args[1]), name), op], shape: BOOL };
+        // chained, e.g. (<= lo x hi): every operand is evaluated once, in order, then adjacent pairs are compared
+        const c: number[] = [];
+        const ls = e.args.map((a) => {
+          const l = this.alloc(R.vt);
+          c.push(...this.int(this.gen(a), name), ...localSet(l));
+          return l;
+        });
+        ls.slice(0, -1).forEach((l, i) => {
+          c.push(...localGet(l), ...localGet(ls[i + 1]), op);
+          if (i > 0) c.push(I32.and);
+        });
+        return { c, shape: BOOL };
       }
       case '=': {
         need(2);
-        const a = this.scalar(this.gen(e.args[0]), '=');
-        const b = this.scalar(this.gen(e.args[1]), '=');
-        if (!sameKind(a.kind, b.kind)) return no(`= on ${showKind(a.kind)} and ${showKind(b.kind)}`);
-        return { c: [...a.c, ...b.c, a.kind.t === 'int' ? R.eq : I32.eq], kind: BOOL };
+        return this.genEq(this.gen(e.args[0]), this.gen(e.args[1]));
       }
       case 'not': {
         need(1);
-        return { c: [...this.bool(this.gen(e.args[0]), 'not'), I32.eqz], kind: BOOL };
+        return { c: [...this.bool(this.gen(e.args[0]), 'not'), I32.eqz], shape: BOOL };
       }
       case 'and':
-      case 'or': {
-        // Operands are pure and cannot trap, so non-short-circuit evaluation is equivalent.
-        if (!e.args.length) return { c: I32.const(name === 'and' ? 1n : 0n), kind: BOOL };
-        const parts = e.args.map((a) => this.bool(this.gen(a), name));
-        const c = [...parts[0]];
-        for (const p of parts.slice(1)) c.push(...p, name === 'and' ? I32.and : I32.or);
-        return { c, kind: BOOL };
-      }
+      case 'or':
+        return this.genShort(e);
       default:
-        return no(`uses ${name}, which is outside the compiled subset (strings, Results and text builtins are not supported)`);
+        return no(`uses ${name}, which is outside the compiled subset`);
     }
+  }
+
+  // --- capability operations: imported host functions -------------------------------------
+  /** `(put h k v)`, `(post h p)`, `(emit h ev)`, `(fresh h)`: one host import per operation and argument shape. */
+  protected genCap(e: Extract<Expr, { k: 'call' }>): G {
+    const op = e.fn;
+    if (op === 'get') return no('get: the reference interpreter cannot run it');
+    if (e.kw.length) return no(`keyword arguments to ${op}`);
+    if (e.args.length !== CAP_OPS[op].arity) return no(`${op} expects ${CAP_OPS[op].arity} argument(s)`);
+    const h = e.args[0];
+    const isHandle = h.k === 'var' && !h.path.length && !this.lookup(h.name) && (this.prog.binds.has(h.name) || h.name.includes(':') || h.name === 'audit' || h.name === 'rand');
+    if (h.k !== 'var' || !isHandle) return no(`${op}: the first argument must be a capability handle named in needs`);
+    const reg = this.ctx.reg;
+    let hid = reg.handles.indexOf(h.name);
+    if (hid < 0) {
+      hid = reg.handles.length;
+      reg.handles.push(h.name);
+    }
+    if (this.opts.mutation === 'effect-handle-swapped') hid = (hid + 1) % Math.max(1, reg.handles.length);
+    const gs = e.args.slice(1).map((a) => this.gen(a));
+    const shapes = gs.map((g) => g.shape);
+    const sig = shapeJson(shapes);
+    let name = reg.imports.find((i) => i.effect?.op === op && shapeJson(i.effect.args) === sig)?.desc.name;
+    if (!name) name = `${op}$${reg.imports.filter((i) => i.effect?.op === op).length}`;
+    const params: ValType[] = ['i32', ...shapes.flatMap((s) => wtypes(s, 'i64'))];
+    const idx = this.imp(name, params, [op === 'fresh' ? 'i64' : 'i32'], { import: name, op, args: shapes });
+    const c: number[] = [...I32.const(BigInt(hid))];
+    for (const g of gs) c.push(...g.c, ...this.convert(g.shape, this.R.vt, 'i64'));
+    if (this.opts.mutation === 'emit-dropped' && op === 'emit') return { c: [...c.slice(0, 0), ...gs.flatMap((g) => [...g.c, ...this.dropAll(g.shape)])], shape: { t: 'unit' } };
+    c.push(...call(idx));
+    switch (op) {
+      case 'put':
+      case 'post':
+        // the import returns 1 when the operation succeeded; a Result tag is 0 for ok
+        return { c: this.opts.mutation === 'put-flag-inverted' ? c : [...c, I32.eqz], shape: { t: 'result', ok: { t: 'unit' }, err: { t: 'unit' } } };
+      case 'emit':
+        return { c: [...c, OP.drop], shape: { t: 'unit' } };
+      default: // fresh
+        return { c: [...c, ...(this.R.vt === 'i32' ? [OP.i32WrapI64] : [])], shape: { t: 'int' } };
+    }
+  }
+  // --- fold, sort and the list builtins ----------------------------------------------------------
+  /** `(fold xs T init (fn (acc x) body))`: a loop whose accumulator lives in locals. */
+  protected genFold(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 4 || e.kw.length) no('fold expects (fold list Type init (fn (acc x) body))');
+    const tE = e.args[1];
+    if (tE.k !== 'var' || tE.path.length || !this.prog.types.has(tE.name)) return no('fold: the second argument must be a declared type name');
+    const src = this.listArg(e.args[0], 'fold');
+    const lam = this.lambda(e.args[3], 2, 'fold');
+    const T = shapeOf(this.prog, { k: 'named', name: tE.name }, `fold accumulator ${tE.name}`, SHAPE_OPTS);
+    if (listsOf(T).length) no('fold: the accumulator type holds a list');
+    const init = this.gen(e.args[2], T);
+    if (!sameShape(init.shape, T)) no(`fold: the initial value is ${showShape(init.shape)} but the accumulator is ${showShape(T)}`);
+    const acc = this.allocLeaves(T);
+    const i = this.alloc('i32');
+    const { binding, load } = this.bindElem(src.lv, i);
+    const body = this.withScope(
+      new Map<string, Binding>([
+        [lam.params[0], { shape: T, locals: acc }],
+        [lam.params[1], binding],
+      ]),
+      () => this.gen(lam.body, T),
+    );
+    if (!sameShape(body.shape, T)) no(`fold: the step is ${showShape(body.shape)} but the accumulator is ${showShape(T)}`);
+    return { c: [...src.c, ...(this.opts.mutation === 'fold-init-dropped' ? [...init.c, ...this.dropAll(T), ...this.zero(T)] : init.c), ...this.setAll(acc), ...this.loop(src.lv.len, i, [...load, ...body.c, ...this.setAll(acc)]), ...this.getAll(acc)], shape: T };
+  }
+
+  /** `block loop { if !cond break; body; continue }` */
+  private whileLoop(cond: number[], body: number[]): number[] {
+    return [OP.block, OP.void, OP.loop, OP.void, ...cond, I32.eqz, OP.brIf, 1, ...body, OP.br, 0, OP.end, OP.end];
+  }
+  private copyElem(dst: number, src: number, stride: number): number[] {
+    const c: number[] = [];
+    for (let k = 0; k < stride; k++) c.push(...localGet(dst), ...localGet(src), ...i64Load(k * SLOT), ...i64Store(k * SLOT));
+    return c;
+  }
+
+  /**
+   * `(sort xs (fn (a b) before))`: the interpreter's stable top-down merge sort, with the same split points
+   * (left = floor(m/2)) and the same comparisons in the same order, using an explicit stack in scratch memory.
+   */
+  protected genSort(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 2 || e.kw.length) no('sort expects (sort list (fn (a b) before))');
+    const src = this.listArg(e.args[0], 'sort');
+    const lam = this.lambda(e.args[1], 2, 'sort');
+    const sk = src.lv.shape;
+    const L = sk.layout;
+    const bytes = sk.max * L.stride * SLOT;
+    const depth = Math.ceil(Math.log2(Math.max(2, sk.max))) + 2;
+    const frames = 2 * depth + 2;
+    const offA = this.allocScratch(bytes, 'sort');
+    const offB = this.allocScratch(bytes, 'sort');
+    const offS = this.allocScratch(frames * 12, 'sort');
+    const [A, B, S] = [this.alloc('i32'), this.alloc('i32'), this.alloc('i32')];
+    const n = src.lv.len;
+    const [sp, lo, hi, mid, st, i, j, k, t] = Array.from({ length: 9 }, () => this.alloc('i32'));
+    const aLV: ListLocals = { ptr: A, len: n, shape: sk };
+    const bj = this.bindElem(aLV, j); // a = r[j]
+    const bi = this.bindElem(aLV, i); // b = l[i]
+    const before = this.withScope(
+      new Map<string, Binding>([
+        [lam.params[0], bj.binding],
+        [lam.params[1], bi.binding],
+      ]),
+      () => this.gen(lam.body),
+    );
+    if (before.shape.t !== 'bool') no(`sort comparator must return Bool, got ${showShape(before.shape)}`);
+    const at = (base: number, idx: number): number[] => this.elemAddr(base, idx, L.stride);
+    const push = (a: number[], b: number[], c: number[]): number[] => {
+      const f = [...localGet(S), ...localGet(sp), ...I32.const(12n), I32.mul, I32.add];
+      return [...f, ...a, ...i32Store(0), ...f, ...b, ...i32Store(4), ...f, ...c, ...i32Store(8), ...localGet(sp), ...I32.const(1n), I32.add, ...localSet(sp)];
+    };
+    const lg = (x: number) => localGet(x);
+    const c1 = I32.const(1n);
+    const da = this.alloc('i32'); // scratch destination address
+    const sa = this.alloc('i32'); // scratch source address
+    const mergeStep = (fromLeft: boolean): number[] => {
+      // copy A[idx] -> B[k]; idx++ ; k++
+      const idx = fromLeft ? i : j;
+      return [...at(B, k), ...localSet(da), ...at(A, idx), ...localSet(sa), ...this.copyElem(da, sa, L.stride), ...lg(idx), ...c1, I32.add, ...localSet(idx), ...lg(k), ...c1, I32.add, ...localSet(k)];
+    };
+    const merge: number[] = [
+      ...lg(lo), ...lg(hi), ...lg(lo), I32.sub, ...I32.const(2n), I32.divS, I32.add, ...localSet(mid),
+      ...lg(lo), ...localSet(i), ...lg(mid), ...localSet(j), ...lg(lo), ...localSet(k),
+      ...this.whileLoop([...lg(i), ...lg(mid), I32.ltS, ...lg(j), ...lg(hi), I32.ltS, I32.and], [...bj.load, ...bi.load, ...before.c, ...(this.opts.mutation === 'sort-inverted' ? [I32.eqz] : []), OP.if, OP.void, ...mergeStep(false), OP.else, ...mergeStep(true), OP.end]),
+      ...(this.opts.mutation === 'sort-left-tail-dropped' ? [] : this.whileLoop([...lg(i), ...lg(mid), I32.ltS], mergeStep(true))),
+      ...this.whileLoop([...lg(j), ...lg(hi), I32.ltS], mergeStep(false)),
+      // copy B[lo..hi) back to A
+      ...lg(lo), ...localSet(t),
+      ...this.whileLoop([...lg(t), ...lg(hi), I32.ltS], [...at(A, t), ...localSet(da), ...at(B, t), ...localSet(sa), ...this.copyElem(da, sa, L.stride), ...lg(t), ...c1, I32.add, ...localSet(t)]),
+    ];
+    const main = this.whileLoop(
+      [...lg(sp), ...I32.const(0n), I32.ne],
+      [
+        ...lg(sp), ...c1, I32.sub, ...localSet(sp),
+        ...lg(S), ...lg(sp), ...I32.const(12n), I32.mul, I32.add, ...localSet(t),
+        ...lg(t), ...i32Load(0), ...localSet(lo), ...lg(t), ...i32Load(4), ...localSet(hi), ...lg(t), ...i32Load(8), ...localSet(st),
+        ...lg(hi), ...lg(lo), I32.sub, ...c1, I32.gtS, OP.if, OP.void,
+        ...lg(st), I32.eqz, OP.if, OP.void,
+        ...lg(lo), ...lg(hi), ...lg(lo), I32.sub, ...I32.const(2n), I32.divS, I32.add, ...localSet(mid),
+        ...push(lg(lo), lg(hi), c1), ...push(lg(mid), lg(hi), I32.const(0n)), ...push(lg(lo), lg(mid), I32.const(0n)),
+        OP.else, ...merge, OP.end,
+        OP.end,
+      ],
+    );
+    const c = [
+      ...src.c,
+      ...this.baseAddr(offA), ...localSet(A), ...this.baseAddr(offB), ...localSet(B), ...this.baseAddr(offS), ...localSet(S),
+      ...I32.const(0n), ...localSet(t),
+      ...this.whileLoop([...lg(t), ...lg(n), I32.ltS], [...at(A, t), ...localSet(da), ...at(src.lv.ptr, t), ...localSet(sa), ...this.copyElem(da, sa, L.stride), ...lg(t), ...c1, I32.add, ...localSet(t)]),
+      ...I32.const(0n), ...localSet(sp),
+      ...push(I32.const(0n), lg(n), I32.const(0n)),
+      ...main,
+      ...lg(A), ...lg(n),
+    ];
+    return { c, shape: { t: 'list', layout: L, min: sk.min, max: sk.max } };
+  }
+
+  /** take / drop: a view of the same memory, no copy. */
+  private genTakeDrop(e: Extract<Expr, { k: 'call' }>): G {
+    const take = e.fn === 'take';
+    if (e.args.length !== 2 || e.kw.length) no(`${e.fn} expects 2 arguments`);
+    const src = this.listArg(e.args[0], e.fn);
+    const R = this.R;
+    const nn = this.int(this.gen(e.args[1]), e.fn);
+    const kk = this.alloc(R.vt);
+    const k = this.alloc('i32');
+    const lenR = [...localGet(src.lv.len), ...(R.vt === 'i64' ? [OP.i64ExtendI32U] : [])];
+    // k = clamp(n, 0, len)
+    const clamp = [
+      ...nn, ...localSet(kk),
+      ...localGet(kk), ...R.const(0n), R.ltS, OP.if, 0x7f, ...I32.const(0n), OP.else,
+      ...localGet(kk), ...lenR, R.gtS, OP.if, 0x7f, ...localGet(src.lv.len), OP.else, ...localGet(kk), ...(R.vt === 'i64' ? [OP.i32WrapI64] : []), OP.end, OP.end,
+      ...localSet(k),
+    ];
+    const L = src.lv.shape.layout;
+    const out: ListShape = { t: 'list', layout: L, min: 0, max: src.lv.shape.max };
+    const c = take
+      ? [...src.c, ...clamp, ...localGet(src.lv.ptr), ...localGet(k)]
+      : [...src.c, ...clamp, ...localGet(src.lv.ptr), ...localGet(k), ...I32.const(BigInt(L.stride * SLOT)), I32.mul, I32.add, ...localGet(src.lv.len), ...localGet(k), I32.sub];
+    return { c, shape: out };
+  }
+
+  /** `(at xs i default)`: the element at a 0-based index, or the default (all three arguments are evaluated). */
+  private genAt(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 3 || e.kw.length) no('at expects 3 arguments');
+    const src = this.listArg(e.args[0], 'at');
+    const R = this.R;
+    const L = src.lv.shape.layout;
+    const idx = this.alloc(R.vt);
+    const iCode = [...this.int(this.gen(e.args[1]), 'at'), ...localSet(idx)];
+    const d = this.gen(e.args[2], L.elem);
+    if (!sameShape(d.shape, L.elem)) no(`at: the default is ${showShape(d.shape)} but the elements are ${showShape(L.elem)}`);
+    const dl = this.spill(d);
+    const lenR = [...localGet(src.lv.len), ...(R.vt === 'i64' ? [OP.i64ExtendI32U] : [])];
+    const i32i = this.alloc('i32');
+    const ea = this.alloc('i32');
+    const load: number[] = [...localGet(idx), ...(R.vt === 'i64' ? [OP.i32WrapI64] : []), ...localSet(i32i), ...this.elemAddr(src.lv.ptr, i32i, L.stride), ...localSet(ea)];
+    for (const l of L.leaves) load.push(...localGet(ea), ...i64Load(l.slot * SLOT), ...this.fromSlot(l.kind));
+    const inRange = [...localGet(idx), ...R.const(0n), R.geS, ...localGet(idx), ...lenR, R.ltS, I32.and];
+    return { c: [...src.c, ...iCode, ...dl.c, ...inRange, OP.if, ...this.bt(L.elem), ...load, OP.else, ...this.getAll(dl.locals), OP.end], shape: L.elem };
+  }
+
+  /** `(append xs x)`: a copy with the element at the end (length grows by one). */
+  private genAppend(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 2 || e.kw.length) no('append expects 2 arguments');
+    const src = this.listArg(e.args[0], 'append');
+    const L = src.lv.shape.layout;
+    const x = this.gen(e.args[1], L.elem);
+    if (!sameShape(x.shape, L.elem)) no(`append: the element is ${showShape(x.shape)} but the list holds ${showShape(L.elem)}`);
+    const xs = this.spill(x);
+    const off = this.allocScratch((src.lv.shape.max + 1) * L.stride * SLOT, 'append');
+    const [p, i, da, sa] = [this.alloc('i32'), this.alloc('i32'), this.alloc('i32'), this.alloc('i32')];
+    const copy = [...this.elemAddr(p, i, L.stride), ...localSet(da), ...this.elemAddr(src.lv.ptr, i, L.stride), ...localSet(sa), ...this.copyElem(da, sa, L.stride)];
+    const c = [
+      ...src.c, ...xs.c, ...this.baseAddr(off), ...localSet(p),
+      ...this.loop(src.lv.len, i, copy),
+      ...this.elemAddr(p, src.lv.len, L.stride), ...localSet(da),
+      ...this.storeElem(da, L, xs.locals),
+      ...localGet(p), ...localGet(src.lv.len), ...I32.const(1n), I32.add,
+    ];
+    return { c, shape: { t: 'list', layout: L, min: src.lv.shape.min + 1, max: src.lv.shape.max + 1 } };
+  }
+
+  // --- strings: opaque i32 handles into a host-owned table -----------------------------
+  /** Index of a host import (registered on first use). Index 0 is returned for a function that will not be emitted. */
+  protected imp(name: string, params: ValType[], results: ValType[], effect?: EffectDesc): number {
+    this.touched.add(name);
+    const reg = this.ctx.reg;
+    let i = reg.importIndex(name);
+    if (i < 0) {
+      if (reg.frozen) return 0;
+      i = reg.imports.length;
+      reg.imports.push({ desc: { module: 'host', name, params, results }, effect, used: false });
+    }
+    return i;
+  }
+
+  protected genStr(v: string): G {
+    return { c: I32.const(BigInt(this.ctx.reg.literal(v))), shape: { t: 'str' } };
+  }
+
+  /** `(text a b ...)`: concatenates strings and renders other values as the interpreter's showVal does. */
+  protected genText(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.kw.length) no('keyword arguments to text');
+    if (!e.args.length) return this.genStr('');
+    const concat = this.imp('str_concat', ['i32', 'i32'], ['i32']);
+    const c: number[] = [];
+    e.args.forEach((a, i) => {
+      c.push(...this.asStr(this.gen(a)));
+      if (i > 0) c.push(...call(concat));
+    });
+    return { c, shape: { t: 'str' } };
+  }
+
+  /** The handle of the rendering of a value inside `text`. */
+  private asStr(g: G): number[] {
+    const s = g.shape;
+    switch (s.t) {
+      case 'str':
+        return g.c;
+      case 'int': {
+        const f = this.imp('str_int', ['i64'], ['i32']);
+        return [...g.c, ...(this.R.vt === 'i32' ? [OP.i64ExtendI32S] : []), ...call(f)];
+      }
+      case 'bool':
+        return [...g.c, OP.if, 0x7f, ...I32.const(BigInt(this.ctx.reg.literal('true'))), OP.else, ...I32.const(BigInt(this.ctx.reg.literal('false'))), OP.end];
+      case 'enum':
+        return [...g.c, ...I32.const(BigInt(this.ctx.reg.enumBlock(s.cases))), I32.add];
+      case 'unit':
+        return [...g.c, ...I32.const(BigInt(this.ctx.reg.literal('unit')))];
+      default:
+        return no(`text of a ${showShape(s)} (only Str, Int, Bool, enum and Unit are rendered)`);
+    }
+  }
+
+  protected genMoney(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 1 || e.kw.length) no('money expects 1 argument');
+    const a = this.int(this.gen(e.args[0]), 'money');
+    const f = this.imp('str_money', ['i64'], ['i32']);
+    return { c: [...a, ...(this.R.vt === 'i32' ? [OP.i64ExtendI32S] : []), ...call(f)], shape: { t: 'str' } };
+  }
+
+  /** `(chars s)`: the host writes the code points into scratch memory (s must have a declared :max). */
+  protected genChars(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 1 || e.kw.length) no('chars expects 1 argument');
+    const s = this.gen(e.args[0]);
+    if (s.shape.t !== 'str') return no(`chars needs a Str, got ${showShape(s.shape)}`);
+    if (s.shape.max === undefined) return no('chars needs a Str with a declared :max');
+    const max = s.shape.max;
+    const f = this.imp('str_chars', ['i32', 'i32', 'i32'], ['i32']);
+    const off = this.allocScratch(max * SLOT, 'chars');
+    const n = this.alloc('i32');
+    const layout = layoutOf({ t: 'int', lo: 0n, hi: 1114111n }, 'chars element');
+    return {
+      c: [...s.c, ...this.baseAddr(off), ...I32.const(BigInt(max)), ...call(f), ...localSet(n), ...this.baseAddr(off), ...localGet(n)],
+      shape: { t: 'list', layout, min: 0, max },
+    };
+  }
+
+  protected genFromChars(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 1 || e.kw.length) no('from-chars expects 1 argument');
+    const l = this.gen(e.args[0]);
+    if (l.shape.t !== 'list' || l.shape.layout.elem.t !== 'int') return no(`from-chars needs a list of Int, got ${showShape(l.shape)}`);
+    const f = this.imp('str_from_chars', ['i32', 'i32'], ['i32']);
+    return { c: [...l.c, ...call(f)], shape: { t: 'str' } };
   }
 }
 
@@ -679,10 +1166,50 @@ class FnGen {
 // Per-function and per-program drivers
 // ---------------------------------------------------------------------------
 
-function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, opts: CompileOptions, callee: CalleeResolver): { report: FnReport; func?: WasmFunc } {
+/** Integer ranges of every type a function body names (record constructions, fold accumulators, callees). */
+function declaredMagnitudes(prog: Program, f: FnDef): bigint[] {
+  const out: bigint[] = [];
+  const add = (t: import('../ast.js').Type) => {
+    try {
+      magnitudes(shapeOf(prog, t, 'type', { strings: true }), out);
+    } catch {
+      // surfaces as a reason during code generation
+    }
+  };
+  walk(f.body, (x) => {
+    if (x.k !== 'call') return;
+    if (prog.types.has(x.fn)) add({ k: 'named', name: x.fn });
+    const uf = prog.fns.get(x.fn);
+    if (uf) {
+      uf.params.forEach((p) => add(p.type));
+      add(uf.out);
+    }
+    if (x.fn === 'fold' && x.args[1]?.k === 'var' && prog.types.has(x.args[1].name)) add({ k: 'named', name: x.args[1].name });
+    if (x.fn === 'fresh') out.push(9007199254740991n);
+    if (x.fn === 'chars') out.push(1114111n);
+  });
+  return out;
+}
+
+function literals(e: Expr): bigint[] {
+  const out: bigint[] = [];
+  walk(e, (x) => {
+    if (x.k === 'int') out.push(x.v);
+  });
+  return out;
+}
+
+function calledFns(prog: Program, e: Expr): Set<string> {
+  const out = new Set<string>();
+  walk(e, (x) => {
+    if (x.k === 'call' && prog.fns.has(x.fn)) out.add(x.fn);
+  });
+  return out;
+}
+
+function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, opts: CompileOptions, callee: CalleeResolver, ctx: Ctx, entries: Set<string>): { report: FnReport; func?: WasmFunc; touched?: Set<string> } {
   const report: FnReport = { name: f.name, compilable: false, checkerRepr: ev.repr };
   try {
-    if (f.needs.length) no(`uses capabilities/effects (needs ${f.needs.join(', ')})`);
     if (f.requires.length) no('has requires clauses, which the backend does not enforce');
     const errs = res.diags.filter((d) => d.level === 'error' && d.fn === f.name);
     if (errs.length) no(`checker reports errors (${errs[0].code})`);
@@ -693,79 +1220,72 @@ function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, op
     }
 
     const params: ParamSpec[] = f.params.map((p) => {
-      const r = resolveType(prog, p.type);
-      // A list parameter is a single leaf of kind list, passed as (ptr, len).
-      if (r.k === 'list') return { name: p.name, type: p.type, leaves: [{ path: '', kind: listKind(prog, r, `param ${p.name}`) }] };
-      return { name: p.name, type: p.type, leaves: leavesOf(prog, p.type, '', `param ${p.name}`) };
+      const shape = shapeOf(prog, p.type, `param ${p.name}`, SHAPE_OPTS);
+      return { name: p.name, type: p.type, shape, leaves: flatLeaves(shape) };
     });
-    const result = kindOfType(prog, f.out, 'result');
+    const result = shapeOf(prog, f.out, 'result', SHAPE_OPTS);
 
     // Representation: the checker's derived repr, widened if its tracked intermediates did not
-    // cover parameters or literals (it only tracks arithmetic results).
+    // cover parameters, declared types or literals (it only tracks arithmetic results).
     const mags: bigint[] = [];
-    for (const p of params) for (const l of p.leaves) if (l.lo !== undefined) mags.push(l.lo < 0n ? -l.lo : l.lo, l.hi! < 0n ? -l.hi! : l.hi!);
-    const lits: bigint[] = [];
-    literals(f.body, lits);
-    for (const v of lits) mags.push(v < 0n ? -v : v);
+    for (const p of params) magnitudes(p.shape, mags);
+    magnitudes(result, mags);
+    mags.push(...declaredMagnitudes(prog, f));
+    mags.push(...literals(f.body).map((v) => (v < 0n ? -v : v)));
     const mine = reprFor(mags.reduce((a, b) => (a > b ? a : b), 0n));
     if (ev.repr === 'bigint' || mine === 'bigint') no('needs bigint representation (exceeds i64)');
     // A caller is at least as wide as its callees, so a callee's result always fits the caller.
     let calleeWide = false;
-    let calleeBase = false;
     for (const name of calledFns(prog, f.body)) {
       const info = callee(name);
       if (typeof info === 'string') no(`calls ${name}, which is not compilable: ${info}`);
-      else {
-        if (info.vt === 'i64') calleeWide = true;
-        if (info.hasBase) calleeBase = true;
-      }
+      else if (info.vt === 'i64') calleeWide = true;
     }
-    let usesListOps = false;
-    walk(f.body, (x) => {
-      if (x.k === 'call' && ['map', 'filter', 'sum', 'len', 'list'].includes(x.fn) && !prog.fns.has(x.fn)) usesListOps = true;
-    });
-    const hasList = params.some((p) => p.leaves.some((l) => l.kind.t === 'list'));
-    const hasBase = hasList || usesListOps || calleeBase;
     const used: 'i32' | 'i64' = ev.repr === 'i64' || mine === 'i64' || calleeWide ? 'i64' : 'i32';
     if (used !== ev.repr) report.widenedFromChecker = `checker derived ${ev.repr}, but parameter ranges or literals need ${used}`;
     report.repr = used;
     const R = used === 'i64' ? I64 : I32;
+    const needsInput = params.some((p) => listsOf(p.shape).length > 0);
 
-    const g = new FnGen(prog, R, opts, callee);
-    const top = new Map<string, Binding>();
-    const ptypes: ValType[] = [];
-    for (const p of params) {
-      const isRec = resolveType(prog, p.type).k === 'rec';
-      const leaves = new Map<string, { local: number; kind: Kind }>();
-      if (p.leaves.length === 1 && p.leaves[0].kind.t === 'list') {
-        const kind = p.leaves[0].kind;
-        top.set(p.name, { b: 'list', lv: { ptr: ptypes.length, len: ptypes.length + 1, kind } });
-        ptypes.push('i32', 'i32');
-        continue;
+    for (const withBase of needsInput ? [true] : [false, true]) {
+      const g = new FnGen(prog, R, opts, callee, ctx);
+      g.retShape = result;
+      const top = new Map<string, Binding>();
+      const ptypes: ValType[] = [];
+      for (const p of params) {
+        const locals = wtypes(p.shape, R.vt).map((t) => {
+          ptypes.push(t);
+          return ptypes.length - 1;
+        });
+        top.set(p.name, { shape: p.shape, locals });
       }
-      for (const l of p.leaves) {
-        leaves.set(l.path, { local: ptypes.length, kind: l.kind });
-        ptypes.push(l.kind.t === 'int' ? R.vt : 'i32');
+      if (withBase) {
+        g.baseLocal = ptypes.length;
+        ptypes.push('i32');
       }
-      top.set(p.name, isRec ? { b: 'rec', leaves } : { b: 'val', local: leaves.get('')!.local, kind: leaves.get('')!.kind });
-    }
-    if (hasBase) {
-      g.baseLocal = ptypes.length;
-      ptypes.push('i32');
-    }
-    g.nParams = ptypes.length;
-    g.scopes.push(top);
-    const body = g.gen(f.body);
-    if (!sameKind(body.kind, result)) no(`body is ${showKind(body.kind)} but declared result is ${showKind(result)}`);
+      g.nParams = ptypes.length;
+      g.scopes.push(top);
+      let body: G;
+      try {
+        body = g.gen(f.body, result);
+      } catch (e) {
+        if (e instanceof NeedBase && !withBase) continue;
+        throw e;
+      }
+      if (!sameShape(body.shape, result)) no(`body is ${showShape(body.shape)} but declared result is ${showShape(result)}`);
 
-    let inputBytes = 0;
-    for (const p of params) for (const l of p.leaves) if (l.kind.t === 'list') inputBytes += l.kind.max * l.kind.layout.stride * SLOT;
-    if (hasBase && MEM_BASE + inputBytes + g.need > MAX_MEMORY_BYTES) no(`memory for inputs (${inputBytes}) and scratch (${g.need}) exceeds the ${MAX_MEMORY_BYTES} byte limit`);
-    if (hasBase) Object.assign(report, { hasBase: true, inputBytes, scratchBytes: g.need });
-    report.params = params;
-    report.result = result;
-    report.compilable = true;
-    return { report, func: { name: f.name, params: ptypes, result: result.t === 'int' ? R.vt : 'i32', locals: g.locals, body: body.c } };
+      let inputBytes = 0;
+      for (const p of params) for (const l of listsOf(p.shape)) inputBytes += l.max * l.layout.stride * SLOT;
+      if (withBase && MEM_BASE + inputBytes + g.need > MAX_MEMORY_BYTES) no(`memory for inputs (${inputBytes}) and scratch (${g.need}) exceeds the ${MAX_MEMORY_BYTES} byte limit`);
+      if (withBase) Object.assign(report, { hasBase: true, inputBytes, scratchBytes: g.need });
+      report.params = params;
+      report.result = result;
+      report.compilable = true;
+      if (entries.has(f.name)) report.entry = true;
+      if (f.needs.length) report.needs = [...f.needs];
+      return { report, func: { name: f.name, params: ptypes, results: wtypes(result, R.vt), locals: g.locals, body: body.c }, touched: g.touched };
+    }
+    return no('internal: scratch base was not granted');
   } catch (e) {
     if (e instanceof NotCompilable) {
       report.reason = e.message;
@@ -775,40 +1295,18 @@ function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, op
   }
 }
 
-function calledFns(prog: Program, e: Expr, out = new Set<string>()): Set<string> {
-  switch (e.k) {
-    case 'call':
-      if (prog.fns.has(e.fn)) out.add(e.fn);
-      e.args.forEach((a) => calledFns(prog, a, out));
-      e.kw.forEach((a) => calledFns(prog, a.value, out));
-      break;
-    case 'let':
-      e.binds.forEach((b) => calledFns(prog, b.value, out));
-      e.body.forEach((b) => calledFns(prog, b, out));
-      break;
-    case 'match':
-      calledFns(prog, e.scrut, out);
-      e.arms.forEach((a) => calledFns(prog, a.body, out));
-      break;
-    case 'if':
-      calledFns(prog, e.cond, out);
-      calledFns(prog, e.then, out);
-      calledFns(prog, e.else, out);
-      break;
-    case 'lam':
-      calledFns(prog, e.body, out);
-      break;
-    case 'do':
-      e.body.forEach((b) => calledFns(prog, b, out));
-      break;
-    case 'try':
-      calledFns(prog, e.expr, out);
-      break;
-  }
-  return out;
+interface Built {
+  funcs: WasmFunc[];
+  fns: FnReport[];
+  reg: Registry;
+  types: TypeTable;
+  entries: string[];
 }
 
-export function compileProgram(prog: Program, res: CheckResult, opts: CompileOptions = {}): CompileResult {
+function buildOnce(prog: Program, res: CheckResult, opts: CompileOptions, reg: Registry, importBase: number): Built {
+  const types = new TypeTable();
+  const ctx: Ctx = { types, reg, importBase };
+  const entrySet = new Set(prog.entries);
   const funcs: WasmFunc[] = [];
   const done = new Map<string, { report: FnReport; index?: number }>();
   const active = new Set<string>();
@@ -829,11 +1327,15 @@ export function compileProgram(prog: Program, res: CheckResult, opts: CompileOpt
     } else {
       active.add(name);
       try {
-        const { report, func } = compileFn(prog, f, ev, res, opts, callee);
+        const { report, func, touched } = compileFn(prog, f, ev, res, opts, callee, ctx, entrySet);
         out = { report };
         if (func) {
           out.index = funcs.length;
           funcs.push(func);
+          for (const n of touched ?? []) {
+            const i = reg.importIndex(n);
+            if (i >= 0) reg.imports[i].used = true;
+          }
         }
       } finally {
         active.delete(name);
@@ -847,18 +1349,36 @@ export function compileProgram(prog: Program, res: CheckResult, opts: CompileOpt
     const r = ensure(name);
     const rep = r.report;
     if (!rep.compilable || r.index === undefined) return rep.reason ?? 'not compilable';
-    const params: Kind[] = [];
-    for (const p of rep.params!) {
-      if (p.leaves.length !== 1 || p.leaves[0].path !== '') return `parameter ${p.name} is a record (record arguments are not supported across calls)`;
-      params.push(p.leaves[0].kind);
-    }
-    return { index: r.index, vt: rep.repr!, params, result: rep.result!, hasBase: !!rep.hasBase, need: rep.scratchBytes ?? 0 };
+    return { index: r.index, vt: rep.repr!, params: rep.params!.map((p) => p.shape), result: rep.result!, hasBase: !!rep.hasBase, need: rep.scratchBytes ?? 0 };
   };
 
   for (const f of prog.fns.values()) ensure(f.name);
   const fns = [...prog.fns.keys()].map((n) => done.get(n)!.report);
+  return { funcs, fns, reg, types, entries: fns.filter((r) => r.compilable && r.entry).map((r) => r.name) };
+}
+
+export function compileProgram(prog: Program, res: CheckResult, opts: CompileOptions = {}): CompileResult {
+  // Pass 1 discovers which host imports the compiled functions use (imports come first in the function index
+  // space, so the defined functions' indices depend on how many there are); pass 2 emits the final code.
+  const reg1 = new Registry();
+  buildOnce(prog, res, opts, reg1, 0);
+  const reg = new Registry(true);
+  reg.imports = reg1.imports.filter((i) => i.used).map((i) => ({ ...i, used: true }));
+  reg.strings = [...reg1.strings];
+  reg.enumBlocks = new Map(reg1.enumBlocks);
+  reg.handles = [...reg1.handles];
+  const b = buildOnce(prog, res, opts, reg, reg.imports.length);
+
   let memBytes = 0;
-  for (const r of fns) if (r.compilable && r.hasBase) memBytes = Math.max(memBytes, MEM_BASE + r.inputBytes! + r.scratchBytes!);
+  for (const r of b.fns) if (r.compilable && r.hasBase) memBytes = Math.max(memBytes, MEM_BASE + r.inputBytes! + r.scratchBytes!);
   const memPages = memBytes ? Math.ceil(memBytes / 65536) : undefined;
-  return { bytes: buildModule(funcs, memPages), fns, memPages };
+  const abi: AbiDescriptor = {
+    version: 1,
+    strings: reg.strings,
+    handles: reg.handles,
+    effects: reg.imports.flatMap((i) => (i.effect ? [i.effect] : [])),
+  };
+  const custom = [{ name: 'sigil.abi', data: new TextEncoder().encode(shapeJson(abi)) }];
+  const bytes = buildModule(b.funcs, { memPages, imports: reg.imports.map((i) => i.desc), types: b.types, custom: b.funcs.length || reg.imports.length ? custom : [] });
+  return { bytes, fns: b.fns, memPages, entries: b.entries, abi };
 }

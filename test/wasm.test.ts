@@ -204,11 +204,8 @@ describe('wasm backend: invoicing example', () => {
     for (const n of ['gross', 'price-invoice']) expect(rep(n).compilable, rep(n).reason).toBe(true);
   });
 
-  it('receipt (strings) and issue-invoice (capabilities) are not compilable', () => {
-  const COMPILABLE = ['line-price', 'floor-pos', 'floor-neg', 'mixed', 'pred', 'tier-of', 'wide', 'calls-other', 'quote', 'chain'];
-    expect(rep('receipt').reason).toMatch(/str/);
-    expect(rep('issue-invoice').compilable).toBe(false);
-    expect(rep('issue-invoice').reason).toMatch(/capabilit/);
+  it('receipt (strings, text, money) compiles; see test/wasm-strings.test.ts', () => {
+    expect(rep('receipt').compilable, rep('receipt').reason).toBe(true);
   });
 
   it('discount agrees with the interpreter on every Plan', async () => {
@@ -218,7 +215,7 @@ describe('wasm backend: invoicing example', () => {
 
   it('only the compilable functions (and the list memory) are exported', async () => {
     const ex = await instantiate(out.bytes);
-    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'memory', 'price-invoice']);
+    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'issue-invoice', 'memory', 'price-invoice', 'receipt']);
   });
 });
 
@@ -253,8 +250,7 @@ describe('wasm backend: numeric fixture', () => {
     expect(rep('sum-line').compilable, rep('sum-line').reason).toBe(true); // lists compile now
     expect(rep('uses-unsafe').compilable).toBe(false);
     expect(rep('uses-unsafe').reason).toMatch(/unsafe-div.*not compilable.*not proved/);
-    expect(rep('passes-record').compilable).toBe(false);
-    expect(rep('passes-record').reason).toMatch(/record|scalar/);
+    expect(rep('passes-record').compilable, rep('passes-record').reason).toBe(true); // records are first-class values now
     expect(rep('unsafe-div').compilable).toBe(false);
     expect(rep('unsafe-div').reason).toMatch(/not proved/);
   });

@@ -29,4 +29,4 @@ Run: `npm run docs:build && npm run docs:serve` (http://localhost:8787, add `?ba
 - Execution is the reference interpreter. Its Host is synchronous, so only synchronous adapters work (memory, SQLite via node:sqlite, localStorage). Async stores need effect batching or a CPS interpreter.
 - Authentication is out of scope: the actor arrives in `x-actor-id` and `x-actor-role` headers.
 - Documents are seeded; creating a document is not a program operation yet.
-- The Wasm backend does not compile this program's entry point (see the Wasm work on branch `wasm/language-gaps`).
+- The docs app runs on the interpreter. The Wasm backend now compiles this program's entry point too (all 11 reference programs, see experiments/wasm-coverage.ts), but the shell is not wired to it yet: the Wasm host ABI (src/wasm/abi.ts) is a separate adapter from the interpreter Host used here.
