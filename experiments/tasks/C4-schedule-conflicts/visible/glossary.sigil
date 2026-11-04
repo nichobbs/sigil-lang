@@ -1,0 +1,86 @@
+; Glossary for C4: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Role, Status, Reason, Booking, Refusal, check-booking),
+; so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a booking {id:Int} from minute {s:Int} to minute {e:Int} that is {st:Status}"
+    (append existing (Booking id s e st)))
+
+  (given "a buffer of {b:Int} minutes"
+    (set buffer b))
+
+  (given "the booking store is unavailable"
+    (fail store:bookings put))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "a {role:Role} requests booking {id:Int} from minute {s:Int} to minute {e:Int}"
+    (default buffer 0)
+    (default existing (list))
+    (call result check-booking existing id s e buffer role))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the booking is accepted"
+    (expect (match result (ok r true) (err e false))))
+
+  (then "the request is refused as Conflict with booking {id:Int}"
+    (expect (= result (err (Refusal Conflict id)))))
+
+  (then "the request is refused as {why:Reason}"
+    (expect (match result (ok r false) (err e (= e.reason why)))))
+
+  (then "the booking is stored as {st:Status}"
+    (expect (= (map (stored store:bookings) (fn (b) b.status)) (list st))))
+
+  (then "nothing is stored"
+    (expect (= (len (stored store:bookings)) 0)))
+
+  (then "an audit event records the {role:Role} booking {id:Int}"
+    (expect (= (len (emitted audit)) 1))
+    (expect (= (map (emitted audit) (fn (e) e.role)) (list role)))
+    (expect (= (map (emitted audit) (fn (e) e.id)) (list id))))
+
+  ; ---- Properties -------------------------------------------------------------
+  (always "A request is refused as BadRange when its end is not after its start, or when its end is after minute 10080 (the end of the week). This is checked first, whatever the existing bookings are."
+    (forall ((ex (List Booking 0 60)) (s Minute) (e Minute) (g Gap) (r Role))
+      (or (and (< s e) (<= e 10080))
+          (= (check-booking ex 1 s e g r) (err (Refusal BadRange 0))))))
+
+  (always "Times are minutes from the start of the week and every booking covers its start minute up to, but not including, its end minute. Two bookings that only touch, where one ends at the minute the other starts, do not overlap."
+    (forall ((a (Int 0 5000)) (n (Int 1 100)) (r Role))
+      (and (match (check-booking (list (Booking 1 a (add a n) Confirmed)) 2 (add a (add n 20)) (add a (add n 30)) 0 r)
+             (ok x true) (err e false))
+           (match (check-booking (list (Booking 1 (add a 30) (add a (add n 30)) Confirmed)) 2 a (add a 10) 0 r)
+             (ok x true) (err e false)))))
+
+  (always "The request carries a buffer, the number of minutes that must separate it from every other booking, on both sides. A booking conflicts with the request when the request, widened by the buffer on both sides, overlaps it. A booking that is exactly the buffer away does not conflict."
+    (forall ((a (Int 0 5000)) (n (Int 1 100)) (g (Int 0 1000)) (r Role))
+      (and (match (check-booking (list (Booking 1 a (add a n) Confirmed)) 2 (add a (add n (add g 20))) (add a (add n (add g 30))) g r)
+             (ok x true) (err e false))
+           (= (check-booking (list (Booking 1 a (add a n) Confirmed)) 2 (add a n) (add a (add n 10)) (add g 1) r)
+              (err (Refusal Conflict 1))))))
+
+  (always "A Staff request is refused as Conflict when any existing booking conflicts with it, whatever that booking's status."
+    (forall ((a (Int 0 5000)) (n (Int 1 100)) (g Gap))
+      (= (check-booking (list (Booking 1 a (add a n) Confirmed)) 2 a (add a n) g Staff)
+         (err (Refusal Conflict 1)))))
+
+  (always "A Manager request may displace conflicting bookings that are Tentative. A Manager request is refused as Conflict when any conflicting booking is Confirmed, and nothing is displaced in that case."
+    (forall ((a (Int 0 5000)) (n (Int 1 100)))
+      (and (= (check-booking (list (Booking 1 a (add a n) Confirmed)) 2 a (add a n) 0 Manager)
+              (err (Refusal Conflict 1)))
+           (match (check-booking (list (Booking 1 a (add a n) Tentative)) 2 a (add a n) 0 Manager)
+             (ok x true) (err e false)))))
+
+  (always "When a request is refused as Conflict, the refusal names the lowest id among the bookings that block the request. For a Staff request every conflicting booking blocks it; for a Manager request only the conflicting Confirmed bookings block it."
+    (forall ((a (Int 0 5000)) (n (Int 1 100)) (x (Int 1 1000)))
+      (and (= (check-booking (list (Booking (add x 1) a (add a n) Confirmed) (Booking x a (add a n) Confirmed)) 9 a (add a n) 0 Staff)
+              (err (Refusal Conflict x)))
+           (= (check-booking (list (Booking (add x 1) a (add a n) Confirmed) (Booking x a (add a n) Tentative)) 9 a (add a n) 0 Manager)
+              (err (Refusal Conflict (add x 1)))))))
+
+  (always "An accepted request is stored as a new booking with the requested start and end. A booking requested by Staff is stored as Tentative, and one requested by a Manager is stored as Confirmed. The result lists the ids of the displaced bookings, in the order the existing bookings were given. One audit event records the requester's role, the new booking's id and the displaced ids, and nothing else. A refused or failed request stores nothing and emits nothing."
+    (forall ((s (Int 0 5000)) (n (Int 1 100)) (i Id) (g Gap) (r Role))
+      (= (check-booking (list) i s (add s n) g r) (ok (Accepted i (list))))))
+)

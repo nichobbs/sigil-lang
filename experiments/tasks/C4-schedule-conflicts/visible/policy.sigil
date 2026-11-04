@@ -1,0 +1,9 @@
+; Human-owned policy for C4: what a program may request, and what each sink may receive.
+; Sinks are deny-by-default. Bookings carry only ids, minutes and statuses, so both sinks accept internal.
+
+(policy
+  (allow store (ns "bookings/*"))
+  (allow audit)
+
+  (sink store:bookings (accepts internal))
+  (sink audit          (accepts internal)))
