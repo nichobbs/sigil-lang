@@ -1,0 +1,22 @@
+{
+  "name": "sigil-lang",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Sigil: spike of a language designed for AI agents (verifiable, capability-secure, token-efficient).",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "sigil": "tsx src/cli.ts",
+    "check": "tsx src/cli.ts check examples/invoicing",
+    "verify": "tsx src/cli.ts verify examples/invoicing",
+    "compare": "tsx src/cli.ts compare examples/invoicing"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "gpt-tokenizer": "^2.9.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

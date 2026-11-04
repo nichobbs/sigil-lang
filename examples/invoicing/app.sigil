@@ -1,0 +1,62 @@
+; Invoicing: implementation layer (agent-authored) and wiring layer.
+; Humans do not need to read this file. They read invoicing.feature and policy.sigil.
+
+(type Cents  (Int 0 1000000000000000))
+(type Pct    (Int 0 100))
+(type Plan   (var Free Pro Enterprise))
+(type Sku    (Str :validated))
+(type Email  (Str :validated))
+(type CustId (Int 0 9007199254740991))
+(type InvId  (Int 0 9007199254740991))
+
+(type Line     (rec (sku Sku) (unit (Int 0 1000000000)) (qty (Int 1 1000))))
+(type Customer (rec (id CustId) (name Str :pii) (email Email :pii) (plan Plan :internal)))
+(type Invoice  (rec (id InvId) (cust CustId) (lines (List Line 1 200)) (total Cents :internal)))
+(type Mail     (rec (to Email :pii) (subject Str) (body Str :pii)))
+(type Issued   (rec (inv InvId)))
+(type IssueError (var StoreFailed MailFailed))
+
+(validator parse-email (in (s Str)) (out Email) (regex "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$") (sample "a@x.com" "b.c+d@mail.example.org"))
+(validator parse-sku   (in (s Str)) (out Sku)   (regex "^[A-Z]+-[0-9]+$") (sample "W-1" "ABC-204"))
+
+(fn gross
+  (in (ls (List Line 1 200)))
+  (out Cents)
+  (sum (map ls (fn (l) (mul l.unit l.qty)))))
+
+(fn discount
+  (in (p Plan))
+  (out Pct)
+  (match p (Free 0) (Pro 10) (Enterprise 20)))
+
+(fn price-invoice
+  (in (p Plan) (ls (List Line 1 200)))
+  (out Cents)
+  (ensures (<= out (gross ls)))
+  (div-floor (mul (gross ls) (sub 100 (discount p))) 100))
+
+(fn receipt
+  (in (c Customer) (i Invoice))
+  (out Mail)
+  (Mail :to c.email
+        :subject (text "Invoice " i.id)
+        :body (text "Hello " c.name ", your total is " i.total)))
+
+(fn issue-invoice
+  (in (c Customer) (ls (List Line 1 200)))
+  (out (Result Invoice IssueError))
+  (needs store:invoices net:mail audit rand)
+  (let [inv (Invoice (fresh rand) c.id ls (price-invoice c.plan ls))]
+    (try (put store:invoices inv.id inv) :on-err StoreFailed)
+    (try (post net:mail (receipt c inv)) :on-err MailFailed)
+    (emit audit (Issued inv.id))
+    (ok inv)))
+
+; Wiring layer: the only place platform and authority appear.
+(program invoicing
+  (targets server browser)
+  (entry issue-invoice
+    (bind store:invoices (store (ns "invoicing/invoices") (mode append) (quota 5GB)))
+    (bind net:mail       (net (connect "https://mail.acme.com") (methods POST) (rate 20/s)))
+    (bind audit          (audit))
+    (bind rand           (rand seeded))))

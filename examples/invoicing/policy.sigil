@@ -1,0 +1,13 @@
+; Human-owned policy: the maximum authority a program may request, and what each sink may receive.
+; Sinks are deny-by-default: a handle with no (sink ...) clause accepts only public data.
+
+(policy
+  (allow store (ns "invoicing/*"))
+  (allow net   (connect "https://mail.acme.com"))
+  (allow audit)
+  (allow rand)
+
+  (sink store:invoices (accepts pii))
+  (sink net:mail       (accepts pii))
+  (sink audit          (accepts internal))
+  (sink rand           (accepts public)))

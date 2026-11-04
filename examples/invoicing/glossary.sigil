@@ -1,0 +1,60 @@
+; Glossary: the single place where business phrases are bound to typed fixtures and assertions.
+; A sentence in invoicing.feature that matches nothing here is a compile error (with nearest phrases).
+; Actions are deliberately few: set, default, append, call, fail, expect.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a {plan:Plan} customer"
+    (set plan plan))
+
+  (given "an order of {qty:Int} x {sku:Sku} at {unit:Money}"
+    (append lines (Line sku unit qty)))
+
+  (given "the invoice store is unavailable"
+    (fail store:invoices put))
+
+  (given "the mail service is unavailable"
+    (fail net:mail post))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "the invoice is priced"
+    (default plan Free)
+    (call total price-invoice plan lines))
+
+  (when "an invoice is issued to {email:Email}"
+    (default plan Free)
+    (default lines (list (Line "W-1" 500 1)))
+    (call result issue-invoice (Customer 7 "Ada Lovelace" email plan) lines))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the total is {amount:Money}"
+    (expect (= total amount)))
+
+  (then "the invoice is stored once"
+    (expect (= (len (stored store:invoices)) 1)))
+
+  (then "one email is sent to {email:Email}"
+    (expect (= (len (sent net:mail)) 1))
+    (expect (= (len (filter (sent net:mail) (fn (m) (= m.to email)))) 1)))
+
+  (then "no email is sent"
+    (expect (= (len (sent net:mail)) 0)))
+
+  (then "the issue fails with \"store failed\""
+    (expect (= result (err StoreFailed))))
+
+  (then "the issue fails with \"mail failed\""
+    (expect (= result (err MailFailed))))
+
+  ; ---- Rules, properties and privacy -------------------------------------------
+  (rule "Discount depends on the customer's plan" discount (Plan Pct))
+
+  (always "The price is never negative and never more than the undiscounted total."
+    (forall ((p Plan) (ls (List Line 1 200)))
+      (<= 0 (price-invoice p ls) (gross ls))))
+
+  (privacy "The customer's name is only sent to mail.acme.com. Changing it must not change anything sent anywhere else."
+    (source Customer.name)
+    (allow net:mail)
+    (run issue-invoice)))
