@@ -222,3 +222,19 @@ TypeScript on these tasks. Caveats: the Sigil file carries type declarations wit
 solutions leave implicit; A2 and A3 have no surviving workspaces; the TS arm also delivers its own tests (10-17 per run on Haiku) which
 are not counted, while the Sigil arm gets its scenarios from the human-owned glossary. C2 (agent Sigil 1928 vs reference 949 tokens) shows
 agents sometimes write far more Sigil than needed.
+
+## Change-request task E1 (post-v1, n=1 per cell, not blind)
+
+E1 is B1 plus ticket DOC-142: an Editor may now publish their own document, and may delete their own document only while it is not Published. The previous program is the starting point (`start/`), the intent spec and glossary property are updated, there are 60 hidden cases (B1's 44 with recomputed expectations, plus 16 new regression and new-rule cases, 5 traps), and both references pass 60/60. The unchanged programs fail 11 of the cases. The TS arm gets the examples as ready-made scenario tests (`SCENARIO_TESTS=1`).
+
+| Arm | Model | Hidden | Traps | Edit size | Tokens | Tool calls | verify |
+|---|---|---|---|---|---|---|---|
+| Sigil (r2) | Sonnet | 60/60 | 0 | 1 line | 87k | 3 | clean |
+| Sigil (r2) | Haiku | 60/60 | 0 | 1 line | 90k | 2 | clean |
+| TS | Sonnet | 60/60 | 0 | 1 line | 75k | 3 | n/a |
+| TS | Haiku | 60/60 | 0 | 1 line plus 5 new tests | 78k | 4 | n/a |
+
+- Ceiling again: every run changed the one `authorised` rule correctly. The change was too small to separate the arms, so this task does not show a change-safety advantage in either direction.
+- Harness bug found: in r1 the glossary's property still carried the old rule wording, so Sigil's `verify` exited 1 with an unbound-property ERR. Both Sigil r1 agents noticed and reported it instead of editing the human-owned glossary (a good behaviour). The glossary was fixed and the Sigil runs repeated as r2; r1 results are in `results/change.jsonl` (verify "exit 1"), all 60/60.
+- Useful as a mechanism check: in Sigil, a changed intent sentence with a stale glossary surfaces as a tool error, whereas the TS arm has no equivalent signal that the spec and the tests have drifted.
+- Next, if worth the budget: a change that touches several functions or reorders refusals, where a one-line edit is not enough.

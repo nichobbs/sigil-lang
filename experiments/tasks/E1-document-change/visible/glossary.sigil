@@ -1,0 +1,122 @@
+; Glossary for B1: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Role, Status, Actor, Doc, Request, Receipt, Applied, Refused,
+; DocError, handle-request), so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a {role:Role} actor {id:Int}"
+    (set actor (Actor id role)))
+
+  (given "an {role:Role} actor {id:Int}"
+    (set actor (Actor id role)))
+
+  (given "a {status:Status} document {id:Int} owned by {owner:Int} titled {title:Str} with {size:Int} characters"
+    (set doc (Doc id owner title size status)))
+
+  (given "the document store is unavailable"
+    (fail store:docs put))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "the actor updates the document to {size:Int} characters titled {title:Str}"
+    (set req (Request Update title size))
+    (call result handle-request actor doc req))
+
+  (when "the actor deletes the document"
+    (set req (Request Delete "" 0))
+    (call result handle-request actor doc req))
+
+  (when "the actor publishes the document"
+    (set req (Request Publish "" 0))
+    (call result handle-request actor doc req))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the request succeeds"
+    (expect (match result (ok d true) (err e false))))
+
+  (then "the request is refused as {why:DocError}"
+    (expect (= result (err why))))
+
+  (then "the request fails with \"store failed\""
+    (expect (= result (err StoreFailed))))
+
+  (then "the stored document has status {status:Status}, {size:Int} characters and title {title:Str}"
+    (expect (= (stored store:docs) (list (Doc doc.id doc.owner title size status)))))
+
+  (then "nothing is stored"
+    (expect (= (len (stored store:docs)) 0)))
+
+  (then "nothing is audited"
+    (expect (= (len (emitted audit)) 0)))
+
+  (then "an audit event records the operation"
+    (expect (= (emitted audit) (list (Applied actor.id doc.id req.op)))))
+
+  (then "an audit event records the refusal as {why:DocError}"
+    (expect (= (emitted audit) (list (Refused actor.id doc.id req.op why)))))
+
+  ; ---- Properties and privacy ---------------------------------------------------
+  (always "A Viewer can never change anything. An Editor may update, delete or publish a document only when they own it, except that an Editor may not delete their own document while it is Published. An Admin may update, delete or publish any document. This is checked before anything else, so an actor who is not allowed gets the same answer whatever the request carries; the only thing about the document that matters is, for an Editor deleting, whether it is Published."
+    (forall ((a Actor) (d Doc) (r Request))
+      (and (= (= (handle-request a d r) (err NotAllowed))
+              (match a.role
+                (Viewer true)
+                (Editor (or (not (= a.id d.owner)) (and (= r.op Delete) (= d.status Published))))
+                (Admin false)))
+           (= (= (handle-request a (Doc d.id d.owner d.title 0 d.status) (Request r.op "" 0)) (err NotAllowed))
+              (= (handle-request a d r) (err NotAllowed))))))
+
+  (always "A document that is Deleted accepts no operation from anyone, an Admin included: the request is refused as Gone. This is checked right after the authorisation."
+    (forall ((a Actor) (d Doc) (r Request))
+      (and (= (handle-request (Actor a.id Admin) (Doc d.id d.owner d.title d.size Deleted) r) (err Gone))
+           (or (= r.op Publish)
+               (= (handle-request (Actor d.owner Editor) (Doc d.id d.owner d.title d.size Deleted) r) (err Gone))))))
+
+  (always "An update replaces the title and the size of the document with those of the request and leaves its status as it is. The new size may be at most 50000: a larger one is refused as TooLong, and exactly 50000 is allowed."
+    (forall ((d Doc) (r Request))
+      (or (= d.status Deleted)
+          (and (= (= (handle-request (Actor 1 Admin) d (Request Update r.title r.size)) (err TooLong)) (> r.size 50000))
+               (or (> r.size 50000)
+                   (= (handle-request (Actor 1 Admin) d (Request Update r.title r.size))
+                      (ok (Receipt d.id d.status r.size))))))))
+
+  (always "A delete sets the status to Deleted and a publish sets it to Published. Both keep the title and the size of the document, and ignore the title and the size carried by the request."
+    (forall ((d Doc) (r Request))
+      (or (= d.status Deleted)
+          (and (= (handle-request (Actor 1 Admin) d (Request Delete r.title r.size))
+                  (ok (Receipt d.id Deleted d.size)))
+               (or (= d.status Published)
+                   (= d.size 0)
+                   (= (handle-request (Actor 1 Admin) d (Request Publish r.title r.size))
+                      (ok (Receipt d.id Published d.size))))))))
+
+  (always "A publish of a document that is already Published is refused as AlreadyPublished, and a publish of a document whose size is 0 is refused as EmptyBody. When both apply, AlreadyPublished is reported."
+    (forall ((d Doc) (r Request))
+      (and (= (handle-request (Actor 1 Admin) (Doc d.id d.owner d.title d.size Published) (Request Publish r.title r.size))
+              (err AlreadyPublished))
+           (= (handle-request (Actor 1 Admin) (Doc d.id d.owner d.title 0 Draft) (Request Publish r.title r.size))
+              (err EmptyBody)))))
+
+  (always "When more than one refusal applies, the first of these is reported: NotAllowed, Gone, TooLong, AlreadyPublished, EmptyBody."
+    (forall ((d Doc) (r Request))
+      (and (= (handle-request (Actor 1 Viewer) (Doc d.id d.owner d.title 0 Deleted) (Request Update r.title 60000)) (err NotAllowed))
+           (= (handle-request (Actor 1 Admin) (Doc d.id d.owner d.title 0 Deleted) (Request Update r.title 60000)) (err Gone))
+           (= (handle-request (Actor 1 Admin) (Doc d.id d.owner d.title 0 Published) (Request Update r.title 60000)) (err TooLong))
+           (= (handle-request (Actor 1 Admin) (Doc d.id d.owner d.title 0 Published) (Request Publish r.title r.size)) (err AlreadyPublished)))))
+
+  (always "A request that is not refused stores the new document under its id, then emits one audit event recording the actor, the document and the operation. A refused request stores nothing and emits one audit event recording the actor, the document, the operation and the reason."
+    (forall ((a Actor) (d Doc) (r Request))
+      (match (handle-request a d r)
+        (ok x (= x.doc d.id))
+        (err e (not (= e StoreFailed))))))
+
+  (privacy "The title of the document is never written to the audit log. Changing it must not change anything audited."
+    (source Doc.title)
+    (allow store:docs)
+    (run handle-request))
+
+  (privacy "The title carried by a request is never written to the audit log. Changing it must not change anything audited."
+    (source Request.title)
+    (allow store:docs)
+    (run handle-request))
+)
