@@ -116,6 +116,9 @@ export class Host {
   stored(handle: string): Val[] {
     return this.log.filter((o) => o.handle === handle && o.op === 'put' && o.ok).map((o) => o.args[1]);
   }
+  emitted(handle: string): Val[] {
+    return this.log.filter((o) => o.handle === handle && o.op === 'emit' && o.ok).map((o) => o.args[0]);
+  }
   call(handle: string, op: string, args: Val[]): Val {
     if (this.failing.has(`${handle}.${op}`)) {
       this.log.push({ handle, op, args, ok: false });
@@ -452,6 +455,8 @@ export class Interp {
         return this.host.sent(a[0] as string);
       case 'stored':
         return this.host.stored(a[0] as string);
+      case 'emitted':
+        return this.host.emitted(a[0] as string);
       default:
         throw new RuntimeFault(`unknown function ${name}`);
     }

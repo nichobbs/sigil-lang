@@ -17,6 +17,12 @@
   (given "the mail service is unavailable"
     (fail net:mail post))
 
+  (given "a customer named {name:Str}"
+    (set cust (Customer 7 name "a@x.com" Free)))
+
+  (given "invoice {n:Int} totalling {amount:Money}"
+    (set inv (Invoice n 7 (list (Line "W-1" 500 1)) amount)))
+
   ; ---- When -------------------------------------------------------------------
   (when "the invoice is priced"
     (default plan Free)
@@ -26,6 +32,9 @@
     (default plan Free)
     (default lines (list (Line "W-1" 500 1)))
     (call result issue-invoice (Customer 7 "Ada Lovelace" email plan) lines))
+
+  (when "the receipt is written"
+    (call mail receipt cust inv))
 
   ; ---- Then -------------------------------------------------------------------
   (then "the total is {amount:Money}"
@@ -37,6 +46,15 @@
   (then "one email is sent to {email:Email}"
     (expect (= (len (sent net:mail)) 1))
     (expect (= (len (filter (sent net:mail) (fn (m) (= m.to email)))) 1)))
+
+  (then "an audit event is recorded for the issued invoice"
+    (expect (= (emitted audit) (map (stored store:invoices) (fn (i) (Issued i.id))))))
+
+  (then "the email subject is {text:Str}"
+    (expect (= mail.subject text)))
+
+  (then "the email body is {text:Str}"
+    (expect (= mail.body text)))
 
   (then "no email is sent"
     (expect (= (len (sent net:mail)) 0)))

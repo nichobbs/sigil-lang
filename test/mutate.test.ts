@@ -27,12 +27,17 @@ describe('mutation adequacy', () => {
     expect(rep.survivors.some((s) => s.desc === '20 -> 21')).toBe(false);
   });
 
-  it('survivors are real spec gaps the human should hear about', () => {
-    const descs = rep.survivors.map((s) => `${s.fn}: ${s.desc}`);
-    // the audit event and the email text are not pinned by any scenario
-    expect(descs.some((d) => d.startsWith('issue-invoice: delete statement (emit audit'))).toBe(true);
-    // the mail failure variant is exactly the Unresolved question
-    expect(descs.some((d) => d.includes(':on-err MailFailed'))).toBe(true);
+  it('the only survivor is the Unresolved mail-failure question, which a human must answer', () => {
+    expect(rep.total).toBe(22);
+    expect(rep.survivors.map((s) => `${s.fn}: ${s.desc}`)).toEqual(['issue-invoice: :on-err MailFailed -> StoreFailed']);
+    // the feature still carries the open question that explains it
+    expect(parseFeature(FEATURE).unresolved).toHaveLength(1);
+  });
+
+  it('receipt wording and the audit emit are no longer survivors', () => {
+    const descs = rep.survivors.map((s) => s.desc);
+    expect(descs.some((d) => d.includes('Invoice ') || d.includes('Hello ') || d.includes('your total is'))).toBe(false);
+    expect(descs.some((d) => d.startsWith('delete statement (emit audit'))).toBe(false);
   });
 
   it('kills most mutants overall', () => {

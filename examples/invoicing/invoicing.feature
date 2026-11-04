@@ -30,6 +30,18 @@ Feature: Invoicing
     Then the issue fails with "store failed"
     And no email is sent
 
+  Example: Issuing an invoice records an audit event
+    Given an order of 1 x "W-1" at $5.00
+    When an invoice is issued to "a@x.com"
+    Then an audit event is recorded for the issued invoice
+
+  Example: The receipt names the invoice, the customer and the total
+    Given a customer named "Ada Lovelace"
+    And invoice 1042 totalling $9.00
+    When the receipt is written
+    Then the email subject is "Invoice 1042"
+    And the email body is "Hello Ada Lovelace, your total is 900"
+
   Always: The price is never negative and never more than the undiscounted total.
 
   Privacy: The customer's name is only sent to mail.acme.com.
