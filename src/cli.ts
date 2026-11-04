@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 // sigil check   <dir>   static checks: ranges, capabilities, information flow
 // sigil verify  <dir> [--fast]  check + scenarios + properties + privacy + mutation adequacy (--fast skips mutation)
+// sigil fix     <dir>   mechanical edits for open findings (clamps, take, max 1, needs); suggestions only, never writes
 // sigil compare <dir>   token-cost comparison of alternative surface syntaxes
 
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -146,6 +147,39 @@ async function main() {
         process.exit(bad || errors(res).length ? 1 : 0);
         break;
       }
+      case 'fix': {
+        const { prog, pol } = load(dir);
+        const res = check(prog, pol);
+        const seen = new Set<string>();
+        let n = 0;
+        const out = (line: string) => {
+          if (seen.has(line)) return;
+          seen.add(line);
+          n++;
+          console.log(line);
+        };
+        console.log('Apply the first suggestion for a function, then rerun: later ones often disappear.\n');
+        for (const ev of res.evidence.values()) {
+          for (const o of ev.obligations) {
+            if (o.status === 'proved' || !o.fix) continue;
+            out(`[${ev.fn}] ${o.status.toUpperCase()} ${o.desc}${o.note ? ` (${o.note})` : ''}\n    replace: ${o.fix.old}\n    with:    ${o.fix.new}\n    note:    ${o.fix.why}`);
+          }
+        }
+        // Capability findings: the fix is a name to add to `needs`.
+        const needsFor = new Map<string, Set<string>>();
+        for (const d of res.diags) {
+          const m = /^(\S+) (?:uses|calls \S+, which needs) (\S+)(?: but| ,)? ?(?:but )?does not declare it in needs/.exec(d.msg);
+          if (d.code === 'E-cap' && m) (needsFor.get(m[1]) ?? needsFor.set(m[1], new Set()).get(m[1])!).add(m[2]);
+        }
+        for (const [fn, hs] of needsFor) out(`[${fn}] E-cap\n    add to its needs clause: ${[...hs].join(' ')}`);
+        const manual = res.diags.filter((d) => d.level === 'error' && !(d.code === 'E-cap' && /does not declare it in needs/.test(d.msg)));
+        if (manual.length) {
+          console.log(`\n${manual.length} error(s) with no mechanical fix (they need a decision):`);
+          for (const d of manual) console.log(`  ${d.code} [${d.fn}] ${d.msg.split('\n')[0].slice(0, 160)}`);
+        }
+        if (!n && !manual.length) console.log('nothing to fix');
+        break;
+      }
       case 'compare': {
         const { prog, pol } = load(dir);
         console.log(formatComparison(compareSyntaxes(prog)));
@@ -168,7 +202,7 @@ async function main() {
         break;
       }
       default:
-        console.log('usage: sigil <check|verify|compare|wasm> <example-dir> [out.wasm]');
+        console.log('usage: sigil <check|verify|fix|compare|wasm> <example-dir> [out.wasm]');
         process.exit(2);
     }
   } catch (e) {

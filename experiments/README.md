@@ -170,3 +170,10 @@ and are not part of this score.
 ### Scorer notes from the cost probe
 - Sigil arguments bind by name when every parameter name matches the case file, otherwise by position (the task README fixes the order; the agent chooses names). The first probe named a parameter `ls` for `lines` and scored 0/32 under strict naming; this was a scorer fix applied to all runs, not a solution fix.
 - `leakHints` searches the agent transcript for hidden or reference paths; it is a hint, to be read by hand.
+
+## v1 workflow changes (2026-11-04)
+
+Runs made after language v1 use a changed Sigil workflow. Report them separately from the frozen runs (see `docs/FREEZE.md`).
+- `verify --fast` (check plus scenarios, no mutation) and one-shot guidance in WORKFLOW.md.
+- `sigil fix`: suggests exact edits (clamps, `take`, `(max 1 d)`, missing `needs`) for open findings.
+- The Sigil PROMPT.md now names `fix` and `--fast`. The TS arm is unchanged, so it has no equivalent aid.
