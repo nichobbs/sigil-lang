@@ -11,6 +11,8 @@ import { parsePolicy, parseProgram } from './parse.js';
 import { DEFAULT_SUITE, parseFeature, parseGlossary, runSuite } from './scenario.js';
 import { SigilError } from './sexpr.js';
 import { showInterval } from './interval.js';
+import { Program } from './ast.js';
+import { proveEnsures, SmtResult } from './smt.js';
 import { compareSyntaxes, fragilityExperiment, formatComparison, formatFragility } from './compare.js';
 
 function load(dir: string) {
@@ -30,13 +32,19 @@ function load(dir: string) {
 const pad = (s: string, n: number) => (s.length >= n ? s : s + ' '.repeat(n - s.length));
 const hr = (title: string) => console.log(`\n== ${title} ${'='.repeat(Math.max(2, 70 - title.length))}`);
 
-function printCheck(res: CheckResult, ensuresTested?: Map<string, number>) {
+function printCheck(res: CheckResult, ensuresTested?: Map<string, number>, smt: SmtResult[] = []) {
   hr('Range and capability evidence (interval analysis)');
   for (const ev of res.evidence.values()) {
-    const proved = ev.obligations.filter((o) => o.status === 'proved').length;
-    const open = ev.obligations.filter((o) => o.status !== 'proved');
+    const smtFor = (o: (typeof ev.obligations)[number]) => {
+      if (o.kind !== 'ensures') return undefined;
+      return smt.find((r) => r.fn === ev.fn && r.index === ev.obligations.filter((x) => x.kind === 'ensures').indexOf(o));
+    };
+    const bySmt = ev.obligations.filter((o) => o.status !== 'proved' && smtFor(o)?.status === 'proved');
+    const proved = ev.obligations.filter((o) => o.status === 'proved').length + bySmt.length;
+    const open = ev.obligations.filter((o) => o.status !== 'proved' && !bySmt.includes(o));
     const mag = ev.maxAbs === null ? '-' : ev.maxAbs.toString();
     console.log(`${pad(ev.fn, 16)} repr=${pad(ev.repr, 6)} max|x|=${pad(mag, 18)} ${proved} proved${open.length ? `, ${open.length} open` : ''}`);
+    for (const o of bySmt) console.log(`    PROVED (SMT)  ${o.desc}   [${smtFor(o)!.note}]`);
     for (const o of open) {
       let note = o.note ?? '';
       if (o.kind === 'ensures' && ensuresTested) {
@@ -44,6 +52,8 @@ function printCheck(res: CheckResult, ensuresTested?: Map<string, number>) {
         const n = ensuresTested.get(`${ev.fn}#${idx}`);
         note = n ? `${note}; held in ${n} runtime checks` : note;
       }
+      const sr = smtFor(o);
+      if (sr && sr.status !== 'proved') note = `${note}; ${sr.note}`;
       console.log(`    ${o.status.toUpperCase()}  ${o.desc}${note ? `   [${note}]` : ''}`);
     }
   }
@@ -67,14 +77,23 @@ function printCheck(res: CheckResult, ensuresTested?: Map<string, number>) {
   }
 }
 
-function main() {
+async function openEnsures(prog: Program, res: CheckResult): Promise<SmtResult[]> {
+  const open = new Set<string>();
+  for (const ev of res.evidence.values()) {
+    ev.obligations.filter((o) => o.kind === 'ensures').forEach((o, i) => o.status !== 'proved' && open.add(`${ev.fn}#${i}`));
+  }
+  if (!open.size) return [];
+  return proveEnsures(prog, (fn, i) => open.has(`${fn}#${i}`));
+}
+
+async function main() {
   const [cmd, dir = 'examples/invoicing'] = process.argv.slice(2);
   try {
     switch (cmd) {
       case 'check': {
         const { prog, pol } = load(dir);
         const res = check(prog, pol);
-        printCheck(res);
+        printCheck(res, undefined, await openEnsures(prog, res));
         process.exit(errors(res).length ? 1 : 0);
         break;
       }
@@ -84,7 +103,7 @@ function main() {
         const res = check(prog, pol);
         const g = parseGlossary(glossarySrc, prog);
         const suite = runSuite(prog, feature, g, res, DEFAULT_SUITE);
-        printCheck(res, suite.ensuresStats);
+        printCheck(res, suite.ensuresStats, await openEnsures(prog, res));
 
         hr('Scenarios, rules, properties, privacy');
         let bad = 0;
@@ -133,4 +152,4 @@ function main() {
 }
 
 void showInterval;
-main();
+main().then(() => process.exit(process.exitCode ?? 0));
