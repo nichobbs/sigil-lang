@@ -11,16 +11,19 @@
 //   Results are returned with multi-value: an array of the result's leaves (a single value or nothing for fewer).
 //   A list in a result points into scratch memory, valid until the next call.
 
-import { Val } from '../interp.js';
+import { Host, Val } from '../interp.js';
 import { FnReport, MEM_BASE } from './compile.js';
+import { WasmHost, readAbi } from './host.js';
 import { LowerState, Raw, StrTable, liftVal, lowerVal } from './marshal.js';
 
-export { Raw, StrTable, readList, writeList } from './marshal.js';
+export type { Raw } from './marshal.js';
+export { StrTable, readList, writeList } from './marshal.js';
 
 /** Per-instance state kept next to the exports (string table, host adapter). */
 export const ENV = Symbol('sigil.env');
 export interface Env {
   strings?: StrTable;
+  host?: WasmHost;
 }
 export type Exports = Record<string, (...a: Raw[]) => Raw | Raw[] | void> & { [ENV]?: Env };
 
@@ -49,10 +52,16 @@ export function liftResult(fn: FnReport, raw: Raw | Raw[] | void, memory?: WebAs
   return liftVal(fn.result!, raws, { i: 0 }, { memory, strings });
 }
 
-export async function instantiate(bytes: Uint8Array): Promise<Exports> {
+/**
+ * Instantiate a compiled module with the host adapter (src/wasm/host.ts) bound to `host`.
+ * The returned exports carry the string table and adapter under the ENV symbol (used by callCompiled).
+ */
+export async function instantiate(bytes: Uint8Array, host: Host = new Host(1)): Promise<Exports> {
   const mod = await WebAssembly.compile(new Uint8Array(bytes)); // also validates the module
-  const instance = await WebAssembly.instantiate(mod, {});
-  return { ...(instance.exports as unknown as Exports) };
+  const wh = new WasmHost(readAbi(mod), host);
+  const instance = await WebAssembly.instantiate(mod, wh.imports(mod));
+  wh.memory = (instance.exports as unknown as { memory?: WebAssembly.Memory }).memory;
+  return { ...(instance.exports as unknown as Exports), [ENV]: { strings: wh.strings, host: wh } };
 }
 
 export function callCompiled(fn: FnReport, exports: Exports, args: Val[]): Val {

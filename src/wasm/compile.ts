@@ -27,7 +27,7 @@ import { CheckResult, FnEvidence } from '../check.js';
 import { Repr, reprFor } from '../interval.js';
 import { I32, I64, IntOps, OP, TypeTable, ValType, WasmFunc, WasmImport, blockTypeOf, buildModule, call, i64Load, i64Store, localGet, localSet } from './encode.js';
 import {
-  ElemLayout, Kind, ListShape, MAX_MEMORY_BYTES, MEM_BASE, NotCompilable, SLOT, Scalar, Shape, flatLeaves, hasLossyList, intLeaves, layoutOf, listsOf, magnitudes, nleaves, no, sameShape, shapeOf, showShape, wtypes,
+  ElemLayout, Kind, ListShape, MAX_MEMORY_BYTES, MEM_BASE, NotCompilable, SLOT, Scalar, Shape, flatLeaves, intLeaves, layoutOf, listsOf, magnitudes, nleaves, no, sameShape, shapeOf, showShape, wtypes,
 } from './shape.js';
 
 export type { ElemLayout, Kind, Shape };
@@ -66,7 +66,7 @@ export interface CompileOptions {
   /** Test hook for mutation testing the compiler itself: 'trunc' emits plain div_s (WRONG for negatives). */
   divMode?: 'floor' | 'trunc';
   /** Test hook: deliberately miscompile one construct, so the differential tests can be shown to catch it. */
-  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped';
+  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-order-swapped' | 'emit-dropped';
 }
 
 export interface CompileResult {
@@ -108,7 +108,7 @@ export type CalleeResolver = (name: string) => Callee | string; // string = reas
 class NeedBase extends Error {}
 
 const FEATURES = { effects: false };
-const SHAPE_OPTS = { strings: false };
+const SHAPE_OPTS = { strings: true };
 
 // ---------------------------------------------------------------------------
 // Module-level registries shared by all functions of one compilation
@@ -121,11 +121,33 @@ interface ImportReg {
 }
 class Registry {
   imports: ImportReg[] = [];
-  strings: string[] = [];
+  strings: string[] = []; // string literal i is host handle i + 1
+  enumBlocks = new Map<string, number>(); // enum cases registered as consecutive literals: first handle
   handles: string[] = [];
-  constructor(public frozenImports = false) {}
+  /** Pass 2: the import set is fixed, so nothing may be added. */
+  constructor(public frozen = false) {}
   importIndex(name: string): number {
     return this.imports.findIndex((i) => i.desc.name === name);
+  }
+  literal(s: string): number {
+    if (s === '') return 0;
+    let i = this.strings.indexOf(s);
+    if (i < 0) {
+      i = this.strings.length;
+      this.strings.push(s);
+    }
+    return i + 1;
+  }
+  /** Handle of the first of `cases.length` consecutive literals holding the case names. */
+  enumBlock(cases: string[]): number {
+    const key = cases.join('|');
+    let h = this.enumBlocks.get(key);
+    if (h === undefined) {
+      h = this.strings.length + 1;
+      this.strings.push(...cases);
+      this.enumBlocks.set(key, h);
+    }
+    return h;
   }
 }
 interface Ctx {
@@ -516,10 +538,6 @@ class FnGen {
     return { c: [...drops, ...gs[gs.length - 1].c], shape: gs[gs.length - 1].shape };
   }
 
-  protected genStr(_v: string): G {
-    return no('string literal');
-  }
-
   private genMatch(e: Extract<Expr, { k: 'match' }>, expect?: Shape): G {
     const s = this.gen(e.scrut);
     if (s.shape.t === 'result') return this.genMatchResult(e, s, expect);
@@ -585,7 +603,6 @@ class FnGen {
   private genRecord(e: Extract<Expr, { k: 'call' }>): G {
     const shape = shapeOf(this.prog, { k: 'named', name: e.fn }, `type ${e.fn}`, SHAPE_OPTS);
     if (shape.t !== 'rec') return no(`${e.fn} is not a record type`);
-    if (hasLossyList(shape)) return no(`${e.fn} holds a list whose elements have Str fields (not stored)`);
     let c: number[] = [];
     if (e.args.length) {
       if (e.kw.length) return no('mixed positional and keyword fields');
@@ -703,7 +720,7 @@ class FnGen {
     }
   }
   protected eqLeaf(k: 'int' | 'i32' | 'str'): number[] {
-    if (k === 'str') return no('= on strings');
+    if (k === 'str') return this.opts.mutation === 'str-eq-true' ? [OP.drop, OP.drop, ...I32.const(1n)] : call(this.imp('str_eq', ['i32', 'i32'], ['i32']));
     return [k === 'int' ? this.R.eq : I32.eq];
   }
 
@@ -799,10 +816,21 @@ class FnGen {
       case '<=':
       case '>':
       case '>=': {
-        if (e.args.length !== 2) return no(`${name} with ${e.args.length} arguments (only binary comparison is supported)`);
-        const a = this.int(this.gen(e.args[0]), name);
-        const b = this.int(this.gen(e.args[1]), name);
-        return { c: [...a, ...b, name === '<' ? R.ltS : name === '<=' ? R.leS : name === '>' ? R.gtS : R.geS], shape: BOOL };
+        if (e.args.length < 2) return no(`${name} with ${e.args.length} argument(s)`);
+        const op = name === '<' ? R.ltS : name === '<=' ? R.leS : name === '>' ? R.gtS : R.geS;
+        if (e.args.length === 2) return { c: [...this.int(this.gen(e.args[0]), name), ...this.int(this.gen(e.args[1]), name), op], shape: BOOL };
+        // chained, e.g. (<= lo x hi): every operand is evaluated once, in order, then adjacent pairs are compared
+        const c: number[] = [];
+        const ls = e.args.map((a) => {
+          const l = this.alloc(R.vt);
+          c.push(...this.int(this.gen(a), name), ...localSet(l));
+          return l;
+        });
+        ls.slice(0, -1).forEach((l, i) => {
+          c.push(...localGet(l), ...localGet(ls[i + 1]), op);
+          if (i > 0) c.push(I32.and);
+        });
+        return { c, shape: BOOL };
       }
       case '=': {
         need(2);
@@ -830,17 +858,89 @@ class FnGen {
   protected genFold(_e: Extract<Expr, { k: 'call' }>): G {
     return no('fold (not yet supported by the Wasm backend)');
   }
-  protected genText(_e: Extract<Expr, { k: 'call' }>): G {
-    return no('text (strings are not supported)');
+
+  // --- strings: opaque i32 handles into a host-owned table -----------------------------
+  /** Index of a host import (registered on first use). Index 0 is returned for a function that will not be emitted. */
+  protected imp(name: string, params: ValType[], results: ValType[], effect?: EffectDesc): number {
+    this.touched.add(name);
+    const reg = this.ctx.reg;
+    let i = reg.importIndex(name);
+    if (i < 0) {
+      if (reg.frozen) return 0;
+      i = reg.imports.length;
+      reg.imports.push({ desc: { module: 'host', name, params, results }, effect, used: false });
+    }
+    return i;
   }
-  protected genMoney(_e: Extract<Expr, { k: 'call' }>): G {
-    return no('money (strings are not supported)');
+
+  protected genStr(v: string): G {
+    return { c: I32.const(BigInt(this.ctx.reg.literal(v))), shape: { t: 'str' } };
   }
-  protected genChars(_e: Extract<Expr, { k: 'call' }>): G {
-    return no('chars (strings are not supported)');
+
+  /** `(text a b ...)`: concatenates strings and renders other values as the interpreter's showVal does. */
+  protected genText(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.kw.length) no('keyword arguments to text');
+    if (!e.args.length) return this.genStr('');
+    const concat = this.imp('str_concat', ['i32', 'i32'], ['i32']);
+    const c: number[] = [];
+    e.args.forEach((a, i) => {
+      c.push(...this.asStr(this.gen(a)));
+      if (i > 0) c.push(...call(concat));
+    });
+    return { c, shape: { t: 'str' } };
   }
-  protected genFromChars(_e: Extract<Expr, { k: 'call' }>): G {
-    return no('from-chars (strings are not supported)');
+
+  /** The handle of the rendering of a value inside `text`. */
+  private asStr(g: G): number[] {
+    const s = g.shape;
+    switch (s.t) {
+      case 'str':
+        return g.c;
+      case 'int': {
+        const f = this.imp('str_int', ['i64'], ['i32']);
+        return [...g.c, ...(this.R.vt === 'i32' ? [OP.i64ExtendI32S] : []), ...call(f)];
+      }
+      case 'bool':
+        return [...g.c, OP.if, 0x7f, ...I32.const(BigInt(this.ctx.reg.literal('true'))), OP.else, ...I32.const(BigInt(this.ctx.reg.literal('false'))), OP.end];
+      case 'enum':
+        return [...g.c, ...I32.const(BigInt(this.ctx.reg.enumBlock(s.cases))), I32.add];
+      case 'unit':
+        return [...g.c, ...I32.const(BigInt(this.ctx.reg.literal('unit')))];
+      default:
+        return no(`text of a ${showShape(s)} (only Str, Int, Bool, enum and Unit are rendered)`);
+    }
+  }
+
+  protected genMoney(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 1 || e.kw.length) no('money expects 1 argument');
+    const a = this.int(this.gen(e.args[0]), 'money');
+    const f = this.imp('str_money', ['i64'], ['i32']);
+    return { c: [...a, ...(this.R.vt === 'i32' ? [OP.i64ExtendI32S] : []), ...call(f)], shape: { t: 'str' } };
+  }
+
+  /** `(chars s)`: the host writes the code points into scratch memory (s must have a declared :max). */
+  protected genChars(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 1 || e.kw.length) no('chars expects 1 argument');
+    const s = this.gen(e.args[0]);
+    if (s.shape.t !== 'str') return no(`chars needs a Str, got ${showShape(s.shape)}`);
+    if (s.shape.max === undefined) return no('chars needs a Str with a declared :max');
+    const max = s.shape.max;
+    const f = this.imp('str_chars', ['i32', 'i32', 'i32'], ['i32']);
+    const off = this.allocScratch(max * SLOT, 'chars');
+    const n = this.alloc('i32');
+    const layout = layoutOf({ t: 'int', lo: 0n, hi: 1114111n }, 'chars element');
+    return {
+      c: [...s.c, ...this.baseAddr(off), ...I32.const(BigInt(max)), ...call(f), ...localSet(n), ...this.baseAddr(off), ...localGet(n)],
+      shape: { t: 'list', layout, min: 0, max },
+    };
+  }
+
+  protected genFromChars(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 1 || e.kw.length) no('from-chars expects 1 argument');
+    const l = this.gen(e.args[0]);
+    if (l.shape.t !== 'list' || l.shape.layout.elem.t !== 'int') return no(`from-chars needs a list of Int, got ${showShape(l.shape)}`);
+    const f = this.imp('str_from_chars', ['i32', 'i32'], ['i32']);
+    return { c: [...l.c, ...call(f)], shape: { t: 'str' } };
   }
 }
 
@@ -907,7 +1007,6 @@ function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, op
       return { name: p.name, type: p.type, shape, leaves: flatLeaves(shape) };
     });
     const result = shapeOf(prog, f.out, 'result', SHAPE_OPTS);
-    if (hasLossyList(result)) no('result holds a list whose elements have Str fields (not stored)');
 
     // Representation: the checker's derived repr, widened if its tracked intermediates did not
     // cover parameters, declared types or literals (it only tracks arithmetic results).
@@ -1048,6 +1147,7 @@ export function compileProgram(prog: Program, res: CheckResult, opts: CompileOpt
   const reg = new Registry(true);
   reg.imports = reg1.imports.filter((i) => i.used).map((i) => ({ ...i, used: true }));
   reg.strings = [...reg1.strings];
+  reg.enumBlocks = new Map(reg1.enumBlocks);
   reg.handles = [...reg1.handles];
   const b = buildOnce(prog, res, opts, reg, reg.imports.length);
 

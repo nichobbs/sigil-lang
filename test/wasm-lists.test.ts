@@ -174,18 +174,17 @@ describe('wasm lists: invoicing example', () => {
     expect(WebAssembly.validate(new Uint8Array(out.bytes))).toBe(true);
   });
 
-  it('memory layout: 200 Lines of (unit, qty) = 3200 bytes of input; scratch is the map output', () => {
-    // Line.sku (a string) is not stored; stride = 2 slots.
-    expect(rep('gross').inputBytes).toBe(200 * 2 * 8);
+  it('memory layout: 200 Lines of (sku, unit, qty) = 4800 bytes of input; scratch is the map output', () => {
+    // Line = (sku, unit, qty): the sku is a string handle in its own slot; stride = 3 slots.
+    expect(rep('gross').inputBytes).toBe(200 * 3 * 8);
     expect(rep('gross').scratchBytes).toBe(200 * 1 * 8);
     // price-invoice calls gross with its own list: the callee's scratch sits above the caller's.
     expect(rep('price-invoice').scratchBytes).toBe(200 * 8);
     expect(out.memPages).toBe(1);
   });
 
-  it('still refuses strings and capabilities', () => {
-    expect(rep('receipt').compilable).toBe(false);
-    expect(rep('receipt').reason).toMatch(/str/);
+  it('compiles strings; still refuses capabilities (until stage 3)', () => {
+    expect(rep('receipt').compilable, rep('receipt').reason).toBe(true);
     expect(rep('issue-invoice').compilable).toBe(false);
     expect(rep('issue-invoice').reason).toMatch(/capabilit/);
   });
@@ -217,7 +216,7 @@ describe('wasm lists: invoicing example', () => {
 
   it('exports memory alongside the functions', async () => {
     const ex = await instantiate(out.bytes);
-    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'memory', 'price-invoice']);
+    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'memory', 'price-invoice', 'receipt']);
   });
 });
 
@@ -236,8 +235,8 @@ describe('wasm lists: fixture', () => {
     expect(rep('count-big').repr).toBe('i32');
     expect(rep('plans').repr).toBe('i32');
     expect(rep('gross-of-big').repr).toBe('i64');
-    // gross-of-big: filter output (200 * 2 slots) + the callee's map scratch above it
-    expect(rep('gross-of-big').scratchBytes).toBe(200 * 2 * 8 + 200 * 8);
+    // gross-of-big: filter output (200 * 3 slots) + the callee's map scratch above it
+    expect(rep('gross-of-big').scratchBytes).toBe(200 * 3 * 8 + 200 * 8);
   });
 
   for (const name of COMPILABLE) {
@@ -285,20 +284,18 @@ describe('wasm lists: fixture', () => {
   });
 
   it('refuses the still-unsupported things, with reasons', () => {
-    expect(rep('str-list').compilable).toBe(false);
-    expect(rep('str-list').reason).toMatch(/str/);
+    expect(rep('str-list').compilable, rep('str-list').reason).toBe(true); // strings are handles now
     expect(rep('res-fn').compilable, rep('res-fn').reason).toBe(true); // Results are first-class values now
     expect(rep('cap-fn').compilable).toBe(false);
     expect(rep('cap-fn').reason).toMatch(/capabilit/);
-    expect(rep('list-result').compilable).toBe(false);
-    expect(rep('list-result').reason).toMatch(/Str fields/); // list results are supported, but not while Str fields are unstored
+    expect(rep('list-result').compilable, rep('list-result').reason).toBe(true); // list results are supported
     expect(rep('nested-list').compilable).toBe(false);
     expect(rep('nested-list').reason).toMatch(/nested list/);
   });
 
-  it('refuses reading an unstored string field', () => {
-    expect(rep('str-field-read').compilable).toBe(false);
-    expect(rep('str-field-read').reason).toMatch(/l\.sku|not a scalar/);
+  it('reads string fields of list elements (handles are stored in their own slot)', async () => {
+    expect(rep('str-field-read').compilable, rep('str-field-read').reason).toBe(true);
+    for (const name of ['str-field-read', 'str-list', 'list-result']) expect((await differential(prog, out, name, 100)).mismatches).toEqual([]);
   });
 
   it('refuses lists whose declared maximum would need unreasonable memory', () => {

@@ -35,7 +35,7 @@ export type Shape =
   | { t: 'unit' }
   | { t: 'rec'; name: string; fields: { name: string; shape: Shape }[] }
   | { t: 'result'; ok: Shape; err: Shape }
-  | { t: 'list'; layout: ElemLayout; min: number; max: number; lossy?: true };
+  | { t: 'list'; layout: ElemLayout; min: number; max: number };
 export type Kind = Shape;
 export type ListShape = Extract<Shape, { t: 'list' }>;
 
@@ -213,7 +213,7 @@ export interface ShapeOpts {
   strings: boolean;
 }
 
-export function shapeOf(prog: Program, t: Type, what: string, opts: ShapeOpts, depth = 0, omitStr = false): Shape {
+export function shapeOf(prog: Program, t: Type, what: string, opts: ShapeOpts, depth = 0): Shape {
   if (depth > 16) return no(`${what}: type nesting too deep (recursive type?)`);
   const r = resolveType(prog, t);
   const name = t.k === 'named' ? t.name : '';
@@ -230,23 +230,14 @@ export function shapeOf(prog: Program, t: Type, what: string, opts: ShapeOpts, d
       if (!opts.strings) return no(`${what} has type str, which is outside the compiled subset`);
       return { t: 'str', ...(r.max !== undefined ? { max: r.max } : {}) };
     case 'rec':
-      // Without string support, Str fields of list elements are not stored (and any read of one is refused).
-      return {
-        t: 'rec',
-        name,
-        fields: r.fields
-          .filter((f) => opts.strings || !omitStr || resolveType(prog, f.type).k !== 'str')
-          .map((f) => ({ name: f.name, shape: shapeOf(prog, f.type, `${what}.${f.name}`, opts, depth + 1, omitStr) })),
-      };
+      return { t: 'rec', name, fields: r.fields.map((f) => ({ name: f.name, shape: shapeOf(prog, f.type, `${what}.${f.name}`, opts, depth + 1) })) };
     case 'result':
       return { t: 'result', ok: shapeOf(prog, r.ok, `${what}.ok`, opts, depth + 1), err: shapeOf(prog, r.err, `${what}.err`, opts, depth + 1) };
     case 'list': {
-      const layout = layoutOf(shapeOf(prog, r.elem, `${what} element`, opts, depth + 1, true), `${what} element`);
+      const layout = layoutOf(shapeOf(prog, r.elem, `${what} element`, opts, depth + 1), `${what} element`);
       const bytes = r.max * layout.stride * SLOT;
       if (!Number.isFinite(r.max) || r.max < 0 || bytes > MAX_MEMORY_BYTES) no(`${what}: list maximum length ${r.max} needs ${bytes} bytes, over the ${MAX_MEMORY_BYTES} byte limit`);
-      // lossy: Str fields of the elements are not stored, so the list must not leave the function (see hasLossyList)
-      const lossy = !opts.strings && typeToHasStrField(prog, r.elem);
-      return { t: 'list', layout, min: r.min, max: r.max, ...(lossy ? { lossy: true as const } : {}) };
+      return { t: 'list', layout, min: r.min, max: r.max };
     }
     default:
       return no(`${what} has type ${(r as { k: string }).k}, which is outside the compiled subset`);
@@ -270,13 +261,3 @@ export function flatLeaves(s: Shape, path = ''): { path: string; kind: Shape; lo
   }
 }
 
-function typeToHasStrField(prog: Program, t: Type, depth = 0): boolean {
-  if (depth > 16) return false;
-  const r = resolveType(prog, t);
-  return r.k === 'rec' && r.fields.some((f) => resolveType(prog, f.type).k === 'str' || typeToHasStrField(prog, f.type, depth + 1));
-}
-
-/** A list whose elements lost their Str fields (without string support): it cannot be returned or stored. */
-export function hasLossyList(s: Shape): boolean {
-  return listsOf(s).some((l) => l.lossy);
-}
