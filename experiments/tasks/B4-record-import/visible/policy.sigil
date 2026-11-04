@@ -1,0 +1,7 @@
+; Human-owned policy for B4: what a program may request, and what each sink may receive.
+; Sinks are deny-by-default: the store and the audit log accept public data only. The free-text note of a record
+; is classified internal, so it can reach neither.
+
+(policy
+  (allow store (ns "records/*"))
+  (allow audit))

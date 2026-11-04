@@ -1,0 +1,87 @@
+; Glossary for B4: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Raw, Clean, Reason, ImportSummary, import-batch),
+; so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a record {id:Int} of {qty:Int} at {unit:Money} in category {cat:Int} with the note {note:Str}"
+    (append batch (Raw id qty unit cat note)))
+
+  (given "the already imported ids are {a:Int} and {b:Int}"
+    (set done (list a b)))
+
+  (given "the record store is unavailable"
+    (fail store:records put))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "the batch is imported"
+    (default done (list))
+    (call report import-batch batch done))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the report shows {n:Int} imported"
+    (expect (= report.imported n)))
+
+  (then "the report shows {n:Int} rejected as {why:Reason}"
+    (expect (= (match why
+                 (Accepted report.imported)
+                 (BadId report.badId)
+                 (BadQuantity report.badQuantity)
+                 (BadPrice report.badPrice)
+                 (UnknownCategory report.unknownCategory)
+                 (AlreadyImported report.alreadyImported)
+                 (DuplicateInBatch report.duplicateInBatch)
+                 (StoreFailed report.storeFailed))
+               n)))
+
+  (then "the stored record ids are {a:Int} and {b:Int}"
+    (expect (= (map (stored store:records) (fn (c) c.id)) (list a b))))
+
+  (then "the stored record id is {a:Int}"
+    (expect (= (map (stored store:records) (fn (c) c.id)) (list a))))
+
+  (then "the stored line totals are {a:Money} and {b:Money}"
+    (expect (= (map (stored store:records) (fn (c) c.lineTotal)) (list a b))))
+
+  (then "the stored record is {id:Int} with quantity {q:Int}, unit price {u:Money}, category {c:Int} and line total {t:Money}"
+    (expect (= (stored store:records) (list (Clean id q u c t)))))
+
+  (then "nothing is stored"
+    (expect (= (len (stored store:records)) 0)))
+
+  (then "the audit log has one summary of {r:Int} received, {i:Int} imported and {x:Int} rejected"
+    (expect (= (emitted audit) (list (ImportSummary r i x)))))
+
+  ; ---- Properties ----------------------------------------------------------------
+  (always "A record is imported only if its id is at least 1, its quantity is from 1 to 1000, its unit price is from 1 cent to $100000.00 and its category is from 0 to 9. Any other record is rejected, and the first check it fails decides the reason, in this order: BadId, BadQuantity, BadPrice, UnknownCategory."
+    (forall ((r Raw))
+      (let [rep (import-batch (list r) (list))]
+        (and (= (= rep.badId 1) (< r.id 1))
+             (= (= rep.badQuantity 1) (and (>= r.id 1) (not (<= 1 r.quantity 1000))))
+             (= (= rep.badPrice 1) (and (>= r.id 1) (<= 1 r.quantity 1000) (not (<= 1 r.unitPrice 10000000))))
+             (= (= rep.unknownCategory 1) (and (>= r.id 1) (<= 1 r.quantity 1000) (<= 1 r.unitPrice 10000000) (not (<= 0 r.category 9))))
+             (= (= rep.imported 1) (and (>= r.id 1) (<= 1 r.quantity 1000) (<= 1 r.unitPrice 10000000) (<= 0 r.category 9)))))))
+
+  (always "A record whose id is in the list of already imported ids is rejected as AlreadyImported, unless it fails one of the earlier checks."
+    (forall ((r Raw) (e RawId))
+      (let [rep (import-batch (list r) (list e))]
+        (= (= rep.alreadyImported 1)
+           (and (= e r.id) (>= r.id 1) (<= 1 r.quantity 1000) (<= 1 r.unitPrice 10000000) (<= 0 r.category 9))))))
+
+  (always "An id that appears in more than one record of the same batch (counting every record of the batch, valid or not) cannot be trusted: every record that carries it is rejected as DuplicateInBatch, unless it fails one of the earlier checks, and none of them is imported."
+    (forall ((k (Int 1 1000000)))
+      (let [rep (import-batch (list (Raw k 1 100 0 "a") (Raw k 2 200 1 "b") (Raw (add k 1) 3 300 2 "c")) (list))]
+        (and (= rep.duplicateInBatch 2) (= rep.imported 1)))))
+
+  (always "Every record of the batch is accounted for exactly once: the number imported plus the numbers rejected for each reason equals the number of records in the batch."
+    (forall ((rs (List Raw 1 20)) (d (List RawId 0 500)))
+      (let [rep (import-batch rs d)]
+        (= (add (add (add (add rep.imported rep.badId) (add rep.badQuantity rep.badPrice))
+                     (add rep.unknownCategory rep.alreadyImported))
+                (add rep.duplicateInBatch rep.storeFailed))
+           (len rs)))))
+
+  (privacy "The free-text note of a record is never stored and never written to the audit log."
+    (source Raw.note) (run import-batch))
+)
