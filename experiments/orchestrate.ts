@@ -80,6 +80,14 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
     }
     writeFileSync(join(dir, 'PROMPT.md'), tsPrompt(basename(td)));
   }
+  // Change-request tasks (E series): the previous program is the starting point, already in place as the deliverable.
+  const startFile = lang === 'sigil' ? join(td, 'start/sigil/app.sigil') : join(td, 'start/ts/solution.ts');
+  const deliverable = lang === 'sigil' ? join(dir, 'task', 'app.sigil') : join(dir, 'solution.ts');
+  const isChange = existsSync(startFile);
+  if (isChange) {
+    copyFileSync(startFile, deliverable);
+    writeFileSync(join(dir, 'PROMPT.md'), readFileSync(join(dir, 'PROMPT.md'), 'utf8') + `\nThis is a CHANGE REQUEST, not a new program: the deliverable file already contains the previous version of the program. The task README describes the change (Change request section); intent.feature is already updated. Edit the existing program to meet the updated spec and keep everything else working. The scorer's hidden cases cover both the new behaviour and the old behaviour that must not regress.\n`);
+  }
   if (process.env.NO_BRIEF) return { dir, prompt: `Read ${join(dir, 'PROMPT.md')} and follow it exactly. Your workspace is ${dir}; do not leave it.` };
   // Single-file brief: everything required reading, in one read.
   const rd = (f: string) => readFileSync(join(dir, f), 'utf8');
@@ -95,6 +103,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
   } else {
     brief += fence('README.md (task)', rd('README.md')) + fence('intent.feature', rd('intent.feature')) + fence('host.ts (read only)', rd('host.ts'));
   }
+  if (isChange) brief += fence(lang === 'sigil' ? 'task/app.sigil (current program, to be changed)' : 'solution.ts (current program, to be changed)', readFileSync(deliverable, 'utf8'));
   writeFileSync(join(dir, 'BRIEF.md'), brief);
   return { dir, prompt: `Read ${join(dir, 'BRIEF.md')} (one read; it contains all instructions and reference material) and follow it exactly. Your workspace is ${dir}; do not leave it.` };
 }

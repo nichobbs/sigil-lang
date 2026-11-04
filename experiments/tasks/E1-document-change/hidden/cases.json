@@ -1,0 +1,2536 @@
+{
+ "entry": "handle-request",
+ "cases": [
+  {
+   "name": "editor updates own draft",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Q3 plan",
+     "size": 800,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Q3 plan v2",
+     "size": 1200
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Draft",
+      "size": 1200
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Q3 plan v2",
+       "size": 1200,
+       "status": "Draft"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor updates own published document and it stays published",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Handbook",
+     "size": 500,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Handbook 2",
+     "size": 450
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 450
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Handbook 2",
+       "size": 450,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin updates a draft owned by someone else",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 9,
+     "title": "Minutes",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Minutes final",
+     "size": 77
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Draft",
+      "size": 77
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 9,
+       "title": "Minutes final",
+       "size": 77,
+       "status": "Draft"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Update"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "update to exactly the maximum size is allowed",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Big",
+     "size": 50000
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Draft",
+      "size": 50000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Big",
+       "size": 50000,
+       "status": "Draft"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "update to size zero is allowed and keeps a published document published",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 40,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Empty now",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Empty now",
+       "size": 0,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor deletes own draft",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Scratch",
+     "size": 12,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Deleted",
+      "size": 12
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Scratch",
+       "size": 12,
+       "status": "Deleted"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Delete"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor cannot delete own published document",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Old notes",
+     "size": 300,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin deletes a published document owned by someone else",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 9,
+     "title": "Policy",
+     "size": 900,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Deleted",
+      "size": 900
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 9,
+       "title": "Policy",
+       "size": 900,
+       "status": "Deleted"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Delete"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "delete ignores the payload of the request",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 9,
+     "title": "Original title",
+     "size": 640,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "Payload title",
+     "size": 31
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Deleted",
+      "size": 640
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 9,
+       "title": "Original title",
+       "size": 640,
+       "status": "Deleted"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Delete"
+      }
+     ]
+    },
+    "forbid": [
+     "Payload title"
+    ]
+   }
+  },
+  {
+   "name": "admin publishes a draft",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Launch post",
+     "size": 450,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 450
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Launch post",
+       "size": 450,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin publishes own draft of one character",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 1,
+     "title": "One",
+     "size": 1,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 1
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 1,
+       "title": "One",
+       "size": 1,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "publish ignores the payload of the request",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Keep me",
+     "size": 250,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "Other title",
+     "size": 9000
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 250
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Keep me",
+       "size": 250,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish"
+      }
+     ]
+    },
+    "forbid": [
+     "Other title"
+    ]
+   }
+  },
+  {
+   "name": "Publish carrying a payload larger than the limit is not a TooLong",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Fine",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "x",
+     "size": 60000
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 10
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Fine",
+       "size": 10,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "viewer cannot update",
+   "args": {
+    "actor": {
+     "id": 7,
+     "role": "Viewer"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 7,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Mine",
+     "size": 10
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 7,
+       "doc": 101,
+       "op": "Update",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "viewer cannot delete even a document they own",
+   "args": {
+    "actor": {
+     "id": 7,
+     "role": "Viewer"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 7,
+     "title": "Mine",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 7,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "viewer cannot publish",
+   "args": {
+    "actor": {
+     "id": 7,
+     "role": "Viewer"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 7,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 7,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "viewer on a deleted document is NotAllowed, not Gone",
+   "args": {
+    "actor": {
+     "id": 7,
+     "role": "Viewer"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 7,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Update",
+     "title": "x",
+     "size": 10
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 7,
+       "doc": 101,
+       "op": "Update",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor cannot update someone else's document",
+   "args": {
+    "actor": {
+     "id": 6,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Mine now",
+     "size": 10
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 6,
+       "doc": 101,
+       "op": "Update",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor cannot delete someone else's document",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 6,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Not yours",
+     "size": 77,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 6,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publishes own draft",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 10
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Roadmap",
+       "size": 10,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor cannot publish someone else's document",
+   "args": {
+    "actor": {
+     "id": 6,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 6,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor on someone else's deleted document is NotAllowed, not Gone",
+   "args": {
+    "actor": {
+     "id": 6,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 6,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor too long update of someone else's document is NotAllowed",
+   "args": {
+    "actor": {
+     "id": 6,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "x",
+     "size": 60000
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 6,
+       "doc": 101,
+       "op": "Update",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publish of an already published own document is AlreadyPublished",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 0,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "AlreadyPublished"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "AlreadyPublished"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor updates own deleted document",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Gone",
+     "size": 10,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Back",
+     "size": 20
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor deletes own deleted document",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin cannot update a deleted document",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Gone",
+     "size": 10,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Revived",
+     "size": 20
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Update",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin cannot delete a deleted document",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin cannot publish a deleted document",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 100,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "deleted is reported before TooLong",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Update",
+     "title": "x",
+     "size": 60000
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Update",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "deleted is reported before EmptyBody",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 0,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "update one over the maximum is TooLong",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Book",
+     "size": 50001
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "TooLong"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update",
+       "reason": "TooLong"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin update to the largest representable size is TooLong",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Huge",
+     "size": 1000000
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "TooLong"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Update",
+       "reason": "TooLong"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "update of a published document that is too long is TooLong",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Long",
+     "size": 50001
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "TooLong"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update",
+       "reason": "TooLong"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "publishing a published document is AlreadyPublished",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "AlreadyPublished"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "AlreadyPublished"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "AlreadyPublished is reported before EmptyBody",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 0,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "AlreadyPublished"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "AlreadyPublished"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "publishing an empty draft is EmptyBody",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 0,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "EmptyBody"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "EmptyBody"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "a refusal does not audit the titles of the document or the request",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 6,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Confidential merger plan",
+     "size": 40,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Secret replacement title",
+     "size": 50
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 6,
+       "doc": 101,
+       "op": "Update",
+       "reason": "NotAllowed"
+      }
+     ]
+    },
+    "forbid": [
+     "Confidential merger plan",
+     "Secret replacement title"
+    ]
+   }
+  },
+  {
+   "name": "a deleted-document refusal does not audit the titles",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Salary review",
+     "size": 40,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Bonus review",
+     "size": 50
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Update",
+       "reason": "Gone"
+      }
+     ]
+    },
+    "forbid": [
+     "Salary review",
+     "Bonus review"
+    ]
+   }
+  },
+  {
+   "name": "a success does not audit the titles",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Draft strategy",
+     "size": 40,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Final strategy",
+     "size": 60
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Draft",
+      "size": 60
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Final strategy",
+       "size": 60,
+       "status": "Draft"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update"
+      }
+     ]
+    },
+    "forbid": [
+     "Draft strategy"
+    ]
+   }
+  },
+  {
+   "name": "store failure on update",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Update",
+     "title": "Notes",
+     "size": 10
+    }
+   },
+   "host": {
+    "fail": [
+     {
+      "handle": "store:docs",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "store failure on delete",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "host": {
+    "fail": [
+     {
+      "handle": "store:docs",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "store failure on publish",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Roadmap",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "host": {
+    "fail": [
+     {
+      "handle": "store:docs",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "a refusal is still audited when the store is unavailable",
+   "args": {
+    "actor": {
+     "id": 7,
+     "role": "Viewer"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 7,
+     "title": "Roadmap",
+     "size": 300,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "host": {
+    "fail": [
+     {
+      "handle": "store:docs",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 7,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publishes own draft carrying a payload",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "Other title",
+     "size": 999999
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 10
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Title 1",
+       "size": 10,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publish of own empty draft is EmptyBody",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 0,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "EmptyBody"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "EmptyBody"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publish of own deleted document is Gone",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "Gone"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "Gone"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publish of own empty published document is AlreadyPublished",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 0,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "AlreadyPublished"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "AlreadyPublished"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publish of someone elses deleted document is NotAllowed, not Gone",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 9,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Deleted"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor publish of someone elses published document is NotAllowed",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 9,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor delete of someone elses published document is NotAllowed",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 9,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor delete of own published document ignores a large payload",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "x",
+     "size": 999999
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor can still update own published document",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Update",
+     "title": "New",
+     "size": 20
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 20
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "New",
+       "size": 20,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Update"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "editor can still delete own draft with the store down",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "host": {
+    "fail": [
+     {
+      "handle": "store:docs",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "editor publish with the store down",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "host": {
+    "fail": [
+     {
+      "handle": "store:docs",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "admin still deletes a published document",
+   "args": {
+    "actor": {
+     "id": 1,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Deleted",
+      "size": 10
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Title 1",
+       "size": 10,
+       "status": "Deleted"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 1,
+       "doc": 101,
+       "op": "Delete"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin still deletes own published document",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Admin"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Deleted",
+      "size": 10
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Title 1",
+       "size": 10,
+       "status": "Deleted"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Delete"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "viewer still cannot publish own document",
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Viewer"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Title 1",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "",
+     "size": 0
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish",
+       "reason": "NotAllowed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "a refusal of an editor deleting a published document does not audit titles",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Secret plan",
+     "size": 10,
+     "status": "Published"
+    },
+    "req": {
+     "op": "Delete",
+     "title": "Hidden req",
+     "size": 3
+    }
+   },
+   "expect": {
+    "result": {
+     "err": "NotAllowed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Delete",
+       "reason": "NotAllowed"
+      }
+     ]
+    },
+    "forbid": [
+     "Secret plan",
+     "Hidden req"
+    ]
+   }
+  },
+  {
+   "name": "an editor publish does not audit titles",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 5,
+     "role": "Editor"
+    },
+    "doc": {
+     "id": 101,
+     "owner": 5,
+     "title": "Quarterly secret",
+     "size": 10,
+     "status": "Draft"
+    },
+    "req": {
+     "op": "Publish",
+     "title": "Req secret",
+     "size": 3
+    }
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "doc": 101,
+      "status": "Published",
+      "size": 10
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 101,
+       "owner": 5,
+       "title": "Quarterly secret",
+       "size": 10,
+       "status": "Published"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 5,
+       "doc": 101,
+       "op": "Publish"
+      }
+     ]
+    },
+    "forbid": [
+     "Req secret"
+    ]
+   }
+  }
+ ]
+}
