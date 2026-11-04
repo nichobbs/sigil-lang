@@ -7,10 +7,12 @@ const { chromium } = createRequire(import.meta.url)('playwright') as { chromium:
 
 type Snap = { cards: string[]; buttons: string[]; message: string; audit: string };
 
-async function drive(base: string, query: string): Promise<{ steps: Snap[]; xss: boolean }> {
+async function drive(base: string, query: string): Promise<{ steps: Snap[]; xss: boolean; label: string }> {
   const browser = await chromium.launch();
   const page = await (await browser.newContext()).newPage();
   await page.goto(`${base}/${query}`);
+  await page.waitForFunction(() => (document.getElementById('backend')!.textContent ?? '') !== '');
+  const label = (await page.textContent('#backend')) ?? '';
   const snap = async (): Promise<Snap> => {
     await page.waitForFunction(() => document.body.dataset.busy === '0' && document.querySelectorAll('[data-doc]').length > 0);
     return page.evaluate(() => ({
@@ -49,32 +51,47 @@ async function drive(base: string, query: string): Promise<{ steps: Snap[]; xss:
   steps.push(await snap());
   const xss = await page.evaluate(() => (window as unknown as { __x?: number }).__x === 1);
   await browser.close();
-  return { steps, xss };
+  return { steps, xss, label };
 }
 
-const { server } = makeServer();
-await new Promise<void>((r) => server.listen(0, r));
-const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+const interp = await makeServer();
+const wasm = await makeServer({ wasm: true });
+const listen = async (srv: typeof interp.server) => {
+  await new Promise<void>((r) => srv.listen(0, r));
+  return `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+};
+const baseI = await listen(interp.server);
+const baseW = await listen(wasm.server);
 let failed = false;
 try {
-  const local = await drive(base, '');
-  const remote = await drive(base, '?backend=remote');
-  for (const [name, r] of [['local', local], ['remote', remote]] as const) {
+  // Four configurations, one script: the in-page engine (interpreter, Wasm) and the Node server (interpreter, Wasm).
+  const runs = {
+    'local interp': await drive(baseI, ''),
+    'local wasm': await drive(baseI, '?engine=wasm'),
+    'remote interp': await drive(baseI, '?backend=remote'),
+    'remote wasm': await drive(baseW, '?backend=remote'),
+  };
+  for (const [name, r] of Object.entries(runs)) {
+    console.log(`${name}: ${r.label}`);
     if (r.xss) { console.error(`FAIL ${name}: title was interpreted as markup`); failed = true; }
+    if (name.endsWith('wasm') !== r.label.includes('wasm')) { console.error(`FAIL ${name}: page reports "${r.label}"`); failed = true; }
   }
-  const a = JSON.stringify(local.steps);
-  const b = JSON.stringify(remote.steps);
-  if (a !== b) { failed = true; console.error('FAIL: local and remote differ\nlocal :', a, '\nremote:', b); }
-  const last = local.steps[local.steps.length - 1];
+  const ref = JSON.stringify(runs['local interp'].steps);
+  for (const [name, r] of Object.entries(runs)) {
+    if (JSON.stringify(r.steps) !== ref) { failed = true; console.error(`FAIL: ${name} differs from local interp\nlocal interp:`, ref, `\n${name}:`, JSON.stringify(r.steps)); }
+  }
+  const last = runs['local wasm'].steps[runs['local wasm'].steps.length - 1];
+  const s = runs['local wasm'].steps;
   const checks: [string, boolean][] = [
-    ['viewer sees no buttons', local.steps[2].buttons.every((x) => x.endsWith(':'))],
-    ['empty draft cannot be published', !local.steps[3].buttons[2].includes('Publish')],
+    ['viewer sees no buttons', s[2].buttons.every((x) => x.endsWith(':'))],
+    ['empty draft cannot be published', !s[3].buttons[2].includes('Publish')],
     ['doc 1 ends Deleted with no buttons', last.cards[0].includes('|Deleted|') && last.buttons[0] === '1:'],
     ['audit has 3 entries and no title', (JSON.parse(last.audit) as unknown[]).length === 3 && !last.audit.includes('onerror')],
   ];
-  for (const [n, ok] of checks) { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}`); if (!ok) failed = true; }
-  console.log(failed ? 'E2E FAILED' : `E2E OK: ${local.steps.length} steps identical on local and remote backends`);
+  for (const [n, ok] of checks) { console.log(`${ok ? 'PASS' : 'FAIL'} ${n} (wasm)`); if (!ok) failed = true; }
+  console.log(failed ? 'E2E FAILED' : `E2E OK: ${s.length} steps identical across local/remote x interpreter/wasm`);
 } finally {
-  server.close();
+  interp.server.close();
+  wasm.server.close();
 }
 process.exit(failed ? 1 : 0);

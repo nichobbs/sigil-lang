@@ -93,7 +93,7 @@ describe('differential: memory engine vs sqlite engine vs real HTTP server', () 
     const sstore = new SqliteDocStore(db);
     seed(sstore);
     const b = new DocsEngine(SRC, sstore, new SqliteAuditLog(db));
-    const { server, engine: c } = makeServer();
+    const { server, engine: c } = await makeServer();
     await new Promise<void>((r) => server.listen(0, r));
     const port = (server.address() as { port: number }).port;
     try {

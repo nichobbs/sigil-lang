@@ -11,11 +11,13 @@ apps/docs/
   src/http.ts        transport-agnostic (method, path, headers, body) -> (status, body); used by the Node server, the browser local backend and the tests
   src/server.ts      Node HTTP server over SQLite, also serves the UI
   src/render.ts      trusted renderer with a closed vocabulary; program strings only ever reach textContent
+  src/wasmio.ts      serialises the compiler's per-function reports (shapes for marshalling) next to app.wasm
+  build-wasm.ts      check + compile to Wasm; writes web/app.wasm and web/app.reports.json
   src/browser.ts     UI; ?backend=remote talks to the server, default runs the engine in the page over localStorage
-  test/              adapter conformance suite (3 adapters), engine, HTTP mapping, differential memory vs SQLite vs real server, Playwright e2e
+  test/              adapter conformance suite (3 adapters), engine, HTTP mapping, differential memory vs SQLite vs real server, wasm vs interpreter, Playwright e2e
 ```
 
-Run: `npm run docs:build && npm run docs:serve` (http://localhost:8787, add `?backend=remote` for the server backend). Tests: `npx vitest run apps` and `npm run docs:e2e` (Chromium).
+Run: `npm run docs:build && npm run docs:serve` (http://localhost:8787). Query options: `?backend=remote` talks to the server, `?engine=wasm` runs the compiled module in the page. `npm run docs:serve:wasm` starts the server with the compiled module (`DOCS_ENGINE=wasm`). `docs:build` bundles the UI and compiles `app.sigil` to `web/app.wasm` plus `web/app.reports.json` (refuses unless the program checks clean and every function the shell calls compiles). Tests: `npx vitest run apps` and `npm run docs:e2e` (Chromium).
 
 ## What is demonstrated
 
@@ -23,10 +25,11 @@ Run: `npm run docs:build && npm run docs:serve` (http://localhost:8787, add `?ba
 - The UI gating comes from the program's `doc-view` function (`can-update`, `can-delete`, `can-publish`), not from JavaScript rules.
 - The title (personal data) never reaches the audit log: proved by the checker and re-checked end to end (the e2e asserts the audit log holds no title text).
 - Local and remote backends produce identical observable state at every step.
+- The same program runs as interpreted code and as compiled Wasm. The Wasm path calls the module through the host ABI: `put` and `emit` reach the same adapters (memory, SQLite, localStorage). Tests: 1200 random requests per run (outcomes, stored documents, audit logs, view models, injected store failures, out-of-range input) agree between the interpreter, Wasm over memory and Wasm over SQLite; the Playwright script gives identical DOM, messages and audit logs across local/remote x interpreter/wasm.
 
 ## Known limits
 
-- Execution is the reference interpreter. Its Host is synchronous, so only synchronous adapters work (memory, SQLite via node:sqlite, localStorage). Async stores need effect batching or a CPS interpreter.
 - Authentication is out of scope: the actor arrives in `x-actor-id` and `x-actor-role` headers.
 - Documents are seeded; creating a document is not a program operation yet.
-- The docs app runs on the interpreter. The Wasm backend now compiles this program's entry point too (all 11 reference programs, see experiments/wasm-coverage.ts), but the shell is not wired to it yet: the Wasm host ABI (src/wasm/abi.ts) is a separate adapter from the interpreter Host used here.
+- The reference interpreter's Host is synchronous, and so is the Wasm host adapter, so only synchronous adapters work (memory, SQLite via node:sqlite, localStorage). Async stores need effect batching or a CPS interpreter.
+- Compiled code trusts the declared ranges of its arguments (the checker's proofs assume them), so the shell validates every argument against the declared types before calling it, in both modes. Skipping that check makes out-of-range input behave differently on Wasm (found by the differential test).

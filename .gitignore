@@ -150,3 +150,8 @@ vite.config.ts.timestamp-*
 
 # a symlinked node_modules (worktrees) is not matched by "node_modules/"
 node_modules
+
+# docs app build outputs
+apps/docs/web/app.js
+apps/docs/web/app.wasm
+apps/docs/web/app.reports.json
