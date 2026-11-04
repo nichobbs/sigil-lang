@@ -50,6 +50,9 @@
   (then "an audit event is recorded for the issued invoice"
     (expect (= (emitted audit) (map (stored store:invoices) (fn (i) (Issued i.id))))))
 
+  (then "an audit event records the failed receipt for the stored invoice"
+    (expect (= (emitted audit) (map (stored store:invoices) (fn (i) (ReceiptFailed i.id))))))
+
   (then "the email subject is {text:Str}"
     (expect (= mail.subject text)))
 

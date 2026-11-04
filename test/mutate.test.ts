@@ -27,11 +27,10 @@ describe('mutation adequacy', () => {
     expect(rep.survivors.some((s) => s.desc === '20 -> 21')).toBe(false);
   });
 
-  it('no mutant survives once the mail-failure decision (keep invoice, report the error) is an Example', () => {
+  it('no mutant survives once the mail-failure decisions (keep invoice, report the error, audit it) are Examples', () => {
     expect(rep.total).toBe(22);
     expect(rep.survivors.map((s) => `${s.fn}: ${s.desc}`)).toEqual([]);
-    // the remaining open question is a different one (audit on mail failure)
-    expect(parseFeature(FEATURE).unresolved).toHaveLength(1);
+    expect(parseFeature(FEATURE).unresolved).toHaveLength(0);
   });
 
   it('receipt wording and the audit emit are no longer survivors', () => {

@@ -14,6 +14,7 @@
 (type Invoice  (rec (id InvId) (cust CustId) (lines (List Line 1 200)) (total Cents :internal)))
 (type Mail     (rec (to Email :pii) (subject Str) (body Str :pii)))
 (type Issued   (rec (inv InvId)))
+(type ReceiptFailed (rec (inv InvId)))
 (type IssueError (var StoreFailed MailFailed))
 
 (validator parse-email (in (s Str)) (out Email) (regex "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$") (sample "a@x.com" "b.c+d@mail.example.org"))
@@ -48,9 +49,11 @@
   (needs store:invoices net:mail audit rand)
   (let [inv (Invoice (fresh rand) c.id ls (price-invoice c.plan ls))]
     (try (put store:invoices inv.id inv) :on-err StoreFailed)
-    (try (post net:mail (receipt c inv)) :on-err MailFailed)
-    (emit audit (Issued inv.id))
-    (ok inv)))
+    (match (post net:mail (receipt c inv))
+      (ok r (do (emit audit (Issued inv.id))
+                (ok inv)))
+      (err e (do (emit audit (ReceiptFailed inv.id))
+                 (err MailFailed))))))
 
 ; Wiring layer: the only place platform and authority appear.
 (program invoicing
