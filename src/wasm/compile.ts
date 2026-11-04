@@ -20,17 +20,21 @@
 // The point of the exercise: the checker has already proved there is no overflow and no zero
 // divisor, so the emitted code is plain wrapping i32/i64 arithmetic with NO checks.
 // (`ensures` clauses are specifications; they are not emitted.)
+// Those proofs assume every argument is within its declared type, so the bodies are internal: the module exports only
+// a validating wrapper per function (validate.ts), which checks the arguments first (ABI version 2).
 
 import { Expr, FnDef, Program, asDeclassify, resolveType } from '../ast.js';
 import { CAP_OPS } from '../caps.js';
 import { CheckResult, FnEvidence } from '../check.js';
 import { Repr, reprFor } from '../interval.js';
 import { I32, I64, IntOps, OP, TypeTable, ValType, WasmFunc, WasmImport, blockTypeOf, buildModule, call, i32Load, i32Store, i64Load, i64Store, localGet, localSet } from './encode.js';
+import { CheckSite, failIf, genWrapper } from './validate.js';
 import {
   ElemLayout, Kind, ListShape, MAX_MEMORY_BYTES, MEM_BASE, NotCompilable, SLOT, Scalar, Shape, flatLeaves, intLeaves, shapeJson, layoutOf, listsOf, magnitudes, nleaves, no, sameShape, shapeOf, showShape, wtypes,
 } from './shape.js';
 
 export type { ElemLayout, Kind, Shape };
+export type { CheckSite };
 export { MAX_MEMORY_BYTES, MEM_BASE, SLOT };
 
 export interface Leaf {
@@ -77,9 +81,20 @@ export interface CompileResult {
   abi: AbiDescriptor;
 }
 
+/**
+ * ABI version of the modules this compiler emits. Version 2: every export is a validating wrapper (see validate.ts),
+ * the internal unchecked functions are not exported, and the module imports contract_violation (and str_len when a
+ * parameter holds a Str). Version 1 modules exported the unchecked functions directly.
+ */
+export const ABI_VERSION = 2;
+
 /** Self-describing ABI data; also embedded in the module as the custom section `sigil.abi` (JSON). */
 export interface AbiDescriptor {
-  version: 1;
+  version: 1 | 2;
+  /** True when every export validates its arguments before running unchecked code (version 2 and later). */
+  validated?: boolean;
+  /** Check sites: the first argument of the contract_violation import is an index into this list. */
+  checks?: CheckSite[];
   /** String literal table: literal i is host string handle i + 1 (handle 0 is the empty string). */
   strings: string[];
   /** Capability handle table: the first argument of a host effect import is an index into this list. */
@@ -124,10 +139,32 @@ class Registry {
   strings: string[] = []; // string literal i is host handle i + 1
   enumBlocks = new Map<string, number>(); // enum cases registered as consecutive literals: first handle
   handles: string[] = [];
+  sites: CheckSite[] = []; // contract_violation sites (AbiDescriptor.checks)
+  private siteKeys = new Map<string, number>();
   /** Pass 2: the import set is fixed, so nothing may be added. */
   constructor(public frozen = false) {}
   importIndex(name: string): number {
     return this.imports.findIndex((i) => i.desc.name === name);
+  }
+  /** Index of a host import, registered on first use (0 for an import pass 1 did not see: that code is discarded). */
+  importFn(name: string, params: ValType[], results: ValType[], effect?: EffectDesc): number {
+    let i = this.importIndex(name);
+    if (i < 0) {
+      if (this.frozen) return 0;
+      i = this.imports.length;
+      this.imports.push({ desc: { module: 'host', name, params, results }, effect, used: false });
+    }
+    return i;
+  }
+  site(s: CheckSite): number {
+    const key = JSON.stringify(s);
+    let i = this.siteKeys.get(key);
+    if (i === undefined) {
+      i = this.sites.length;
+      this.sites.push(s);
+      this.siteKeys.set(key, i);
+    }
+    return i;
   }
   literal(s: string): number {
     if (s === '') return 0;
@@ -222,6 +259,7 @@ class FnGen {
   need = 0; // max scratch bytes needed, including callees
   retShape: Shape = { t: 'unit' };
   touched = new Set<string>(); // host imports this function uses
+  fnName = ''; // for host-result check sites
   constructor(
     protected prog: Program,
     protected R: IntOps,
@@ -720,7 +758,7 @@ class FnGen {
     }
   }
   protected eqLeaf(k: 'int' | 'i32' | 'str'): number[] {
-    if (k === 'str') return this.opts.mutation === 'str-eq-true' ? [OP.drop, OP.drop, ...I32.const(1n)] : call(this.imp('str_eq', ['i32', 'i32'], ['i32']));
+    if (k === 'str') return this.opts.mutation === 'str-eq-true' ? [OP.drop, OP.drop, ...I32.const(1n)] : [...call(this.imp('str_eq', ['i32', 'i32'], ['i32'])), ...I32.const(0n), I32.ne]; // a host may answer any nonzero
     return [k === 'int' ? this.R.eq : I32.eq];
   }
 
@@ -890,8 +928,12 @@ class FnGen {
         return { c: this.opts.mutation === 'put-flag-inverted' ? c : [...c, I32.eqz], shape: { t: 'result', ok: { t: 'unit' }, err: { t: 'unit' } } };
       case 'emit':
         return { c: [...c, OP.drop], shape: { t: 'unit' } };
-      default: // fresh
+      default: {
+        // fresh: the checker assumes 0..9007199254740991, so a host value outside it must not reach unchecked code
+        const v = this.alloc('i64');
+        c.push(...localSet(v), ...this.hostResult(v, 'i64', 0n, 9007199254740991n, `${h.name}.fresh`), ...localGet(v));
         return { c: [...c, ...(this.R.vt === 'i32' ? [OP.i32WrapI64] : [])], shape: { t: 'int' } };
+      }
     }
   }
   // --- fold, sort and the list builtins ----------------------------------------------------------
@@ -1081,14 +1123,16 @@ class FnGen {
   /** Index of a host import (registered on first use). Index 0 is returned for a function that will not be emitted. */
   protected imp(name: string, params: ValType[], results: ValType[], effect?: EffectDesc): number {
     this.touched.add(name);
-    const reg = this.ctx.reg;
-    let i = reg.importIndex(name);
-    if (i < 0) {
-      if (reg.frozen) return 0;
-      i = reg.imports.length;
-      reg.imports.push({ desc: { module: 'host', name, params, results }, effect, used: false });
-    }
-    return i;
+    return this.ctx.reg.importFn(name, params, results, effect);
+  }
+
+  /** Check a value returned by a host import (held in `local`, of type `vt`) against the range the code relies on. */
+  protected hostResult(local: number, vt: ValType, lo: bigint, hi: bigint, where: string): number[] {
+    const R = vt === 'i64' ? I64 : I32;
+    const site = this.ctx.reg.site({ fn: this.fnName, reason: 'host-result', at: where, low: String(lo), high: String(hi) });
+    const cv = this.imp('contract_violation', ['i32', 'i32', 'i64'], []);
+    const cond = [...localGet(local), ...R.const(lo), R.ltS, ...localGet(local), ...R.const(hi), R.gtS, 0x72 /* i32.or */];
+    return failIf(cond, site, I32.const(-1n), [...localGet(local), ...(vt === 'i32' ? [OP.i64ExtendI32S] : [])], cv);
   }
 
   protected genStr(v: string): G {
@@ -1148,7 +1192,8 @@ class FnGen {
     const n = this.alloc('i32');
     const layout = layoutOf({ t: 'int', lo: 0n, hi: 1114111n }, 'chars element');
     return {
-      c: [...s.c, ...this.baseAddr(off), ...I32.const(BigInt(max)), ...call(f), ...localSet(n), ...this.baseAddr(off), ...localGet(n)],
+      // the count becomes a list length, so it must be within 0..max whatever the host answers
+      c: [...s.c, ...this.baseAddr(off), ...I32.const(BigInt(max)), ...call(f), ...localSet(n), ...this.hostResult(n, 'i32', 0n, BigInt(max), 'str_chars'), ...this.baseAddr(off), ...localGet(n)],
       shape: { t: 'list', layout, min: 0, max },
     };
   }
@@ -1250,6 +1295,7 @@ function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, op
     for (const withBase of needsInput ? [true] : [false, true]) {
       const g = new FnGen(prog, R, opts, callee, ctx);
       g.retShape = result;
+      g.fnName = f.name;
       const top = new Map<string, Binding>();
       const ptypes: ValType[] = [];
       for (const p of params) {
@@ -1354,6 +1400,29 @@ function buildOnce(prog: Program, res: CheckResult, opts: CompileOptions, reg: R
 
   for (const f of prog.fns.values()) ensure(f.name);
   const fns = [...prog.fns.keys()].map((n) => done.get(n)!.report);
+
+  // The trust boundary: the compiled bodies above are internal (not exported); each is exported only through a
+  // wrapper that validates its arguments first (validate.ts). Wrappers come after every body, so the bodies'
+  // function indices (used by direct calls) are unchanged.
+  const mark = (name: string, params: ValType[], results: ValType[]) => {
+    const i = reg.importFn(name, params, results);
+    const j = reg.importIndex(name);
+    if (j >= 0) reg.imports[j].used = true;
+    return i;
+  };
+  const env = {
+    site: (x: CheckSite) => reg.site(x),
+    cv: () => mark('contract_violation', ['i32', 'i32', 'i64'], []),
+    strLen: () => mark('str_len', ['i32'], ['i32']),
+  };
+  for (const f of funcs) f.export = false;
+  for (const name of prog.fns.keys()) {
+    const d = done.get(name)!;
+    const r = d.report;
+    if (!r.compilable || d.index === undefined) continue;
+    const spec = { name, repr: r.repr!, params: r.params!, result: r.result!, hasBase: !!r.hasBase, scratchBytes: r.scratchBytes ?? 0 };
+    funcs.push(genWrapper(spec, importBase + d.index, env));
+  }
   return { funcs, fns, reg, types, entries: fns.filter((r) => r.compilable && r.entry).map((r) => r.name) };
 }
 
@@ -1373,10 +1442,12 @@ export function compileProgram(prog: Program, res: CheckResult, opts: CompileOpt
   for (const r of b.fns) if (r.compilable && r.hasBase) memBytes = Math.max(memBytes, MEM_BASE + r.inputBytes! + r.scratchBytes!);
   const memPages = memBytes ? Math.ceil(memBytes / 65536) : undefined;
   const abi: AbiDescriptor = {
-    version: 1,
+    version: ABI_VERSION,
+    validated: true,
     strings: reg.strings,
     handles: reg.handles,
     effects: reg.imports.flatMap((i) => (i.effect ? [i.effect] : [])),
+    checks: reg.sites,
   };
   const custom = [{ name: 'sigil.abi', data: new TextEncoder().encode(shapeJson(abi)) }];
   const bytes = buildModule(b.funcs, { memPages, imports: reg.imports.map((i) => i.desc), types: b.types, custom: b.funcs.length || reg.imports.length ? custom : [] });

@@ -11,6 +11,16 @@
 //     str_money(cents: i64) -> i32                  "$12.34"
 //     str_chars(s: i32, dst: i32, max: i32) -> i32  writes the code points of s as i64 slots at dst, returns the count
 //     str_from_chars(ptr: i32, len: i32) -> i32     the string of the i64 code points at ptr
+//     str_len(s: i32) -> i32                        the number of code points of s, or -1 when s is not a live handle
+//                                                   (used by the validating wrappers for Str parameters)
+//
+//   Contract violations (ABI version 2, see validate.ts): every export validates its arguments first and, on a
+//   violation, calls
+//     contract_violation(site: i32, index: i32, value: i64)
+//   then traps (`unreachable`). `site` indexes AbiDescriptor.checks, `index` is the list element index (or -1) and
+//   `value` the offending raw value. This adapter throws from the import: the interpreter's ContractViolation (same
+//   kind 'type', same reason and the same `where` path as Interp.checkType) for argument checks, and RuntimeFault for
+//   reason host-result (a host import, e.g. fresh, answered outside the range the compiled code relies on).
 //
 //   Capability operations (one import per operation and argument shape: put$0, put$1, post$0, emit$0, fresh$0 ...).
 //   The first parameter is a handle id (an index into AbiDescriptor.handles); the rest are the leaves of the
@@ -22,8 +32,9 @@
 //   Each effect import's AbiDescriptor.effects entry lists the shapes of its arguments, so the host can rebuild the
 //   interpreter's values (records, strings, lists) and call Host.call(handle, op, args), producing the same log.
 
-import { Host, Val, moneyStr } from '../interp.js';
+import { ContractViolation, Host, RuntimeFault, Val, moneyStr } from '../interp.js';
 import { AbiDescriptor } from './compile.js';
+import { violationMessage } from './validate.js';
 import { Raw, StrTable, liftVal } from './marshal.js';
 import { SLOT } from './shape.js';
 
@@ -38,6 +49,8 @@ export function readAbi(mod: WebAssembly.Module): AbiDescriptor {
 export class WasmHost {
   strings: StrTable;
   memory?: WebAssembly.Memory;
+  /** How many contract violations the module has reported through contract_violation. */
+  violations = 0;
   constructor(
     public abi: AbiDescriptor,
     public host: Host,
@@ -80,6 +93,13 @@ export class WasmHost {
           cps.forEach((cp, i) => v.setBigInt64(dst + i * SLOT, BigInt(cp), true));
           return cps.length;
         });
+      case 'str_len':
+        return f((h: number) => (Number.isInteger(h) && h >= 0 && h < S.items.length ? Array.from(S.items[h]).length : -1));
+      case 'contract_violation':
+        return f((site: number, index: number, value: bigint) => {
+          this.violations++;
+          throw contractError(this.abi, site, index, value);
+        });
       case 'str_from_chars':
         return f((ptr: number, len: number) => {
           const v = this.view();
@@ -109,4 +129,13 @@ export class WasmHost {
       return r && typeof r === 'object' && !Array.isArray(r) && r.$ === 'err' ? 0 : 1;
     });
   }
+}
+
+/** The error a contract_violation(site, index, value) call stands for (see the header comment). */
+export function contractError(abi: AbiDescriptor, site: number, index: number, value: bigint): Error {
+  const s = abi.checks?.[site];
+  if (!s) return new RuntimeFault(`contract violation at unknown check site ${site}`);
+  const { where, message } = violationMessage(s, index, value);
+  if (s.reason === 'host-result') return new RuntimeFault(`${s.fn}: ${message}`);
+  return new ContractViolation('type', message, s.reason, where);
 }

@@ -144,6 +144,8 @@ export interface WasmFunc {
   results: ValType[];
   locals: ValType[]; // beyond params
   body: number[]; // instructions, without the final `end`
+  /** Exported under `name` unless false (internal, unchecked function bodies are not exported). */
+  export?: boolean;
 }
 
 export interface WasmImport {
@@ -183,7 +185,7 @@ export function buildModule(funcs: WasmFunc[], opts: ModuleOptions = {}): Uint8A
     ...(nImports ? section(2, vec(imports.map((im, i) => [...utf8(im.module), ...utf8(im.name), 0x00, ...uleb(importTypeIdx[i])]))) : []),
     ...section(3, vec(funcTypeIdx.map((t) => uleb(t)))),
     ...(memPages ? section(5, vec([[0x00, ...uleb(memPages)]])) : []),
-    ...section(7, vec([...funcs.map((f, i) => [...utf8(f.name), 0x00, ...uleb(nImports + i)]), ...(memPages ? [[...utf8('memory'), 0x02, 0x00]] : [])])),
+    ...section(7, vec([...funcs.flatMap((f, i) => (f.export === false ? [] : [[...utf8(f.name), 0x00, ...uleb(nImports + i)]])), ...(memPages ? [[...utf8('memory'), 0x02, 0x00]] : [])])),
     ...section(10, vec(code)),
     ...(opts.custom ?? []).flatMap((c) => section(0, [...utf8(c.name), ...c.data])),
   ]);
