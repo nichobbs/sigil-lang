@@ -353,7 +353,7 @@ export function gen(prog: Program, t: Type, rnd: () => number): Val {
         return pick(v.samples);
       }
       const alphabet = ['a', 'Z', '0', ' ', 'é', '"', '\n', '<', '>', "'", ';', '%'];
-      const n = Math.floor(rnd() * 12);
+      const n = Math.min(r.max ?? 12, Math.floor(rnd() * 12));
       return Array.from({ length: n }, () => pick(alphabet)).join('');
     }
     case 'list': {

@@ -47,6 +47,12 @@ export const BUILTIN_ARITY: Record<string, number> = {
   map: 2,
   filter: 2,
   fold: 4,
+  chars: 1,
+  'from-chars': 1,
+  append: 2,
+  take: 2,
+  drop: 2,
+  at: 3,
   text: -1,
   money: 1, // cents -> "$d.cc"
   list: -1,

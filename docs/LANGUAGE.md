@@ -11,6 +11,7 @@ You write one file, `app.sigil`: types, validators, functions, and one `program`
 (type Plan (var Free Pro Enterprise))   ; enum; case names are global, so unique across all enums
 (type Err (var TooSmall StoreFailed MailFailed))
 (type Email (Str :validated))           ; Str = text; :validated = must come from a validator
+(type Line (Str :max 200))              ; :max N = at most N characters (code points); needed before `chars`
 (type Line (rec (unit (Int 0 1000000)) (qty (Int 1 1000))))
 (type Customer (rec (id (Int 0 1000000)) (name Str :pii) (email Email :pii) (plan Plan :internal)))
 (type Mail (rec (to Email :pii) (subject Str) (body Str :pii)))   ; (field Type flags...)
@@ -77,6 +78,11 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | `not` | 1 | Bool |
 | `text` | n | Str, concatenates strings and renders other values |
 | `money` | 1 Int cents | Str `"$12.34"` |
+| `chars` | 1 Str with `:max N` | list of code points, `(List (Int 0 1114111) 0 N)`. Counts characters, not UTF-16 units. A Str without `:max` is `E-type` |
+| `from-chars` | 1 list of code points | Str (each element must be 0..1114111; unproved if its range is wider) |
+| `append` | list, element | the list with the element at the end (length grows by 1: wrap in `take` to fit a declared max) |
+| `take` `drop` | list, n | first n elements, or all but the first n; n below 0 counts as 0, above the length as the length |
+| `at` | list, index, default | the element at a 0-based index, or the default when the index is out of range (total, never fails) |
 | `ok err` | 1 | Result |
 | `put get post emit fresh` | see Capabilities | |
 | `declassify` | name, expr | see Declassifiers |
@@ -292,4 +298,4 @@ Feature: Shop
 
 ## Not supported
 
-No recursion, loops, mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money` and `=` (no length, slice, split, parse, regex match, case change, formatting widths), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no list indexing, folds beyond `sum`, no sorting, `concat`, `zip` or `reverse`, no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`sum`/`len`, or report the gap instead of faking it.
+No recursion, loops (other than `fold` over a bounded list), mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money`, `=` and taking a bounded Str apart with `chars` / putting one back with `from-chars` (no split, regex match, case change, formatting widths: build them with `chars` and `fold`; digits to a number is `(sub code 48)` in a fold), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no sorting, `concat`, `zip` or `reverse` (build them with `fold` and `append`), no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`sum`/`len`/`fold`, or report the gap instead of faking it.
