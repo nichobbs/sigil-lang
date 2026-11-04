@@ -27,10 +27,10 @@ describe('mutation adequacy', () => {
     expect(rep.survivors.some((s) => s.desc === '20 -> 21')).toBe(false);
   });
 
-  it('the only survivor is the Unresolved mail-failure question, which a human must answer', () => {
+  it('no mutant survives once the mail-failure decision (keep invoice, report the error) is an Example', () => {
     expect(rep.total).toBe(22);
-    expect(rep.survivors.map((s) => `${s.fn}: ${s.desc}`)).toEqual(['issue-invoice: :on-err MailFailed -> StoreFailed']);
-    // the feature still carries the open question that explains it
+    expect(rep.survivors.map((s) => `${s.fn}: ${s.desc}`)).toEqual([]);
+    // the remaining open question is a different one (audit on mail failure)
     expect(parseFeature(FEATURE).unresolved).toHaveLength(1);
   });
 

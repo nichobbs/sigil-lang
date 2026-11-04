@@ -21,11 +21,11 @@ describe('feature parser', () => {
   it('reads rules, examples, properties, privacy and open questions', () => {
     expect(f.title).toBe('Invoicing');
     expect(f.rules[0].rows).toEqual([['Free', '0%'], ['Pro', '10%'], ['Enterprise', '20%']]);
-    expect(f.examples.map((e) => e.title)).toHaveLength(6);
+    expect(f.examples.map((e) => e.title)).toHaveLength(7);
     expect(f.examples[0].steps.map((s) => s.kind)).toEqual(['given', 'given', 'when', 'then']);
     expect(f.always[0].text).toBe('The price is never negative and never more than the undiscounted total.');
     expect(f.privacy[0].text).toContain('Changing it must not change anything sent anywhere else.');
-    expect(f.unresolved[0].text).toContain('roll back?');
+    expect(f.unresolved[0].text).toContain('audit event');
   });
 });
 
@@ -33,7 +33,7 @@ describe('suite on the invoicing example', () => {
   const out = suite();
   it('every scenario, rule, property and privacy check passes', () => {
     for (const r of out.results) expect(r, `${r.kind}: ${r.title}`).toMatchObject({ status: 'pass' });
-    expect(out.results.map((r) => r.kind).sort()).toEqual(['always', ...Array(6).fill('example'), 'privacy', 'rule']);
+    expect(out.results.map((r) => r.kind).sort()).toEqual(['always', ...Array(7).fill('example'), 'privacy', 'rule']);
   });
   it('surfaces the spec gap as an unresolved question rather than guessing', () => {
     expect(out.unresolved).toHaveLength(1);
