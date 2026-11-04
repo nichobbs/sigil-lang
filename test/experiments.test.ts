@@ -159,3 +159,92 @@ describe('experiments harness: hidden cases are relocatable', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// A2 ledger postings: the same checks for the second dev task.
+
+const A2 = 'A2-ledger-postings';
+const A2_SIGIL = `experiments/tasks/${A2}/ref/sigil/app.sigil`;
+const A2_TS = `experiments/tasks/${A2}/ref/ts/solution.ts`;
+
+const A2_SIGIL_VARIANTS: Variant[] = [
+  { name: 'trap: the overdraft boundary is exclusive', from: '(< (sub a.balance p.amount) (neg (overdraft-limit a.kind)))', to: '(<= (sub a.balance p.amount) (neg (overdraft-limit a.kind)))', trap: true },
+  { name: 'trap: the daily limit is exclusive', from: '(> (add a.spent p.amount) 200000)', to: '(>= (add a.spent p.amount) 200000)', trap: true },
+  {
+    name: 'trap: a Frozen account refuses a Credit',
+    from: '(Credit (accept acct posting (min 1000000000000 (add acct.balance posting.amount)) acct.spent))',
+    to: '(Credit (if (is-frozen acct) (reject acct AcctFrozen) (accept acct posting (min 1000000000000 (add acct.balance posting.amount)) acct.spent)))',
+    trap: true,
+  },
+  {
+    name: 'trap: Insufficient is checked before OverLimit',
+    from: '(if (over-limit acct posting)\n          (reject acct OverLimit)\n          (if (would-overdraw acct posting)\n            (reject acct Insufficient)',
+    to: '(if (would-overdraw acct posting)\n          (reject acct Insufficient)\n          (if (over-limit acct posting)\n            (reject acct OverLimit)',
+    trap: true,
+  },
+  { name: 'Savings gets the Checking overdraft allowance', from: '(Savings 0)', to: '(Savings 50000)', trap: false },
+  { name: 'a Debit does not add to spent today', from: '(min 1000000000000 (add acct.spent posting.amount))', to: 'acct.spent', trap: false },
+  {
+    name: 'a Fee adds to spent today',
+    from: '(accept acct posting (max -50000 (sub acct.balance posting.amount)) acct.spent))))))',
+    to: '(accept acct posting (max -50000 (sub acct.balance posting.amount)) (min 1000000000000 (add acct.spent posting.amount))))))))',
+    trap: false,
+  },
+  { name: 'missing effect: no audit event on a refusal', from: '(do (emit audit (PostingRejected a.id why))\n      (err why))', to: '(err why)', trap: false },
+];
+
+const A2_TS_VARIANTS: Variant[] = [
+  { name: 'trap: the overdraft boundary is exclusive', from: 'acct.balance - amount < -overdraftLimit(acct.kind)', to: 'acct.balance - amount <= -overdraftLimit(acct.kind)', trap: true },
+  { name: 'trap: the daily limit is exclusive', from: 'acct.spent + amount > DAILY_LIMIT', to: 'acct.spent + amount >= DAILY_LIMIT', trap: true },
+  { name: 'trap: a Frozen account refuses a Credit', from: "if (kind !== 'Credit' && frozen)", to: 'if (frozen)', trap: true },
+  {
+    name: 'trap: Insufficient is checked before OverLimit',
+    from: "if (overLimit) return reject('OverLimit');\n  if (overdraws) return reject('Insufficient');",
+    to: "if (overdraws) return reject('Insufficient');\n  if (overLimit) return reject('OverLimit');",
+    trap: true,
+  },
+  { name: 'Savings gets the Checking overdraft allowance', from: "k === 'Checking' ? 50_000 : 0", to: "k === 'Checking' ? 50_000 : 50_000", trap: false },
+  { name: 'a Fee adds to spent today', from: "kind === 'Debit' ? Math.min(MAX, acct.spent + amount)", to: "kind !== 'Credit' ? Math.min(MAX, acct.spent + amount)", trap: false },
+  { name: 'a Fee is subject to the daily limit', from: "kind === 'Debit' && acct.spent + amount", to: "kind !== 'Credit' && acct.spent + amount", trap: false },
+  { name: 'missing effect: no audit event on a refusal', from: "await host.audit.emit('audit', { acct: acct.id, reason: why });", to: '', trap: false },
+];
+
+describe('experiments harness: task A2 (Sigil)', () => {
+  it('reference solution passes 100%', async () => {
+    const s = await runTask(A2, 'sigil', A2_SIGIL);
+    expect(s.failures).toEqual([]);
+    expect(s.passed).toBe(s.total);
+    expect(s.total).toBeGreaterThanOrEqual(28);
+    expect(s.trapTotal).toBe(3);
+    expect(s.trapViolations).toBe(0);
+  });
+
+  A2_SIGIL_VARIANTS.forEach((v, i) => {
+    it(`catches: ${v.name}`, async () => {
+      const s = await runTask(A2, 'sigil', variantFile(A2_SIGIL, v, 'sigil', 100 + i));
+      expect(s.passed).toBeLessThan(s.total);
+      if (v.trap) expect(s.trapViolations).toBeGreaterThan(0);
+      else expect(s.failures.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('experiments harness: task A2 (TypeScript)', () => {
+  it('reference solution passes 100%', async () => {
+    const s = await runTask(A2, 'ts', A2_TS);
+    expect(s.failures).toEqual([]);
+    expect(s.passed).toBe(s.total);
+    expect(s.trapTotal).toBe(3);
+    expect(s.trapViolations).toBe(0);
+  }, 30_000);
+
+  it('catches every broken variant (and flags trap violations)', async () => {
+    const results = await Promise.all(A2_TS_VARIANTS.map((v, i) => runTask(A2, 'ts', variantFile(A2_TS, v, 'ts', 100 + i))));
+    results.forEach((s, i) => {
+      const v = A2_TS_VARIANTS[i];
+      expect(s.passed, v.name).toBeLessThan(s.total);
+      if (v.trap) expect(s.trapViolations, v.name).toBeGreaterThan(0);
+      else expect(s.failures.length, v.name).toBeGreaterThan(0);
+    });
+  }, 30_000);
+});
