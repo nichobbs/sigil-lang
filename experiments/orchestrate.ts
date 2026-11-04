@@ -38,7 +38,7 @@ Budget: at most ${TOOL_CALL_CAP} tool calls in total. Stop as soon as you are co
 
 function sigilPrompt(task: string): string {
   return `${common(task, 'sigil')}
-Language: Sigil. Your deliverable is the single file task/app.sigil. Read LANGUAGE.md first (the language spec), then WORKFLOW.md (the tool loop). The files in task/ other than app.sigil (feature, glossary, policy, README.md) belong to humans: do not edit them. The tools are \`node sigil.mjs check task\`, \`node sigil.mjs verify task\` (also \`--fast\`) and \`node sigil.mjs fix task\`; do not read sigil.mjs.
+Language: Sigil. Your deliverable is the single file task/app.sigil. Read LANGUAGE.md first (the language spec), then WORKFLOW.md (the tool loop). The files in task/ other than app.sigil (feature, glossary, policy, README.md) belong to humans: do not edit them. Your loop is \`node sigil.mjs verify task --fast\` (check plus scenarios, seconds) and, for open findings, \`node sigil.mjs fix task\`. Do not run the full \`verify\` (mutation testing takes minutes; the harness runs it after you finish); do not read sigil.mjs.
 `;
 }
 

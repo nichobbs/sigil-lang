@@ -59,3 +59,30 @@ describe('sigil fix: every suggested edit makes its obligation provable', () => 
     expect(fixed).toContain('(max 0 d)');
   });
 });
+
+describe('diagnostics that replace crashes and late failures', () => {
+  const errs = (app: string) => run(app).diags.filter((d) => d.level === 'error');
+
+  it('an undeclared type is E-name, not a crash', () => {
+    const d = errs(`${TYPES}(fn f (in (a Nope)) (out Qty) 1)`);
+    expect(d.map((x) => x.code)).toContain('E-name');
+    expect(d[0].msg).toContain('unknown type Nope');
+  });
+
+  it('a bare Int or List type is a parse error that says what to write', () => {
+    expect(() => parseProgram(`(fn f (in (a Int)) (out Int) 1)`)).toThrow(/Int needs bounds/);
+    expect(() => parseProgram(`(type L List)`)).toThrow(/List needs/);
+  });
+
+  it('unknown functions get a hint', () => {
+    expect(errs(`${TYPES}(fn f (in (s (Str :max 5))) (out Qty) (char-at s 0))`)[0].msg).toMatch(/chars/);
+    expect(errs(`${TYPES}(fn f (in (xs (List Qty 0 5))) (out Qty) (sumn xs))`)[0].msg).toMatch(/Did you mean sum/);
+  });
+
+  it('a number where a record is declared is E-type at check time ((list 0) is not an empty list)', () => {
+    const app = `${TYPES}(type R (rec (v Qty)))\n(type Out (rec (items (List R 0 5))))\n(fn f (in (a Qty)) (out Out) (Out (list 0)))`;
+    expect(errs(app).map((x) => x.code)).toContain('E-type');
+    const ok = `${TYPES}(type R (rec (v Qty)))\n(type Out (rec (items (List R 0 5))))\n(fn f (in (a Qty)) (out Out) (Out (list)))`;
+    expect(errs(ok)).toEqual([]);
+  });
+});

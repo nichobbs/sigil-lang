@@ -71,7 +71,7 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | `len` | 1 list | Int |
 | `map` `filter` | list, lambda | list (`filter` length becomes 0..max) |
 | `fold` | list, Type, init, `(fn (acc x) body)` | a value of Type. Loops over the list in order; `Type` (a declared type name, e.g. `Cents` or a record) is the accumulator's invariant: `init` and every step result must fit it (checked as obligations and at run time), and inside the body `acc` is assumed to be any value of Type. Clamp with `min`/`max` so each step provably fits. Not yet compiled to Wasm |
-| `list` | n | list of exactly n elements |
+| `list` | n | list of exactly n elements: `(list)` is the empty list, `(list 0)` is a list holding one 0 (not an empty list) |
 | `=` | 2 | Bool, structural equality on any values |
 | `< <= > >=` | 2 or more | Bool, chained: `(<= 0 x 100)` |
 | `and or` | n | Bool |

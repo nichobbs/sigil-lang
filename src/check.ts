@@ -11,7 +11,7 @@
 // declassifiers only as human-declared policy entries, no covert channels, capability rows must be declared rather than inferred.
 
 import { Expr, FnDef, Policy, Program, Type, asDeclassify, resolveType } from './ast.js';
-import { CAP_OPS, KIND_TARGETS, isBuiltin, kindOfHandle } from './caps.js';
+import { BUILTIN_ARITY, CAP_OPS, KIND_TARGETS, isBuiltin, kindOfHandle } from './caps.js';
 import * as I from './interval.js';
 import { Interval } from './interval.js';
 import * as L from './labels.js';
@@ -270,7 +270,10 @@ function conforms(ctx: Ctx, a: AV | undefined, t: Type, where: string, src?: Exp
       return;
     }
     case 'rec': {
-      if (!a?.fields) return;
+      if (!a?.fields) {
+        if (a && a.num !== undefined && a.tags === undefined && a.len === undefined) diag(ctx, 'error', 'E-type', `${where} must be a record, but the value is a number${src ? ` (${printExpr(src)})` : ''}`);
+        return;
+      }
       for (const f of r.fields) conforms(ctx, a.fields.get(f.name), f.type, `${where}.${f.name}`);
       return;
     }
@@ -439,10 +442,54 @@ function evalCall(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   }
 
   if (!isBuiltin(name)) {
-    diag(ctx, 'error', 'E-name', `unknown function ${name}`);
+    diag(ctx, 'error', 'E-name', `unknown function ${name}${didYouMean(ctx.prog, name)}`);
     return topAV();
   }
   return evalBuiltin(e, env, ctx);
+}
+
+/** Common names from other languages, mapped to what Sigil has. */
+const ALIASES: Record<string, string> = {
+  'char-at': 'chars gives a list of code points: (at (chars s) i 0)',
+  'string-ref': 'chars gives a list of code points: (at (chars s) i 0)',
+  substring: 'take and drop work on lists: (from-chars (take (drop (chars s) from) n))',
+  slice: 'take and drop: (take (drop xs from) n)',
+  'str-len': 'len works on lists: (len (chars s))',
+  length: 'len works on lists: (len xs); for a string (len (chars s))',
+  'string-length': '(len (chars s))',
+  split: 'there is no split: scan with fold over (chars s)',
+  concat: 'there is no concat: fold with append',
+  push: 'append: (append xs x)',
+  head: 'at: (at xs 0 default)',
+  first: 'at: (at xs 0 default)',
+  nth: 'at: (at xs i default)',
+  get: 'get is not runnable; use at for lists',
+  reduce: 'fold: (fold xs Type init (fn (acc x) body))',
+  foldl: 'fold: (fold xs Type init (fn (acc x) body))',
+  'parse-int': 'no parse-int: fold over chars, (sub code 48) per digit',
+  'to-int': 'no parse-int: fold over chars, (sub code 48) per digit',
+  'string-append': 'text concatenates: (text a b)',
+  concatenate: 'text concatenates strings: (text a b)',
+  abs: '(max x (neg x))',
+  mod: 'no modulo: (sub a (mul (div-floor a b) b))',
+  'not-equal': '(not (= a b))',
+  '!=': '(not (= a b))',
+  '==': '(= a b)',
+  '+': 'add', '-': 'sub', '*': 'mul', '/': 'div-floor',
+  empty: '(list) is the empty list',
+};
+
+function didYouMean(prog: Program, name: string): string {
+  if (ALIASES[name]) return `. Hint: ${ALIASES[name]}`;
+  const names = [...Object.keys(BUILTIN_ARITY), ...Object.keys(CAP_OPS), ...prog.fns.keys()];
+  const dist = (a: string, b: string) => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  };
+  const best = names.map((n) => [n, dist(name, n)] as const).sort((x, y) => x[1] - y[1])[0];
+  return best && best[1] <= 2 ? `. Did you mean ${best[0]}?` : '';
 }
 
 function callFn(f: FnDef, args: AV[], site: Expr, ctx: Ctx): AV {
@@ -930,9 +977,46 @@ function globMatch(pattern: string, value: string): boolean {
   return pattern.endsWith('*') ? value.startsWith(pattern.slice(0, -1)) : pattern === value;
 }
 
+/** Named types used but not declared, with where they are used. */
+function undeclaredTypes(prog: Program): [string, string][] {
+  const found = new Map<string, string>();
+  const walk = (t: Type, where: string) => {
+    switch (t.k) {
+      case 'named':
+        if (!prog.types.has(t.name) && !found.has(t.name)) found.set(t.name, where);
+        return;
+      case 'rec':
+        for (const f of t.fields) walk(f.type, where);
+        return;
+      case 'list':
+        walk(t.elem, where);
+        return;
+      case 'result':
+        walk(t.ok, where);
+        walk(t.err, where);
+        return;
+      default:
+        return;
+    }
+  };
+  for (const [n, t] of prog.types) walk(t, `type ${n}`);
+  for (const f of prog.fns.values()) {
+    for (const p of f.params) walk(p.type, `${f.name}(${p.name})`);
+    walk(f.out, `${f.name} out`);
+  }
+  return [...found];
+}
+
 export function check(prog: Program, pol: Policy): CheckResult {
   const res: CheckResult = { diags: [], evidence: new Map(), flows: [], manifest: [] };
   const wiring = (code: string, msg: string, level: Diag['level'] = 'error') => res.diags.push({ level, code, fn: '(program)', msg });
+
+  // A reference to a type that is not declared would crash later analysis: report it as an ordinary error and stop.
+  const missing = undeclaredTypes(prog);
+  if (missing.length) {
+    for (const [name, where] of missing) wiring('E-name', `unknown type ${name} (used in ${where}); declare it with (type ${name} ...), or write (Int lo hi) or (List T min max) inline`);
+    return res;
+  }
 
   for (const f of prog.fns.values()) checkFn(prog, pol, f, res);
 
