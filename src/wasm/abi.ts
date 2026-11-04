@@ -10,6 +10,19 @@
 //   the start of scratch memory (just after the inputs).
 //   Results are returned with multi-value: an array of the result's leaves (a single value or nothing for fewer).
 //   A list in a result points into scratch memory, valid until the next call.
+//
+// Host ABI (imports, module "host"). Strings are opaque i32 handles into a host-owned table (handle 0 is "",
+// 1..n the module's literals, listed in the custom section `sigil.abi`). Effects are one import per operation and
+// argument shape; the first parameter is a capability handle id (index into `sigil.abi` handles), the rest are the
+// argument leaves with Ints widened to i64:
+//     str_eq(a, b) -> i32            str_concat(a, b) -> str          str_int(i64) -> str      str_money(i64) -> str
+//     str_chars(s, dst, max) -> len  str_from_chars(ptr, len) -> str
+//     put$k(h, key..., value...) -> i32 ok      post$k(h, payload...) -> i32 ok
+//     emit$k(h, event...) -> i32 ok             fresh$k(h) -> i64
+// `sigil.abi` (JSON: AbiDescriptor in compile.ts) carries the literal table, the handle table and, per effect import,
+// the shapes of its arguments, so any host can rebuild the values. src/wasm/host.ts is the reference adapter over
+// the interpreter's Host (so the effect logs of both executions can be compared). An entry point (a function
+// listed in a `program` form) is an ordinary export with this ABI, flagged `entry` in the FnReport.
 
 import { Host, Val } from '../interp.js';
 import { FnReport, MEM_BASE } from './compile.js';

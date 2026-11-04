@@ -261,3 +261,6 @@ export function flatLeaves(s: Shape, path = ''): { path: string; kind: Shape; lo
   }
 }
 
+
+/** JSON of shapes without integer ranges (bigint is not JSON): a stable key and the serialized ABI form. */
+export const shapeJson = (v: unknown): string => JSON.stringify(v, (k, x) => (k === 'lo' || k === 'hi' ? undefined : x));

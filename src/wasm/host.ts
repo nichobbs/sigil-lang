@@ -100,7 +100,12 @@ export class WasmHost {
       const pos = { i: 0 };
       const args: Val[] = eff.args.map((sh) => liftVal(sh, raws, pos, { memory: this.memory, strings: this.strings }));
       const r = this.host.call(handle, eff.op, args);
-      if (eff.op === 'fresh') return r as bigint;
+      if (eff.op === 'fresh') {
+        // The interpreter's failing `fresh` returns an err value where an Int is declared (it faults when used, or is
+        // logged as a non-Int). Compiled code has no such value, so a failing `fresh` traps here instead.
+        if (typeof r !== 'bigint') throw new Error(`host: ${handle}.fresh failed (the interpreter would continue with an err value in place of an Int)`);
+        return r;
+      }
       return r && typeof r === 'object' && !Array.isArray(r) && r.$ === 'err' ? 0 : 1;
     });
   }

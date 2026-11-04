@@ -27,7 +27,7 @@ import { CheckResult, FnEvidence } from '../check.js';
 import { Repr, reprFor } from '../interval.js';
 import { I32, I64, IntOps, OP, TypeTable, ValType, WasmFunc, WasmImport, blockTypeOf, buildModule, call, i64Load, i64Store, localGet, localSet } from './encode.js';
 import {
-  ElemLayout, Kind, ListShape, MAX_MEMORY_BYTES, MEM_BASE, NotCompilable, SLOT, Scalar, Shape, flatLeaves, intLeaves, layoutOf, listsOf, magnitudes, nleaves, no, sameShape, shapeOf, showShape, wtypes,
+  ElemLayout, Kind, ListShape, MAX_MEMORY_BYTES, MEM_BASE, NotCompilable, SLOT, Scalar, Shape, flatLeaves, intLeaves, shapeJson, layoutOf, listsOf, magnitudes, nleaves, no, sameShape, shapeOf, showShape, wtypes,
 } from './shape.js';
 
 export type { ElemLayout, Kind, Shape };
@@ -66,7 +66,7 @@ export interface CompileOptions {
   /** Test hook for mutation testing the compiler itself: 'trunc' emits plain div_s (WRONG for negatives). */
   divMode?: 'floor' | 'trunc';
   /** Test hook: deliberately miscompile one construct, so the differential tests can be shown to catch it. */
-  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-order-swapped' | 'emit-dropped';
+  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-handle-swapped' | 'emit-dropped';
 }
 
 export interface CompileResult {
@@ -107,7 +107,7 @@ export type CalleeResolver = (name: string) => Callee | string; // string = reas
 /** The function needs scratch memory (and so a trailing base parameter): compile it again with one. */
 class NeedBase extends Error {}
 
-const FEATURES = { effects: false };
+
 const SHAPE_OPTS = { strings: true };
 
 // ---------------------------------------------------------------------------
@@ -848,9 +848,44 @@ class FnGen {
     }
   }
 
-  // Extension points, filled in by later stages.
+  // --- capability operations: imported host functions -------------------------------------
+  /** `(put h k v)`, `(post h p)`, `(emit h ev)`, `(fresh h)`: one host import per operation and argument shape. */
   protected genCap(e: Extract<Expr, { k: 'call' }>): G {
-    return no(`capability operation ${e.fn}`);
+    const op = e.fn;
+    if (op === 'get') return no('get: the reference interpreter cannot run it');
+    if (e.kw.length) return no(`keyword arguments to ${op}`);
+    if (e.args.length !== CAP_OPS[op].arity) return no(`${op} expects ${CAP_OPS[op].arity} argument(s)`);
+    const h = e.args[0];
+    const isHandle = h.k === 'var' && !h.path.length && !this.lookup(h.name) && (this.prog.binds.has(h.name) || h.name.includes(':') || h.name === 'audit' || h.name === 'rand');
+    if (h.k !== 'var' || !isHandle) return no(`${op}: the first argument must be a capability handle named in needs`);
+    const reg = this.ctx.reg;
+    let hid = reg.handles.indexOf(h.name);
+    if (hid < 0) {
+      hid = reg.handles.length;
+      reg.handles.push(h.name);
+    }
+    if (this.opts.mutation === 'effect-handle-swapped') hid = (hid + 1) % Math.max(1, reg.handles.length);
+    const gs = e.args.slice(1).map((a) => this.gen(a));
+    const shapes = gs.map((g) => g.shape);
+    const sig = shapeJson(shapes);
+    let name = reg.imports.find((i) => i.effect?.op === op && shapeJson(i.effect.args) === sig)?.desc.name;
+    if (!name) name = `${op}$${reg.imports.filter((i) => i.effect?.op === op).length}`;
+    const params: ValType[] = ['i32', ...shapes.flatMap((s) => wtypes(s, 'i64'))];
+    const idx = this.imp(name, params, [op === 'fresh' ? 'i64' : 'i32'], { import: name, op, args: shapes });
+    const c: number[] = [...I32.const(BigInt(hid))];
+    for (const g of gs) c.push(...g.c, ...this.convert(g.shape, this.R.vt, 'i64'));
+    if (this.opts.mutation === 'emit-dropped' && op === 'emit') return { c: [...c.slice(0, 0), ...gs.flatMap((g) => [...g.c, ...this.dropAll(g.shape)])], shape: { t: 'unit' } };
+    c.push(...call(idx));
+    switch (op) {
+      case 'put':
+      case 'post':
+        // the import returns 1 when the operation succeeded; a Result tag is 0 for ok
+        return { c: this.opts.mutation === 'put-flag-inverted' ? c : [...c, I32.eqz], shape: { t: 'result', ok: { t: 'unit' }, err: { t: 'unit' } } };
+      case 'emit':
+        return { c: [...c, OP.drop], shape: { t: 'unit' } };
+      default: // fresh
+        return { c: [...c, ...(this.R.vt === 'i32' ? [OP.i32WrapI64] : [])], shape: { t: 'int' } };
+    }
   }
   protected genSort(_e: Extract<Expr, { k: 'call' }>): G {
     return no('sort (not yet supported by the Wasm backend)');
@@ -992,7 +1027,6 @@ function calledFns(prog: Program, e: Expr): Set<string> {
 function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, opts: CompileOptions, callee: CalleeResolver, ctx: Ctx, entries: Set<string>): { report: FnReport; func?: WasmFunc; touched?: Set<string> } {
   const report: FnReport = { name: f.name, compilable: false, checkerRepr: ev.repr };
   try {
-    if (f.needs.length && !FEATURES.effects) no(`uses capabilities/effects (needs ${f.needs.join(', ')})`);
     if (f.requires.length) no('has requires clauses, which the backend does not enforce');
     const errs = res.diags.filter((d) => d.level === 'error' && d.fn === f.name);
     if (errs.length) no(`checker reports errors (${errs[0].code})`);
@@ -1065,6 +1099,7 @@ function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, op
       report.result = result;
       report.compilable = true;
       if (entries.has(f.name)) report.entry = true;
+      if (f.needs.length) report.needs = [...f.needs];
       return { report, func: { name: f.name, params: ptypes, results: wtypes(result, R.vt), locals: g.locals, body: body.c }, touched: g.touched };
     }
     return no('internal: scratch base was not granted');
@@ -1160,7 +1195,7 @@ export function compileProgram(prog: Program, res: CheckResult, opts: CompileOpt
     handles: reg.handles,
     effects: reg.imports.flatMap((i) => (i.effect ? [i.effect] : [])),
   };
-  const custom = [{ name: 'sigil.abi', data: new TextEncoder().encode(JSON.stringify(abi, (k, v) => (k === 'lo' || k === 'hi' ? undefined : v))) }];
+  const custom = [{ name: 'sigil.abi', data: new TextEncoder().encode(shapeJson(abi)) }];
   const bytes = buildModule(b.funcs, { memPages, imports: reg.imports.map((i) => i.desc), types: b.types, custom: b.funcs.length || reg.imports.length ? custom : [] });
   return { bytes, fns: b.fns, memPages, entries: b.entries, abi };
 }

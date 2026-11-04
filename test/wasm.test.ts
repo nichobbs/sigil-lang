@@ -215,7 +215,7 @@ describe('wasm backend: invoicing example', () => {
 
   it('only the compilable functions (and the list memory) are exported', async () => {
     const ex = await instantiate(out.bytes);
-    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'memory', 'price-invoice', 'receipt']);
+    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'issue-invoice', 'memory', 'price-invoice', 'receipt']);
   });
 });
 

@@ -183,10 +183,9 @@ describe('wasm lists: invoicing example', () => {
     expect(out.memPages).toBe(1);
   });
 
-  it('compiles strings; still refuses capabilities (until stage 3)', () => {
+  it('compiles strings and capabilities (see wasm-effects.test.ts)', () => {
     expect(rep('receipt').compilable, rep('receipt').reason).toBe(true);
-    expect(rep('issue-invoice').compilable).toBe(false);
-    expect(rep('issue-invoice').reason).toMatch(/capabilit/);
+    expect(rep('issue-invoice').compilable, rep('issue-invoice').reason).toBe(true);
   });
 
   it('known values at the extremes: 200 lines of unit 1e9, qty 1000', async () => {
@@ -216,7 +215,7 @@ describe('wasm lists: invoicing example', () => {
 
   it('exports memory alongside the functions', async () => {
     const ex = await instantiate(out.bytes);
-    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'memory', 'price-invoice', 'receipt']);
+    expect(Object.keys(ex).sort()).toEqual(['discount', 'gross', 'issue-invoice', 'memory', 'price-invoice', 'receipt']);
   });
 });
 
@@ -287,7 +286,7 @@ describe('wasm lists: fixture', () => {
     expect(rep('str-list').compilable, rep('str-list').reason).toBe(true); // strings are handles now
     expect(rep('res-fn').compilable, rep('res-fn').reason).toBe(true); // Results are first-class values now
     expect(rep('cap-fn').compilable).toBe(false);
-    expect(rep('cap-fn').reason).toMatch(/capabilit/);
+    expect(rep('cap-fn').reason).toMatch(/E-cap/); // no bind in a program: the checker's error is respected
     expect(rep('list-result').compilable, rep('list-result').reason).toBe(true); // list results are supported
     expect(rep('nested-list').compilable).toBe(false);
     expect(rep('nested-list').reason).toMatch(/nested list/);
