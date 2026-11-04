@@ -159,3 +159,70 @@ describe('experiments harness: hidden cases are relocatable', () => {
     }
   });
 });
+
+// ---- A4: authorised transfer ---------------------------------------------------------------------------------
+
+const A4 = 'A4-authorised-transfer';
+const A4_SIGIL = `experiments/tasks/${A4}/ref/sigil/app.sigil`;
+const A4_TS = `experiments/tasks/${A4}/ref/ts/solution.ts`;
+
+const A4_SIGIL_VARIANTS: Variant[] = [
+  { name: 'off-by-one: transferring exactly the balance is refused', from: '(> amount s.balance)', to: '(>= amount s.balance)', trap: false },
+  { name: 'a Teller is not allowed to debit accounts they do not own', from: '(Teller true)', to: '(Teller (= a.id s.owner))', trap: false },
+  { name: 'SameAccount compares owners instead of ids', from: '(= s.id d.id)', to: '(= s.owner d.owner)', trap: false },
+  { name: 'missing effect: no success audit event', from: '(emit audit (Transferred actor.id src.id dst.id amount))', to: '', trap: false },
+  { name: 'missing effect: destination record not stored', from: '(try (put store:accounts dst.id (Ledger dst.id dst.owner ndst)) :on-err StoreFailed)', to: '', trap: false },
+  { name: 'trap: balance checked before authorisation', from: '(err NotAllowed)', to: '(if (> amount s.balance) (err Insufficient) (err NotAllowed))', trap: true },
+  { name: 'trap: exactly the limit needs approval (>= instead of >)', from: '(> amount 1000000)', to: '(>= amount 1000000)', trap: true },
+  { name: 'trap: approval flag honoured from Customer and Teller', from: '(Customer false)\n    (Teller false)', to: '(Customer approved)\n    (Teller approved)', trap: true },
+  { name: 'trap: refusals are not audited', from: '(err e (do (emit audit (TransferRefused actor.id src.id dst.id amount e))\n               (err e)))', to: '(err e (err e))', trap: true },
+  { name: 'trap: source balance leaks into the refusal audit event', from: '(TransferRefused actor.id src.id dst.id amount e)', to: '(TransferRefused actor.id src.id dst.id src.balance e)', trap: true },
+];
+
+const A4_TS_VARIANTS: Variant[] = [
+  { name: 'off-by-one: transferring exactly the balance is refused', from: 'amount > src.balance', to: 'amount >= src.balance', trap: false },
+  { name: 'a Teller is not allowed to debit accounts they do not own', from: "actor.role !== 'Customer' ||", to: "actor.role === 'Admin' ||", trap: false },
+  { name: 'SameAccount compares owners instead of ids', from: 'src.id === dst.id', to: 'src.owner === dst.owner', trap: false },
+  { name: 'missing effect: no success audit event', from: "await host.audit.emit('audit', { actor: actor.id, src: src.id, dst: dst.id, amount });", to: '', trap: false },
+  { name: 'missing effect: destination record not stored', from: "await host.store.put('store:accounts', dst.id, { id: dst.id, owner: dst.owner, balance: dstBalance });", to: 'Promise.resolve({ ok: true });', trap: false },
+  { name: 'trap: balance checked before authorisation', from: "if (!mayDebit(actor, src)) return 'NotAllowed';", to: "if (!mayDebit(actor, src)) return amount > src.balance ? 'Insufficient' : 'NotAllowed';", trap: true },
+  { name: 'trap: exactly the limit needs approval (>= instead of >)', from: 'amount > APPROVAL_LIMIT', to: 'amount >= APPROVAL_LIMIT', trap: true },
+  { name: 'trap: approval flag honoured from any actor', from: "!(actor.role === 'Admin' && approved)", to: '!approved', trap: true },
+  { name: 'trap: refusals are not audited', from: "await host.audit.emit('audit', { actor: actor.id, src: src.id, dst: dst.id, amount, reason });", to: '', trap: true },
+  { name: 'trap: source balance leaks into the refusal audit event', from: 'amount, reason }', to: 'amount, reason, balance: src.balance }', trap: true },
+];
+
+describe('experiments harness: A4 authorised transfer', () => {
+  it('Sigil reference passes 100%', async () => {
+    const s = await runTask(A4, 'sigil', A4_SIGIL);
+    expect(s.failures).toEqual([]);
+    expect(s.passed).toBe(s.total);
+    expect(s.total).toBeGreaterThanOrEqual(28);
+    expect(s.trapTotal).toBeGreaterThanOrEqual(3);
+    expect(s.trapViolations).toBe(0);
+  });
+
+  A4_SIGIL_VARIANTS.forEach((v, i) => {
+    it(`Sigil catches: ${v.name}`, async () => {
+      const s = await runTask(A4, 'sigil', variantFile(A4_SIGIL, v, 'sigil', 100 + i));
+      expect(s.passed).toBeLessThan(s.total);
+      if (v.trap) expect(s.trapViolations).toBeGreaterThan(0);
+    });
+  });
+
+  it('TypeScript reference passes 100%', async () => {
+    const s = await runTask(A4, 'ts', A4_TS);
+    expect(s.failures).toEqual([]);
+    expect(s.passed).toBe(s.total);
+    expect(s.trapViolations).toBe(0);
+  }, 30_000);
+
+  it('TypeScript catches every broken variant (and flags trap violations)', async () => {
+    const results = await Promise.all(A4_TS_VARIANTS.map((v, i) => runTask(A4, 'ts', variantFile(A4_TS, v, 'ts', 100 + i))));
+    results.forEach((s, i) => {
+      const v = A4_TS_VARIANTS[i];
+      expect(s.passed, v.name).toBeLessThan(s.total);
+      if (v.trap) expect(s.trapViolations, v.name).toBeGreaterThan(0);
+    });
+  }, 30_000);
+});
