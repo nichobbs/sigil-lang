@@ -1,0 +1,65 @@
+; A4 authorised transfer: reference implementation (Sigil).
+
+(type Cents      (Int 0 1000000000000))
+(type Wide       (Int 0 2000000000000))
+(type Id         (Int 0 9007199254740991))
+(type Role       (var Customer Teller Admin))
+(type TransferError (var NotAllowed SameAccount BadAmount NeedsApproval Insufficient StoreFailed))
+
+(type Actor   (rec (id Id) (role Role)))
+(type Account (rec (id Id) (owner Id) (balance Cents :internal)))
+(type Ledger  (rec (id Id) (owner Id) (balance Wide :internal)))
+(type Receipt (rec (src Id) (dst Id) (amount Cents) (srcBalance Wide :internal) (dstBalance Wide :internal)))
+(type Transferred     (rec (actor Id) (src Id) (dst Id) (amount Cents)))
+(type TransferRefused (rec (actor Id) (src Id) (dst Id) (amount Cents) (reason TransferError :internal)))
+
+(fn may-debit
+  (in (a Actor) (s Account))
+  (out Bool)
+  (match a.role
+    (Customer (= a.id s.owner))
+    (Teller true)
+    (Admin true)))
+
+(fn approval-counts
+  (in (a Actor) (approved Bool))
+  (out Bool)
+  (match a.role
+    (Customer false)
+    (Teller false)
+    (Admin approved)))
+
+(fn check
+  (in (a Actor) (s Account) (d Account) (amount Cents) (approved Bool))
+  (out (Result Bool TransferError))
+  (if (not (may-debit a s))
+    (err NotAllowed)
+    (if (= s.id d.id)
+      (err SameAccount)
+      (if (< amount 1)
+        (err BadAmount)
+        (if (and (> amount 1000000) (not (approval-counts a approved)))
+          (err NeedsApproval)
+          (if (> amount s.balance)
+            (err Insufficient)
+            (ok true)))))))
+
+(fn transfer
+  (in (actor Actor) (src Account) (dst Account) (amount Cents) (approved Bool))
+  (out (Result Receipt TransferError))
+  (needs store:accounts audit)
+  (match (check actor src dst amount approved)
+    (err e (do (emit audit (TransferRefused actor.id src.id dst.id amount e))
+               (err e)))
+    (ok _ (let [nsrc (max 0 (sub src.balance amount))
+                ndst (add dst.balance amount)]
+            (try (put store:accounts src.id (Ledger src.id src.owner nsrc)) :on-err StoreFailed)
+            (try (put store:accounts dst.id (Ledger dst.id dst.owner ndst)) :on-err StoreFailed)
+            (emit audit (Transferred actor.id src.id dst.id amount))
+            (ok (Receipt src.id dst.id amount nsrc ndst))))))
+
+(program accounts
+  (targets server browser)
+  (entry transfer
+    (bind store:accounts (store (ns "accounts/accounts") (mode append)))
+    (bind audit          (audit))))

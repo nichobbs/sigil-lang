@@ -1,0 +1,94 @@
+; Glossary for A4: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Role, Actor, Account, Transferred, TransferError, transfer),
+; so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a {role:Role} actor {id:Int}"
+    (set actor (Actor id role)))
+
+  (given "an {role:Role} actor {id:Int}"
+    (set actor (Actor id role)))
+
+  (given "a source account {id:Int} owned by {owner:Int} holding {balance:Money}"
+    (set src (Account id owner balance)))
+
+  (given "a destination account {id:Int} owned by {owner:Int} holding {balance:Money}"
+    (set dst (Account id owner balance)))
+
+  (given "approval is given"
+    (set approved true))
+
+  (given "the account store is unavailable"
+    (fail store:accounts put))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "{amount:Money} is transferred"
+    (default approved false)
+    (call result transfer actor src dst amount approved))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the transfer succeeds"
+    (expect (match result (ok r true) (err e false))))
+
+  (then "the transfer is refused as {why:TransferError}"
+    (expect (= result (err why))))
+
+  (then "the transfer fails with \"store failed\""
+    (expect (= result (err StoreFailed))))
+
+  (then "the stored balances are {a:Money} and {b:Money}"
+    (expect (= (map (stored store:accounts) (fn (x) x.balance)) (list a b))))
+
+  (then "nothing is stored"
+    (expect (= (len (stored store:accounts)) 0)))
+
+  (then "an audit event records the transfer of {amount:Money}"
+    (expect (= (emitted audit) (list (Transferred actor.id src.id dst.id amount)))))
+
+  ; ---- Properties -------------------------------------------------------------
+  (always "A Customer may only move money out of an account they own. A Teller or an Admin may move money out of any account. This is checked before anything else, so an actor who is not allowed gets the same answer whatever the balances are."
+    (forall ((a Actor) (s Account) (d Account) (m (Int 0 1000000000000)) (ap Bool))
+      (and (= (= (transfer a s d m ap) (err NotAllowed))
+              (and (= a.role Customer) (not (= a.id s.owner))))
+           (= (= (transfer a (Account s.id s.owner 0) d m ap) (err NotAllowed))
+              (= (transfer a s d m ap) (err NotAllowed))))))
+
+  (always "A transfer of more than $10,000.00 needs approval, otherwise it is refused as NeedsApproval. A transfer of exactly $10,000.00 does not need approval. Approval counts only when an Admin gives it: the approved flag is ignored when the actor is a Customer or a Teller."
+    (forall ((s Account) (d Account) (m (Int 0 1000000000000)))
+      (and (= (transfer (Actor 2 Teller) s d m true) (transfer (Actor 2 Teller) s d m false))
+           (= (transfer (Actor s.owner Customer) s d m true) (transfer (Actor s.owner Customer) s d m false))
+           (match (transfer (Actor 1 Admin) s d m false)
+             (ok r (<= m 1000000))
+             (err e (or (<= m 1000000) (= e SameAccount) (= e NeedsApproval)))))))
+
+  (always "The source account must hold at least the amount, otherwise the transfer is refused as Insufficient. Moving exactly the whole balance is allowed."
+    (forall ((s Account) (d Account))
+      (match (transfer (Actor 1 Admin) s d s.balance true)
+        (ok r (= r.srcBalance 0))
+        (err e (or (= e SameAccount) (= e BadAmount))))))
+
+  (always "The source and the destination must be different accounts, otherwise the transfer is refused as SameAccount, and the amount must be at least 1 cent, otherwise it is refused as BadAmount."
+    (forall ((s Account) (d Account) (m (Int 0 1000000000000)) (ap Bool))
+      (and (= (transfer (Actor 2 Teller) s (Account s.id d.owner d.balance) m ap) (err SameAccount))
+           (or (= s.id d.id)
+               (= (transfer (Actor 2 Teller) s d 0 ap) (err BadAmount))))))
+
+  (always "When more than one refusal applies, the first of these is reported: NotAllowed, SameAccount, BadAmount, NeedsApproval, Insufficient."
+    (forall ((s Account) (d Account))
+      (or (= s.id d.id)
+          (= (transfer (Actor 2 Teller) (Account s.id s.owner 0) d 2000000 false) (err NeedsApproval)))))
+
+  (always "A transfer that is not refused moves the amount from the source to the destination. The new source record is stored first, then the new destination record, and one audit event records the actor, the source, the destination and the amount."
+    (forall ((s Account) (d Account) (m (Int 0 1000000000000)))
+      (match (transfer (Actor 2 Teller) s d m false)
+        (ok r (and (= r.srcBalance (sub s.balance m)) (= r.dstBalance (add d.balance m)) (= r.amount m)))
+        (err e true))))
+
+  (always "Every refusal is recorded in the audit log with its reason and stores nothing. The record of a refusal names the actor, the source, the destination, the amount and the reason, and never contains a balance."
+    (forall ((a Actor) (s Account) (d Account) (m (Int 0 1000000000000)) (ap Bool))
+      (match (transfer a s d m ap)
+        (ok r true)
+        (err e (not (= e StoreFailed))))))
+)
