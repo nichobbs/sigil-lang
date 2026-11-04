@@ -1,6 +1,6 @@
 # Language freeze (v0)
 
-Frozen at commit `b202e1b` (tag `language-freeze-v0`), 2026-11-04, after the DEV set (A1 to A4) and the cost pilot.
+Frozen at commit `b202e1b`, 2026-11-04, after the DEV set (A1 to A4) and the cost pilot.
 
 From this point, for the held-out tasks (5 to 12):
 - No change to `src/`, `docs/LANGUAGE.md`, `docs/AGENT_WORKFLOW.md`, the checker, the interpreter or the Wasm backend.
