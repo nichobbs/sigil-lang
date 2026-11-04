@@ -1,0 +1,89 @@
+; Glossary for A1: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Tier, Line, Customer, Quote, QuoteIssued, QuoteRefused,
+; volume-pct, tier-pct, quote-order), so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a {tier:Tier} customer with {credit:Money} credit"
+    (set cust (Customer 7 "Ada Lovelace" "ada@example.com" tier credit)))
+
+  (given "an order of {qty:Int} x {sku:Str} at {unit:Money}"
+    (append lines (Line sku unit qty)))
+
+  (given "the quote store is unavailable"
+    (fail store:quotes put))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "quote {n:Int} is requested"
+    (call result quote-order n cust lines))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the quote total is {amount:Money}"
+    (expect (match result (ok q (= q.total amount)) (err e false))))
+
+  (then "the credit used is {amount:Money}"
+    (expect (match result (ok q (= q.creditUsed amount)) (err e false))))
+
+  (then "the amount due is {amount:Money}"
+    (expect (match result (ok q (= q.due amount)) (err e false))))
+
+  (then "the quote is stored once"
+    (expect (= (len (stored store:quotes)) 1)))
+
+  (then "nothing is stored"
+    (expect (= (len (stored store:quotes)) 0)))
+
+  (then "an audit event records quote {n:Int} as issued"
+    (expect (= (len (emitted audit)) 1))
+    (expect (= (map (emitted audit) (fn (e) e.id)) (list n))))
+
+  (then "the quote is refused as needing approval"
+    (expect (= result (err NeedsApproval)))
+    (expect (= (len (emitted audit)) 1)))
+
+  (then "the quote fails with \"store failed\""
+    (expect (= result (err StoreFailed))))
+
+  (then "no audit event records an issued quote"
+    (expect (= (len (emitted audit)) 0)))
+
+  ; ---- Rules, properties and privacy -------------------------------------------
+  (rule "The volume discount depends on the quantity on a line and applies to every unit on that line" volume-pct (Int Pct))
+
+  (rule "The customer discount depends on the customer's tier and applies to the whole order after the volume discounts" tier-pct (Tier Pct))
+
+  (always "Money is whole cents. The volume discount is rounded down to a whole cent on each line, and the customer discount is rounded down to a whole cent once on the order."
+    (forall ((u (Int 0 10000000)) (q (Int 1 1000)))
+      (match (quote-order 1 (Customer 7 "n" "e" Standard 0) (list (Line "S" u q)))
+        (ok r (= r.total (div-floor (mul (mul u q) (sub 100 (volume-pct q))) 100)))
+        (err e true))))
+
+  (always "Whatever the discounts add up to, a quote total is never more than the undiscounted total and never less than 80% of the undiscounted total, rounded up to a whole cent. The floor is checked after both discounts."
+    (forall ((c Customer) (ls (List Line 1 50)))
+      (match (quote-order 1 c ls)
+        (ok r (and (<= r.total (sum (map ls (fn (l) (mul l.unit l.qty)))))
+                   (>= (mul r.total 100) (mul (sum (map ls (fn (l) (mul l.unit l.qty)))) 80))))
+        (err e true))))
+
+  (always "Account credit is applied last, to the total after the floor. The credit used is the smaller of the customer's credit and the quote total, so the amount due is never negative."
+    (forall ((c Customer) (ls (List Line 1 50)))
+      (match (quote-order 1 c ls)
+        (ok r (and (= r.creditUsed (min c.credit r.total)) (= r.due (sub r.total r.creditUsed))))
+        (err e true))))
+
+  (always "An order is refused with NeedsApproval exactly when its undiscounted total is above $50,000.00. Exactly $50,000.00 is allowed. A refused order stores nothing and is recorded in the audit log as refused."
+    (forall ((c Customer) (ls (List Line 1 50)))
+      (match (quote-order 1 c ls)
+        (ok r (<= (sum (map ls (fn (l) (mul l.unit l.qty)))) 5000000))
+        (err e (> (sum (map ls (fn (l) (mul l.unit l.qty)))) 5000000)))))
+
+  (privacy "The customer's name is never stored or written to the audit log. Changing it must not change anything stored or audited."
+    (source Customer.name)
+    (allow)
+    (run quote-order))
+
+  (privacy "The customer's email is never stored or written to the audit log. Changing it must not change anything stored or audited."
+    (source Customer.email)
+    (allow)
+    (run quote-order)))

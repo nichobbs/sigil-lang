@@ -1,0 +1,72 @@
+; A1 tiered pricing: reference implementation (Sigil).
+
+(type Cents   (Int 0 1000000000000))
+(type Pct     (Int 0 100))
+(type Tier    (var Standard Silver Gold))
+(type CustId  (Int 0 9007199254740991))
+(type QuoteId (Int 0 9007199254740991))
+
+(type Line     (rec (sku Str) (unit (Int 0 10000000)) (qty (Int 1 1000))))
+(type Customer (rec (id CustId) (name Str :pii) (email Str :pii) (tier Tier :internal) (credit Cents :internal)))
+(type Quote    (rec (id QuoteId) (cust CustId) (gross Cents) (total Cents :internal) (creditUsed Cents :internal) (due Cents :internal)))
+(type QuoteIssued  (rec (id QuoteId) (cust CustId) (due Cents :internal)))
+(type QuoteRefused (rec (id QuoteId) (cust CustId)))
+(type QuoteError   (var NeedsApproval StoreFailed))
+
+(fn volume-pct
+  (in (qty (Int 1 1000)))
+  (out Pct)
+  (if (< qty 10) 0 (if (< qty 50) 5 (if (< qty 200) 10 15))))
+
+(fn tier-pct
+  (in (t Tier))
+  (out Pct)
+  (match t (Standard 0) (Silver 5) (Gold 10)))
+
+(fn line-gross
+  (in (l Line))
+  (out Cents)
+  (mul l.unit l.qty))
+
+(fn line-net
+  (in (l Line))
+  (out Cents)
+  (div-floor (mul (line-gross l) (sub 100 (volume-pct l.qty))) 100))
+
+(fn gross
+  (in (ls (List Line 1 50)))
+  (out Cents)
+  (sum (map ls (fn (l) (line-gross l)))))
+
+(fn subtotal
+  (in (ls (List Line 1 50)))
+  (out Cents)
+  (sum (map ls (fn (l) (line-net l)))))
+
+(fn total
+  (in (c Customer) (ls (List Line 1 50)))
+  (out Cents)
+  (let [after-tier (div-floor (mul (subtotal ls) (sub 100 (tier-pct c.tier))) 100)
+        least      (div-floor (add (mul (gross ls) 80) 99) 100)]
+    (max after-tier least)))
+
+(fn quote-order
+  (in (id QuoteId) (cust Customer) (lines (List Line 1 50)))
+  (out (Result Quote QuoteError))
+  (needs store:quotes audit)
+  (let [g (gross lines)]
+    (if (> g 5000000)
+      (do (emit audit (QuoteRefused id cust.id))
+          (err NeedsApproval))
+      (let [t    (total cust lines)
+            used (min cust.credit t)
+            q    (Quote id cust.id g t used (max 0 (sub t used)))]
+        (try (put store:quotes q.id q) :on-err StoreFailed)
+        (emit audit (QuoteIssued q.id q.cust q.due))
+        (ok q)))))
+
+(program quotes
+  (targets server browser)
+  (entry quote-order
+    (bind store:quotes (store (ns "quotes/quotes") (mode append)))
+    (bind audit        (audit))))

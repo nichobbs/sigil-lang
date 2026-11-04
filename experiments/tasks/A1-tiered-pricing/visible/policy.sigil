@@ -1,0 +1,10 @@
+; Human-owned policy for A1: what a program may request, and what each sink may receive.
+; Sinks are deny-by-default. Neither sink accepts pii, so a customer's name or email must never reach
+; the quote store or the audit log.
+
+(policy
+  (allow store (ns "quotes/*"))
+  (allow audit)
+
+  (sink store:quotes (accepts internal))
+  (sink audit        (accepts internal)))
