@@ -60,7 +60,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
   if (lang === 'sigil') {
     copyFileSync(bundle(), join(dir, 'sigil.mjs'));
     symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'));
-    copyFileSync(join(REPO, 'docs/LANGUAGE.md'), join(dir, 'LANGUAGE.md'));
+    writeFileSync(join(dir, 'LANGUAGE.md'), readFileSync(join(REPO, 'docs/LANGUAGE.md'), 'utf8').replace(/npx tsx src\/cli\.ts (\w+) DIR/g, 'node sigil.mjs $1 task').replace(/\bDIR\b/g, 'task'));
     writeFileSync(join(dir, 'WORKFLOW.md'), readFileSync(join(REPO, 'docs/AGENT_WORKFLOW.md'), 'utf8').replace(/npx tsx src\/cli\.ts (\w+)\s+DIR/g, (_m, c: string) => `node sigil.mjs ${c} task`).replace(/DIR/g, 'task'));
     mkdirSync(join(dir, 'task'));
     for (const f of readdirSync(vis)) copyFileSync(join(vis, f), f === 'README.md' ? join(dir, 'README.md') : join(dir, 'task', f));
@@ -93,7 +93,7 @@ export async function score(dir: string, extra: Record<string, unknown> = {}): P
   const tr = extra.transcript as string | undefined;
   if (tr && existsSync(tr)) {
     const text = readFileSync(tr, 'utf8');
-    leaked = ['hidden', 'cases.json', '/ref/', 'tasks/', 'sigil-lang'].filter((p) => text.includes(p));
+    leaked = ['/hidden', 'cases.json', '/ref/', 'experiments/tasks', 'src/cli'].filter((p) => text.includes(p));
   }
   const rec = { task, lang, model, run: Number(r.slice(1)), passed: s.passed, total: s.total, m1: s.passed === s.total, trapTotal: s.trapTotal, trapViolations: s.trapViolations, verify, leakHints: leaked, ...extra, failures: s.failures.slice(0, 5) };
   delete (rec as Record<string, unknown>).transcript;
