@@ -1,0 +1,72 @@
+; Glossary for C2: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Region, Scope, Sale, Report, build-report), so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a sale of {qty:Int} x {unit:Money} of product {p:Int} in the {r:Region}"
+    (append sales (Sale r p qty unit false)))
+
+  (given "a refunded sale of {qty:Int} x {unit:Money} of product {p:Int} in the {r:Region}"
+    (append sales (Sale r p qty unit true)))
+
+  (given "there are no sales"
+    (set sales (list)))
+
+  (given "the report covers only the {r:Region}"
+    (set scope (match r (North OnlyNorth) (South OnlySouth) (East OnlyEast) (West OnlyWest))))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "the report is built"
+    (default scope AllRegions)
+    (call report build-report sales scope))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the total revenue is {amount:Money}"
+    (expect (= report.total amount)))
+
+  (then "the {r:Region} revenue is {amount:Money}"
+    (expect (= (match r (North report.north) (South report.south) (East report.east) (West report.west)) amount)))
+
+  (then "the report counts {n:Int} sales"
+    (expect (= report.count n)))
+
+  (then "the best product is {p:Int}"
+    (expect (= report.best p)))
+
+  (then "there is no best product"
+    (expect (= report.best -1)))
+
+  (then "the average sale is {amount:Money}"
+    (expect (= report.average amount)))
+
+  ; ---- Properties ----------------------------------------------------------------
+  (always "A sale is counted when it is not refunded and it is in the chosen region (every region counts when all regions are chosen). Only counted sales appear anywhere in the report: the total revenue, the regional revenues, the number of sales counted, the best product and the average sale. A region that was not chosen has revenue $0.00."
+    (forall ((ls (List Sale 0 12)))
+      (let [kept (filter ls (fn (s) (not s.refunded)))
+            r (build-report ls AllRegions)
+            e (build-report kept AllRegions)
+            n (build-report ls OnlyNorth)]
+        (and (= r e)
+             (= r.count (len kept))
+             (= n.south 0) (= n.east 0) (= n.west 0)
+             (= n.north r.north)))))
+
+  (always "Revenue is whole cents. The revenue of a sale is its quantity times its unit price. The total revenue and the regional revenues are the sums of the revenues of the sales counted, so with all regions chosen the total equals the sum of the four regional revenues."
+    (forall ((ls (List Sale 0 12)))
+      (let [r (build-report ls AllRegions)]
+        (and (= r.total (add (add r.north r.south) (add r.east r.west)))
+             (= r.total (sum (map (filter ls (fn (s) (not s.refunded))) (fn (s) (mul s.qty s.unit)))))))))
+
+  (always "There is a best product exactly when at least one sale is counted. When two or more products tie on revenue, the one with the lowest product code is the best product."
+    (forall ((ls (List Sale 0 12)) (sc Scope))
+      (let [r (build-report ls sc)]
+        (= (= r.best -1) (= r.count 0)))))
+
+  (always "The average sale is the total revenue divided by the number of sales counted, rounded half up to a whole cent: a fraction of exactly one half is rounded up. With no sales counted the average is $0.00."
+    (forall ((ls (List Sale 0 12)) (sc Scope))
+      (let [r (build-report ls sc)]
+        (if (= r.count 0)
+            (= r.average 0)
+            (and (< (sub (mul 2 r.total) r.count) (mul 2 (mul r.average r.count)))
+                 (<= (mul 2 (mul r.average r.count)) (add (mul 2 r.total) r.count))))))))
