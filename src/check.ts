@@ -274,7 +274,7 @@ const lit = (p: Partial<AV>): AV => mk({ ...p, lab: { conf: 'public', integ: 'tr
 function evalExpr(e: Expr, env: Env, ctx: Ctx): AV {
   switch (e.k) {
     case 'int':
-      return lit({ num: I.point(e.v) });
+      return lit({ num: track(ctx, I.point(e.v)) });
     case 'str':
       return lit({});
     case 'bool':
@@ -698,6 +698,14 @@ function evalTri(e: Expr, env: Env, ctx: Ctx): I.Tri {
 // Program-level checking
 // ---------------------------------------------------------------------------
 
+/** Parameter ranges count toward the representation width, not just arithmetic results. */
+function trackAll(ctx: Ctx, av: AV | undefined, depth = 0): void {
+  if (!av || depth > 6) return;
+  if (av.num !== undefined && av.num !== 'top') track(ctx, av.num);
+  av.fields?.forEach((f) => trackAll(ctx, f, depth + 1));
+  trackAll(ctx, av.elem, depth + 1);
+}
+
 export function checkFn(prog: Program, pol: Policy, f: FnDef, into: CheckResult): void {
   const acc: Ctx['acc'] = { diags: into.diags, obs: [], flows: into.flows, maxAbs: 0n, seen: new Set(), n: 0 };
   const ctx: Ctx = { prog, pol, root: f, depth: 0, report: true, pc: L.bottom(), acc };
@@ -712,6 +720,7 @@ export function checkFn(prog: Program, pol: Policy, f: FnDef, into: CheckResult)
     // Entry parameters keep per-field labels but trusted envelopes.
     av = { ...av };
     env.set(p.name, av);
+    trackAll(ctx, av);
   }
 
   const out = evalExpr(f.body, env, ctx);

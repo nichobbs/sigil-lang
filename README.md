@@ -40,7 +40,7 @@ npx tsx src/cli.ts wasm examples/invoicing [out.wasm]   # which functions compil
 Covered:
 - Parameters of ranged `Int`, `Bool`, enums (as an `i32` index) and records of those (flattened to one scalar parameter per field). Results: `Int`, `Bool`, enum.
 - Expressions: literals, variables and field reads, `let`, `do`, `if`, `match` on enums (must be exhaustive, no payload binders), `add sub mul div-floor neg min max`, binary `= < <= > >=`, `and or not`.
-- Every `Int` in a function uses the checker's derived repr (`i32` or `i64`). The checker only tracks arithmetic results, not parameters or literals, so the backend widens to `i64` when a parameter range or literal needs it and records that in the report.
+- Every `Int` in a function uses the checker's derived repr (`i32` or `i64`). The checker counts parameter ranges and literals as well as arithmetic results (this was a gap the Wasm work found); the backend keeps a defensive check that widens to `i64` and reports it if the two ever disagree.
 - A function compiles only if it has no `needs`, no `requires`, no checker errors, and every non-`ensures` obligation is proved.
 
 Not covered (reported as "not compilable" with the reason, never miscompiled): lists and `sum`/`map`/`filter`/`len`, strings and `text`, `Result`/`try`/`ok`/`err`, capabilities and effects, record construction or record results, calls between functions, lambdas, `bigint` repr, comparisons with more than two arguments, and `requires`. `ensures` clauses are specifications and are not emitted as runtime checks. There is no linking, memory, host ABI or optimisation.
