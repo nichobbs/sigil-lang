@@ -1,0 +1,25 @@
+name: agent-review
+# A reviewing agent that is not the author. Needs the ANTHROPIC_API_KEY repository secret;
+# without it the job is skipped. Review is advisory unless made a required check.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: ${{ vars.AGENT_REVIEW == 'on' }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request as an independent reviewer. You did not write it.
+            Check: soundness of checker/SMT changes (no assumed obligations, no unsound abstractions),
+            that no scenario was weakened or deleted, that Intent-layer files (*.feature, glossary, policy)
+            were not changed to make tests pass, and that new behaviour has tests. Reply with APPROVE or
+            REQUEST CHANGES and specific findings.

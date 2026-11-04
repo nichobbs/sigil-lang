@@ -1,0 +1,30 @@
+name: automerge
+# Enables auto-merge (squash) on pull requests that do not touch human-owned paths.
+# The merge itself still waits for the required `verify` check and branch protection.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Check changed paths
+        id: paths
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+          if echo "$files" | grep -Eq '^(examples/.*\.(feature|sigil)$|\.github/|CODEOWNERS$|src/(check|labels|interval|caps|smt|scenario|mutate)\.ts$)'; then
+            echo "protected=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "protected=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Enable auto-merge
+        if: steps.paths.outputs.protected == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"

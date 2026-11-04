@@ -1,0 +1,12 @@
+# Human-owned: the Intent layer, the evidence machinery, and the pipeline itself.
+/examples/**/*.feature     @nichobbs
+/examples/**/glossary.sigil @nichobbs
+/examples/**/policy.sigil  @nichobbs
+/src/check.ts              @nichobbs
+/src/labels.ts             @nichobbs
+/src/interval.ts           @nichobbs
+/src/caps.ts               @nichobbs
+/src/smt.ts                @nichobbs
+/src/scenario.ts           @nichobbs
+/src/mutate.ts             @nichobbs
+/.github/                  @nichobbs
