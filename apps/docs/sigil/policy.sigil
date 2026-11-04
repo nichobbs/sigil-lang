@@ -1,0 +1,9 @@
+; Human-owned policy for B1: what a program may request, and what each sink may receive.
+; Sinks are deny-by-default. A document title is personal data (pii): the store may hold it, the audit log may not.
+
+(policy
+  (allow store (ns "docs/*"))
+  (allow audit)
+
+  (sink store:docs (accepts pii))
+  (sink audit      (accepts internal)))
