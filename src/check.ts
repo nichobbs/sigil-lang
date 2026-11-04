@@ -629,6 +629,9 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
     }
     case 'text':
       return mk({ lab: labOf(xs) });
+    case 'money':
+      if (!ar(1)) return topAV();
+      return mk({ lab: labOf(xs) });
     case 'list': {
       const elem = xs.length ? xs.reduce(joinAV) : undefined;
       return mk({ len: I.point(BigInt(xs.length)), elem });

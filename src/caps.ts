@@ -47,6 +47,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   map: 2,
   filter: 2,
   text: -1,
+  money: 1, // cents -> "$d.cc"
   list: -1,
   '=': 2,
   '<=': -1,
@@ -61,7 +62,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
 };
 
 // Query builtins available only to scenario glossaries (observations of the effect log).
-export const WORLD_BUILTINS = ['sent', 'stored'];
+export const WORLD_BUILTINS = ['sent', 'stored', 'emitted'];
 
 export function isBuiltin(name: string): boolean {
   return name in BUILTIN_ARITY || name in CAP_OPS;

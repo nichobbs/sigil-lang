@@ -127,7 +127,11 @@ async function main() {
         console.log(`  by scenarios/props:     ${m.killedByScenarios}`);
         console.log(`  by runtime contracts:   ${m.killedByContractsOnly}  (ranges/ensures only; no scenario asserts it)`);
         console.log(`  SURVIVED:               ${m.survivors.length}`);
-        for (const s of m.survivors) console.log(`    - ${s.fn}: ${s.desc}`);
+        for (const s of m.survivors) {
+          // An :on-err mutant is the Unresolved question (keep or roll back?) while one is open: a human must answer, not the spec writer.
+          const open = feature.unresolved.length > 0 && s.desc.startsWith(':on-err');
+          console.log(`    - ${s.fn}: ${s.desc}${open ? '   [OPEN QUESTION: see Unresolved above; stays a survivor until a human answers]' : ''}`);
+        }
 
         process.exit(bad || errors(res).length ? 1 : 0);
         break;

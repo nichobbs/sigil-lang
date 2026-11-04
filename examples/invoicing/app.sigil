@@ -40,7 +40,7 @@
   (out Mail)
   (Mail :to c.email
         :subject (text "Invoice " i.id)
-        :body (text "Hello " c.name ", your total is " i.total)))
+        :body (text "Hello " c.name ", your total is " (money i.total))))
 
 (fn issue-invoice
   (in (c Customer) (ls (List Line 1 200)))

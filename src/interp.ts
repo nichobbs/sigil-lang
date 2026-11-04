@@ -116,6 +116,9 @@ export class Host {
   stored(handle: string): Val[] {
     return this.log.filter((o) => o.handle === handle && o.op === 'put' && o.ok).map((o) => o.args[1]);
   }
+  emitted(handle: string): Val[] {
+    return this.log.filter((o) => o.handle === handle && o.op === 'emit' && o.ok).map((o) => o.args[0]);
+  }
   call(handle: string, op: string, args: Val[]): Val {
     if (this.failing.has(`${handle}.${op}`)) {
       this.log.push({ handle, op, args, ok: false });
@@ -426,6 +429,11 @@ export class Interp {
         return BigInt(a[0].length);
       case 'text':
         return a.map((x) => (typeof x === 'string' ? x : showVal(x))).join('');
+      case 'money': {
+        const c = this.num(a[0], 'money');
+        const abs = c < 0n ? -c : c;
+        return `${c < 0n ? '-' : ''}$${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`;
+      }
       case 'list':
         return a;
       case '=':
@@ -452,6 +460,8 @@ export class Interp {
         return this.host.sent(a[0] as string);
       case 'stored':
         return this.host.stored(a[0] as string);
+      case 'emitted':
+        return this.host.emitted(a[0] as string);
       default:
         throw new RuntimeFault(`unknown function ${name}`);
     }
