@@ -11,7 +11,7 @@ You write one file, `app.sigil`: types, validators, functions, and one `program`
 (type Plan (var Free Pro Enterprise))   ; enum; case names are global, so unique across all enums
 (type Err (var TooSmall StoreFailed MailFailed))
 (type Email (Str :validated))           ; Str = text; :validated = must come from a validator
-(type Line (Str :max 200))              ; :max N = at most N characters (code points); needed before `chars`
+(type Note (Str :max 200))              ; :max N = at most N characters (code points); needed before `chars`
 (type Line (rec (unit (Int 0 1000000)) (qty (Int 1 1000))))
 (type Customer (rec (id (Int 0 1000000)) (name Str :pii) (email Email :pii) (plan Plan :internal)))
 (type Mail (rec (to Email :pii) (subject Str) (body Str :pii)))   ; (field Type flags...)
