@@ -4,6 +4,8 @@ A prototype of a programming language intended for AI agents only: token-efficie
 
 This repo is a feasibility prototype in TypeScript, not a full compiler. The only code generation is a narrow Wasm backend for the pure numeric core (see below).
 
+Terms such as mutant, survivor, trap and hidden case are defined in `docs/GLOSSARY.md`.
+
 ## Layers
 
 | Layer | Who reads it | Files in `examples/invoicing` |
