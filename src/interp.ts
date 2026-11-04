@@ -429,6 +429,11 @@ export class Interp {
         return BigInt(a[0].length);
       case 'text':
         return a.map((x) => (typeof x === 'string' ? x : showVal(x))).join('');
+      case 'money': {
+        const c = this.num(a[0], 'money');
+        const abs = c < 0n ? -c : c;
+        return `${c < 0n ? '-' : ''}$${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`;
+      }
       case 'list':
         return a;
       case '=':

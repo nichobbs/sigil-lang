@@ -40,7 +40,7 @@ Feature: Invoicing
     And invoice 1042 totalling $9.00
     When the receipt is written
     Then the email subject is "Invoice 1042"
-    And the email body is "Hello Ada Lovelace, your total is 900"
+    And the email body is "Hello Ada Lovelace, your total is $9.00"
 
   Always: The price is never negative and never more than the undiscounted total.
 
