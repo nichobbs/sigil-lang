@@ -23,10 +23,12 @@ export async function runSigil(cf: CaseFile, source: string): Promise<Score> {
     for (const f of c.host?.fail ?? []) host.fail(f.handle, f.op);
     let args;
     try {
-      args = fn.params.map((p) => {
-        if (!(p.name in c.args)) throw new Error(`case has no argument ${p.name}`);
-        return decodeVal(prog, p.type, c.args[p.name], p.name);
-      });
+      // The task README fixes the parameter order; names are the agent's choice. Bind by name when every name matches,
+      // otherwise by position (the case file lists arguments in README order).
+      const byName = fn.params.every((p) => p.name in c.args);
+      const given = Object.values(c.args);
+      if (!byName && given.length !== fn.params.length) throw new Error(`entry takes ${fn.params.length} parameters, case has ${given.length}`);
+      args = fn.params.map((p, i) => decodeVal(prog, p.type, byName ? c.args[p.name] : given[i], p.name));
     } catch (e) {
       return { error: `argument encoding: ${(e as Error).message}` };
     }
