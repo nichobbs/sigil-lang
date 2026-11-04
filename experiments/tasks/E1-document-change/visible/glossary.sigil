@@ -56,14 +56,14 @@
     (expect (= (emitted audit) (list (Refused actor.id doc.id req.op why)))))
 
   ; ---- Properties and privacy ---------------------------------------------------
-  (always "A Viewer can never change anything. An Editor may update or delete a document only when they own it, and may never publish. An Admin may update, delete or publish any document. This is checked before anything else, so an actor who is not allowed gets the same answer whatever the state of the document and whatever the request carries."
+  (always "A Viewer can never change anything. An Editor may update, delete or publish a document only when they own it, except that an Editor may not delete their own document while it is Published. An Admin may update, delete or publish any document. This is checked before anything else, so an actor who is not allowed gets the same answer whatever the request carries; the only thing about the document that matters is, for an Editor deleting, whether it is Published."
     (forall ((a Actor) (d Doc) (r Request))
       (and (= (= (handle-request a d r) (err NotAllowed))
               (match a.role
                 (Viewer true)
-                (Editor (or (not (= a.id d.owner)) (= r.op Publish)))
+                (Editor (or (not (= a.id d.owner)) (and (= r.op Delete) (= d.status Published))))
                 (Admin false)))
-           (= (= (handle-request a (Doc d.id d.owner d.title 0 Draft) (Request r.op "" 0)) (err NotAllowed))
+           (= (= (handle-request a (Doc d.id d.owner d.title 0 d.status) (Request r.op "" 0)) (err NotAllowed))
               (= (handle-request a d r) (err NotAllowed))))))
 
   (always "A document that is Deleted accepts no operation from anyone, an Admin included: the request is refused as Gone. This is checked right after the authorisation."
