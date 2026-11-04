@@ -138,3 +138,5 @@ Not to be confused with `glossary.sigil`, which is a per-example file that binds
 **Compilable.** A function is compilable when it is pure, numeric (or a bounded list of numbers), and has no checker errors or unproved obligations. Anything else is reported as "not compilable" with the reason, never miscompiled.
 
 **Scratch memory.** The fixed region a compiled list function uses for intermediate lists. Its size is a compile-time number, so there is no dynamic allocation.
+
+**Validating wrapper.** What a compiled module exports for each function: code that checks every argument against its declared type (ranges, enum cases, `Str :max`, list lengths and memory bounds) and traps through `contract_violation` before calling the internal, unchecked body. It is why a compiled module rejects out-of-range input the way the interpreter does, instead of trusting its caller (ABI version 2).

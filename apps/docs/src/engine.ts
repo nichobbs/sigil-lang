@@ -74,8 +74,9 @@ export class DocsEngine {
     const f = this.prog.fns.get(fn);
     if (!f) throw new Error(`program has no function ${fn}`);
     const vals = f.params.map((p, i) => decodeVal(this.prog, p.type, args[i], p.name));
-    // Input boundary. Compiled code trusts the declared ranges of its arguments (the checker's proofs assume them), so the
-    // shell enforces them here, in both modes, with the interpreter's own contract check (same message either way).
+    // Input boundary. The compiled module validates its own arguments (its exports are validating wrappers, ABI version 2),
+    // but the shell still enforces the declared types here, in both modes, with the interpreter's own contract check
+    // (same message either way), as defence in depth.
     const guard = new Interp(this.prog, new AdapterHost(this.store, this.audit));
     f.params.forEach((p, i) => guard.checkType(vals[i], p.type, `${fn}(${p.name})`));
     if (this.wasm) {

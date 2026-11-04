@@ -87,7 +87,10 @@ describe('wasm strings', () => {
     expect(abi).toEqual(out.abi);
     expect(abi.strings).toEqual(expect.arrayContaining(['Hello ', 'Ada', 'your receipt is ready']));
     const imports = WebAssembly.Module.imports(mod).map((i) => i.name).sort();
-    expect(imports).toEqual(['str_chars', 'str_concat', 'str_eq', 'str_from_chars', 'str_int', 'str_money']);
+    // contract_violation and str_len are used by the validating export wrappers (ABI version 2)
+    expect(imports).toEqual(['contract_violation', 'str_chars', 'str_concat', 'str_eq', 'str_from_chars', 'str_int', 'str_len', 'str_money']);
+    expect(abi.version).toBe(2);
+    expect(abi.validated).toBe(true);
   });
 
   it('strings are copied and passed by handle: long strings cost nothing to pass around', async () => {

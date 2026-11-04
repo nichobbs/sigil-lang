@@ -23,13 +23,39 @@
 // the shapes of its arguments, so any host can rebuild the values. src/wasm/host.ts is the reference adapter over
 // the interpreter's Host (so the effect logs of both executions can be compared). An entry point (a function
 // listed in a `program` form) is an ordinary export with this ABI, flagged `entry` in the FnReport.
+//
+// Trust model (ABI version 2, `validated: true` in `sigil.abi`; see validate.ts for the full list of checks):
+//   - Every export is a validating wrapper. Before any unchecked code runs it checks each argument against its
+//     declared type, in the interpreter's order: Int ranges (also inside records, Results and list elements), Bool
+//     0/1, enum case indices, Str handles live and within :max (host import str_len), Result tags and zero inactive
+//     sides, list lengths within min..max, list memory below the scratch base, and the scratch base plus the
+//     function's scratch inside the memory. A violation calls contract_violation(site, index, value), then traps.
+//   - The compiled function bodies (plain wrapping arithmetic, relying on the checker's proofs) are internal: they
+//     are not exported, so no caller can reach them with unvalidated arguments. Calls between compiled functions
+//     stay direct and unchecked (the checker proved the callee's parameter ranges at every call site).
+//   - Host results the code relies on are checked too: fresh (0..9007199254740991) and the str_chars count; str_eq
+//     is normalised to 0/1. Still trusted: the host's string table (handles returned by str_concat, str_int,
+//     str_money and str_from_chars, and the strings behind them), the success flags of put/post/emit (any nonzero
+//     is success, so they cannot break an invariant), and the host's own writes into memory (str_chars), since a host
+//     can write to the exported memory at any time anyway. `ensures` is not checked at run time (as before).
+//   - Version 1 modules (no `validated` flag) exported the unchecked functions directly: a caller had to validate
+//     every argument itself. isValidated() tells the two apart.
 
 import { Host, Val } from '../interp.js';
-import { FnReport, MEM_BASE } from './compile.js';
+import { ABI_VERSION, AbiDescriptor, FnReport, MEM_BASE } from './compile.js';
 import { WasmHost, readAbi } from './host.js';
 import { LowerState, Raw, StrTable, liftVal, lowerVal } from './marshal.js';
 
 export type { Raw } from './marshal.js';
+export type { CheckReason, CheckSite } from './validate.js';
+export { ABI_VERSION };
+export { contractError, readAbi } from './host.js';
+
+/** True when the module's exports validate their arguments (ABI version 2 or later with the `validated` flag). */
+export function isValidated(abi: AbiDescriptor | WebAssembly.Module): boolean {
+  const a = abi instanceof WebAssembly.Module ? readAbi(abi) : abi;
+  return a.version >= 2 && a.validated === true;
+}
 export { StrTable, readList, writeList } from './marshal.js';
 
 /** Per-instance state kept next to the exports (string table, host adapter). */
@@ -42,19 +68,21 @@ export type Exports = Record<string, (...a: Raw[]) => Raw | Raw[] | void> & { [E
 
 /**
  * Lower interpreter values to raw wasm arguments. Functions with list parameters need the instance's
- * `memory`: lists are marshalled into it and the lengths are checked against the declared bounds
- * (the compiled code trusts them, exactly as it trusts the declared ranges of scalar arguments).
+ * `memory`: lists are marshalled into it. By default the lengths are also checked here against the declared bounds;
+ * with `forward` every encodable value goes to the module, whose validating wrapper is then the one that rejects it
+ * (see marshal.ts LowerState.forward). A value with no encoding (wrong kind, too wide) is always rejected here, with
+ * the interpreter's ContractViolation.
  */
-export function lowerArgs(fn: FnReport, args: Val[], memory?: WebAssembly.Memory, strings?: StrTable): Raw[] {
+export function lowerArgs(fn: FnReport, args: Val[], memory?: WebAssembly.Memory, strings?: StrTable, opts: { forward?: boolean } = {}): Raw[] {
   if (!fn.compilable || !fn.params || !fn.repr) throw new Error(`${fn.name} is not compilable`);
   const out: Raw[] = [];
-  const st: LowerState = { repr: fn.repr, memory, cursor: MEM_BASE, strings, who: '' };
+  const st: LowerState = { repr: fn.repr, memory, cursor: MEM_BASE, strings, who: '', forward: opts.forward };
   fn.params.forEach((p, i) => {
-    st.who = p.name;
+    st.who = `${fn.name}(${p.name})`;
     lowerVal(args[i], p.shape, st, out);
   });
   if (fn.hasBase) {
-    if (st.cursor - MEM_BASE !== fn.inputBytes) throw new Error('internal: input area mismatch');
+    if (st.cursor - MEM_BASE < fn.inputBytes!) throw new Error('internal: input area mismatch');
     out.push(st.cursor); // scratch base
   }
   return out;
@@ -77,9 +105,14 @@ export async function instantiate(bytes: Uint8Array, host: Host = new Host(1)): 
   return { ...(instance.exports as unknown as Exports), [ENV]: { strings: wh.strings, host: wh } };
 }
 
+/**
+ * Call a compiled function with interpreter values. Arguments are forwarded to the module's validating export, so an
+ * argument outside its declared type fails with the interpreter's ContractViolation (same reason and `where`),
+ * raised by the module through contract_violation, or by the adapter for a value with no encoding at all.
+ */
 export function callCompiled(fn: FnReport, exports: Exports, args: Val[]): Val {
   const memory = (exports as unknown as { memory?: WebAssembly.Memory }).memory;
   const strings = exports[ENV]?.strings;
   strings?.reset();
-  return liftResult(fn, exports[fn.name](...lowerArgs(fn, args, memory, strings)), memory, strings);
+  return liftResult(fn, exports[fn.name](...lowerArgs(fn, args, memory, strings, { forward: true })), memory, strings);
 }

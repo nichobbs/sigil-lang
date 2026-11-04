@@ -22,10 +22,27 @@ export const enumVal = (tag: string): Val => ({ $: 'enum', tag });
 export const okVal = (v: Val): Val => ({ $: 'ok', v });
 export const errVal = (v: Val): Val => ({ $: 'err', v });
 
+/**
+ * Why a value failed its declared type (set on `type` violations; shared with the Wasm backend, which reports the
+ * same reasons from its validating export wrappers, see src/wasm/validate.ts):
+ *   range        an Int outside its declared [lo, hi]
+ *   str-max      a Str longer than its declared :max (in code points)
+ *   enum         not one of the enum's cases
+ *   list-length  a list length outside its declared [min, max]
+ *   type         a value of the wrong kind (not an Int, Str, Bool, record, list or Result)
+ * Only a compiled module raises the last two, for raw arguments that no Sigil value encodes to:
+ *   encoding     the inactive side of a Result argument is not all zero
+ *   memory       a list argument or the scratch base lies outside the module's memory layout
+ */
+export type ContractReason = 'range' | 'str-max' | 'enum' | 'list-length' | 'type' | 'encoding' | 'memory';
+
 export class ContractViolation extends Error {
   constructor(
     public kind: 'type' | 'requires' | 'ensures',
     msg: string,
+    /** For `type` violations: the reason, and where the value sits (e.g. "f(req).size", "f(xs)[3].qty"). */
+    public reason?: ContractReason,
+    public where?: string,
   ) {
     super(msg);
     this.name = 'ContractViolation';
@@ -176,17 +193,17 @@ export class Interp {
   checkType(v: Val, t: Type, where: string): void {
     if (!this.opts.contracts) return;
     const r = resolveType(this.prog, t);
-    const bad = (m: string) => {
-      throw new ContractViolation('type', `${where}: ${m}`);
+    const bad = (m: string, reason: ContractReason = 'type') => {
+      throw new ContractViolation('type', `${where}: ${m}`, reason, where);
     };
     switch (r.k) {
       case 'int':
         if (typeof v !== 'bigint') return bad(`expected Int, got ${showVal(v)}`);
-        if (v < r.lo || v > r.hi) return bad(`${v} outside [${r.lo}, ${r.hi}]`);
+        if (v < r.lo || v > r.hi) return bad(`${v} outside [${r.lo}, ${r.hi}]`, 'range');
         return;
       case 'str':
         if (typeof v !== 'string') return bad(`expected Str, got ${showVal(v)}`);
-        if (r.max !== undefined && Array.from(v).length > r.max) bad(`string of ${Array.from(v).length} characters exceeds :max ${r.max}`);
+        if (r.max !== undefined && Array.from(v).length > r.max) bad(`string of ${Array.from(v).length} characters exceeds :max ${r.max}`, 'str-max');
         return;
       case 'bool':
         if (typeof v !== 'boolean') bad('expected Bool');
@@ -194,11 +211,11 @@ export class Interp {
       case 'unit':
         return;
       case 'enum':
-        if (!v || typeof v !== 'object' || Array.isArray(v) || v.$ !== 'enum' || !r.cases.includes(v.tag)) bad(`expected one of ${r.cases.join('|')}, got ${showVal(v)}`);
+        if (!v || typeof v !== 'object' || Array.isArray(v) || v.$ !== 'enum' || !r.cases.includes(v.tag)) bad(`expected one of ${r.cases.join('|')}, got ${showVal(v)}`, 'enum');
         return;
       case 'list':
         if (!Array.isArray(v)) return bad('expected list');
-        if (v.length < r.min || v.length > r.max) return bad(`length ${v.length} outside [${r.min}, ${r.max}]`);
+        if (v.length < r.min || v.length > r.max) return bad(`length ${v.length} outside [${r.min}, ${r.max}]`, 'list-length');
         v.forEach((x, i) => this.checkType(x, r.elem, `${where}[${i}]`));
         return;
       case 'rec':

@@ -1,6 +1,6 @@
 // Marshalling between interpreter values (Val) and raw Wasm values, driven by shapes (see shape.ts).
 
-import { Val, enumVal, errVal, okVal } from '../interp.js';
+import { ContractReason, ContractViolation, Val, enumVal, errVal, okVal, showVal } from '../interp.js';
 import { ElemLayout, MEM_BASE, Scalar, SLOT, Shape, nleaves } from './shape.js';
 
 export type Raw = number | bigint;
@@ -38,45 +38,71 @@ export interface LowerState {
   memory?: WebAssembly.Memory;
   cursor: number; // next free byte of the input area
   strings?: StrTable;
-  who: string;
+  who: string; // where the value sits, as the interpreter names it: "f(p)", "f(p).field", "f(p)[3]"
+  /**
+   * Forward every value that has an encoding to the module and let its validating wrapper reject it (an out-of-range
+   * Int, an unknown enum case (encoded as an out-of-range case index), an over-long Str, a list outside min..max).
+   * Off (the default for lowerArgs): list lengths are checked here, as before. Either way, a value that has no
+   * encoding at all (wrong kind, an Int too wide for the representation, a list that does not fit the memory) is
+   * rejected here with the interpreter's ContractViolation.
+   */
+  forward?: boolean;
 }
 
 const isRec = (v: Val): v is Extract<Val, { $: 'rec' }> => !!v && typeof v === 'object' && !Array.isArray(v) && v.$ === 'rec';
 
-function scalarSlot(v: Val, k: Scalar, strings?: StrTable): bigint {
+/** The interpreter's contract error, raised by the adapter for a value it cannot encode. */
+export const bad = (where: string, m: string, reason: ContractReason = 'type'): never => {
+  throw new ContractViolation('type', `${where}: ${m}`, reason, where);
+};
+
+const I64_MIN = -(2n ** 63n);
+const I64_MAX = 2n ** 63n - 1n;
+const I32_MIN = -(2n ** 31n);
+const I32_MAX = 2n ** 31n - 1n;
+
+/** An Int that the representation can hold (a wider one is necessarily outside the declared range). */
+function intOf(v: Val, k: { lo?: bigint; hi?: bigint }, repr: 'i32' | 'i64', where: string): bigint {
+  if (typeof v !== 'bigint') return bad(where, `expected Int, got ${showVal(v)}`);
+  const [min, max] = repr === 'i64' ? [I64_MIN, I64_MAX] : [I32_MIN, I32_MAX];
+  if (v < min || v > max) bad(where, `${v} outside [${k.lo ?? min}, ${k.hi ?? max}]`, 'range');
+  return v;
+}
+
+function scalarSlot(v: Val, k: Scalar, strings: StrTable | undefined, where = 'value', forward = false, repr: 'i32' | 'i64' = 'i64'): bigint {
   switch (k.t) {
     case 'int':
-      if (typeof v !== 'bigint') throw new Error(`expected Int, got ${String(v)}`);
-      return v;
+      return intOf(v, k, repr, where);
     case 'bool':
+      if (typeof v !== 'boolean') bad(where, 'expected Bool');
       return v === true ? 1n : 0n;
     case 'enum': {
       const tag = v && typeof v === 'object' && !Array.isArray(v) && v.$ === 'enum' ? v.tag : undefined;
       const i = tag === undefined ? -1 : k.cases.indexOf(tag);
-      if (i < 0) throw new Error(`expected enum ${k.cases.join('|')}`);
-      return BigInt(i);
+      if (i < 0 && !(forward && tag !== undefined)) bad(where, `expected one of ${k.cases.join('|')}, got ${showVal(v)}`, 'enum');
+      return BigInt(i < 0 ? k.cases.length : i); // forward: an unknown case is passed as an out-of-range index
     }
     case 'str':
-      if (typeof v !== 'string') throw new Error(`expected Str, got ${String(v)}`);
+      if (typeof v !== 'string') return bad(where, `expected Str, got ${showVal(v)}`);
       if (!strings) throw new Error('string values need a string table');
       return BigInt(strings.intern(v));
   }
 }
 
 /** The scalar slots of one list element, in layout order. */
-function elemSlots(shape: Shape, v: Val, strings: StrTable | undefined, out: bigint[]): void {
+function elemSlots(shape: Shape, v: Val, strings: StrTable | undefined, out: bigint[], where = 'element', forward = false): void {
   switch (shape.t) {
     case 'unit':
       return;
     case 'rec':
-      if (!isRec(v)) throw new Error('expected record');
-      for (const f of shape.fields) elemSlots(f.shape, v.fields[f.name], strings, out);
+      if (!isRec(v)) return bad(where, `expected record, got ${showVal(v)}`);
+      for (const f of shape.fields) elemSlots(f.shape, v.fields[f.name], strings, out, `${where}.${f.name}`, forward);
       return;
     case 'int':
     case 'bool':
     case 'enum':
     case 'str':
-      out.push(scalarSlot(v, shape, strings));
+      out.push(scalarSlot(v, shape, strings, where, forward, 'i64'));
       return;
     default:
       throw new Error('list elements must be scalars or records of scalars');
@@ -84,11 +110,11 @@ function elemSlots(shape: Shape, v: Val, strings: StrTable | undefined, out: big
 }
 
 /** Write a Sigil list into linear memory at `addr` in the compiled layout. Returns the bytes used. */
-export function writeList(view: DataView, addr: number, layout: ElemLayout, xs: Val, strings?: StrTable): number {
-  if (!Array.isArray(xs)) throw new Error('expected a list');
+export function writeList(view: DataView, addr: number, layout: ElemLayout, xs: Val, strings?: StrTable, where = 'list', forward = false): number {
+  if (!Array.isArray(xs)) return bad(where, 'expected list');
   xs.forEach((x, i) => {
     const slots: bigint[] = [];
-    elemSlots(layout.elem, x, strings, slots);
+    elemSlots(layout.elem, x, strings, slots, `${where}[${i}]`, forward);
     slots.forEach((s, k) => view.setBigInt64(addr + (i * layout.stride + k) * SLOT, s, true));
   });
   return xs.length * layout.stride * SLOT;
@@ -157,44 +183,59 @@ function zerosOf(s: Shape, repr: 'i32' | 'i64'): Raw[] {
 
 /** Lower an interpreter value to the raw leaves of `shape`. */
 export function lowerVal(v: Val, shape: Shape, st: LowerState, out: Raw[]): void {
+  const where = st.who;
+  const at = <T,>(sub: string, f: () => T): T => {
+    st.who = `${where}${sub}`;
+    try {
+      return f();
+    } finally {
+      st.who = where;
+    }
+  };
   switch (shape.t) {
     case 'unit':
       return;
-    case 'int':
-      if (typeof v !== 'bigint') throw new Error(`expected Int, got ${String(v)}`);
-      out.push(st.repr === 'i64' ? v : Number(v));
+    case 'int': {
+      const x = intOf(v, shape, st.repr, where);
+      out.push(st.repr === 'i64' ? x : Number(x));
       return;
+    }
     case 'bool':
     case 'enum':
     case 'str': {
-      const s = scalarSlot(v, shape, st.strings);
+      const s = scalarSlot(v, shape, st.strings, where, st.forward);
       out.push(Number(s));
       return;
     }
     case 'rec':
-      if (!isRec(v)) throw new Error(`expected record at ${st.who}`);
-      for (const f of shape.fields) lowerVal(v.fields[f.name], f.shape, st, out);
+      if (!isRec(v)) return bad(where, `expected record, got ${showVal(v)}`);
+      for (const f of shape.fields) at(`.${f.name}`, () => lowerVal(v.fields[f.name], f.shape, st, out));
       return;
     case 'result': {
-      if (!v || typeof v !== 'object' || Array.isArray(v) || (v.$ !== 'ok' && v.$ !== 'err')) throw new Error(`expected Result at ${st.who}`);
+      if (!v || typeof v !== 'object' || Array.isArray(v) || (v.$ !== 'ok' && v.$ !== 'err')) return bad(where, 'expected Result');
       if (v.$ === 'ok') {
         out.push(0);
-        lowerVal(v.v, shape.ok, st, out);
+        at('.ok', () => lowerVal(v.v, shape.ok, st, out));
         out.push(...zeroRaw(0, st.repr, shape.err));
       } else {
         out.push(1);
         out.push(...zeroRaw(0, st.repr, shape.ok));
-        lowerVal(v.v, shape.err, st, out);
+        at('.err', () => lowerVal(v.v, shape.err, st, out));
       }
       return;
     }
     case 'list': {
-      if (!st.memory) throw new Error(`${st.who} has list parameters: pass the instance's memory`);
-      if (!Array.isArray(v)) throw new Error(`expected a list for ${st.who}`);
-      if (v.length < shape.min || v.length > shape.max) throw new Error(`${st.who}: length ${v.length} outside declared ${shape.min}..${shape.max}`);
-      writeList(new DataView(st.memory.buffer), st.cursor, shape.layout, v, st.strings);
+      if (!st.memory) throw new Error(`${where} has list parameters: pass the instance's memory`);
+      if (!Array.isArray(v)) return bad(where, 'expected list');
+      const inBounds = v.length >= shape.min && v.length <= shape.max;
+      if (!inBounds && !st.forward) bad(where, `length ${v.length} outside declared ${shape.min}..${shape.max}`, 'list-length');
+      const stride = shape.layout.stride * SLOT;
+      const reserve = Math.max(v.length, shape.max) * stride;
+      // forward: a list longer than its maximum still gets room of its own (the module rejects it on its length)
+      if (st.cursor + reserve > st.memory.buffer.byteLength) bad(where, `length ${v.length} outside [${shape.min}, ${shape.max}]`, 'list-length');
+      writeList(new DataView(st.memory.buffer), st.cursor, shape.layout, v, st.strings, where, st.forward);
       out.push(st.cursor, v.length);
-      st.cursor += shape.max * shape.layout.stride * SLOT;
+      st.cursor += reserve;
       return;
     }
   }
