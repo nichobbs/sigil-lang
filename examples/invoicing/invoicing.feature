@@ -30,6 +30,12 @@ Feature: Invoicing
     Then the issue fails with "store failed"
     And no email is sent
 
+  Example: If the email fails the invoice is kept and the failure is reported
+    Given the mail service is unavailable
+    When an invoice is issued to "a@x.com"
+    Then the invoice is stored once
+    And the issue fails with "mail failed"
+
   Example: Issuing an invoice records an audit event
     Given an order of 1 x "W-1" at $5.00
     When an invoice is issued to "a@x.com"
@@ -47,5 +53,6 @@ Feature: Invoicing
   Privacy: The customer's name is only sent to mail.acme.com.
            Changing it must not change anything sent anywhere else.
 
-  Unresolved: The invoice is stored but the email fails.
-              Keep the invoice and report "mail failed", or roll back?
+  Unresolved: The email fails after the invoice is stored. No audit event is recorded
+              for that invoice today. Should one be recorded (for example as "issued, receipt
+              failed"), or is an invoice with no audit event acceptable?
