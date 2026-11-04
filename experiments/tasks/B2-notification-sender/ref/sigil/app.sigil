@@ -1,0 +1,96 @@
+; B2 notification sender with a retry policy: reference implementation (Sigil).
+
+(type Id        (Int 0 9007199254740991))
+(type Channel   (var Email Sms))
+(type Kind      (var Receipt Reminder Alert))
+(type Outcome   (var Delivered Failed Skipped))
+
+(type Recipient     (rec (id Id) (name Str :pii) (email Str :pii) (phone Str :pii) (channel Channel) (optedOut Bool)))
+(type AttemptPolicy (rec (maxAttempts (Int 1 10)) (fallback Bool)))
+(type Notice        (rec (to Str :pii) (kind Kind) (channel Channel) (attempt (Int 1 3)) (text Str :pii)))
+(type Report        (rec (outcome Outcome) (attempts (Int 0 3))))
+(type NoticeAudit   (rec (recipient Id) (kind Kind) (outcome Outcome) (attempts (Int 0 3))))
+
+(fn notice-line
+  (in (k Kind))
+  (out Str)
+  (match k
+    (Receipt "your receipt is ready")
+    (Reminder "this is a reminder")
+    (Alert "this is an alert")))
+
+(fn other-channel
+  (in (c Channel))
+  (out Channel)
+  (match c (Email Sms) (Sms Email)))
+
+(fn channel-for
+  (in (pref Channel) (fallback Bool) (n (Int 1 3)))
+  (out Channel)
+  (if (and fallback (= n 2)) (other-channel pref) pref))
+
+(fn attempt-limit
+  (in (p AttemptPolicy))
+  (out (Int 1 3))
+  (min p.maxAttempts 3))
+
+(fn attempt-once
+  (in (r Recipient) (k Kind) (ch Channel) (n (Int 1 3)))
+  (out Bool)
+  (needs net:email net:sms)
+  (match ch
+    (Email (match (post net:email (Notice r.email k Email n (text "Hello " r.name ", " (notice-line k))))
+             (ok _ true)
+             (err _ false)))
+    (Sms (match (post net:sms (Notice r.phone k Sms n (text "Hello " r.name ", " (notice-line k))))
+           (ok _ true)
+           (err _ false)))))
+
+(fn single-attempt
+  (in (r Recipient) (k Kind))
+  (out Report)
+  (needs net:email net:sms)
+  (if (attempt-once r k r.channel 1) (Report Delivered 1) (Report Failed 1)))
+
+(fn run-attempts
+  (in (r Recipient) (k Kind) (p AttemptPolicy))
+  (out Report)
+  (needs net:email net:sms)
+  (let [lim (attempt-limit p)]
+    (if (attempt-once r k (channel-for r.channel p.fallback 1) 1)
+      (Report Delivered 1)
+      (if (< lim 2)
+        (Report Failed 1)
+        (if (attempt-once r k (channel-for r.channel p.fallback 2) 2)
+          (Report Delivered 2)
+          (if (< lim 3)
+            (Report Failed 2)
+            (if (attempt-once r k (channel-for r.channel p.fallback 3) 3)
+              (Report Delivered 3)
+              (Report Failed 3))))))))
+
+(fn deliver
+  (in (r Recipient) (k Kind) (p AttemptPolicy))
+  (out Report)
+  (needs net:email net:sms)
+  (if r.optedOut
+    (match k
+      (Alert (single-attempt r k))
+      (Receipt (Report Skipped 0))
+      (Reminder (Report Skipped 0)))
+    (run-attempts r k p)))
+
+(fn send-notice
+  (in (recipient Recipient) (kind Kind) (policy AttemptPolicy))
+  (out Report)
+  (needs net:email net:sms audit)
+  (let [rep (deliver recipient kind policy)]
+    (emit audit (NoticeAudit recipient.id kind rep.outcome rep.attempts))
+    rep))
+
+(program notifier
+  (targets server browser)
+  (entry send-notice
+    (bind net:email (net (connect "https://mail.example.com")))
+    (bind net:sms   (net (connect "https://sms.example.com")))
+    (bind audit     (audit))))

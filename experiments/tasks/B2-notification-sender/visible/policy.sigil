@@ -1,0 +1,12 @@
+; Human-owned policy for B2: what a program may request, and what each sink may receive.
+; Sinks are deny-by-default. The two delivery services legitimately receive the recipient's personal data
+; (name and address); the audit log accepts internal data only, so a name, email or phone number must never reach it.
+
+(policy
+  (allow net (connect "https://mail.example.com"))
+  (allow net (connect "https://sms.example.com"))
+  (allow audit)
+
+  (sink net:email (accepts pii))
+  (sink net:sms   (accepts pii))
+  (sink audit     (accepts internal)))

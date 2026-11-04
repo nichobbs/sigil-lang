@@ -1,0 +1,2028 @@
+{
+  "entry": "send-notice",
+  "cases": [
+    {
+      "name": "email receipt delivered on the first attempt",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "ada@example.com",
+              "kind": "Receipt",
+              "channel": "Email",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "sms reminder goes to the phone number",
+      "args": {
+        "recipient": {
+          "id": 8,
+          "name": "Grace Hopper",
+          "email": "grace@navy.example",
+          "phone": "+61400555666",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400555666",
+              "kind": "Reminder",
+              "channel": "Sms",
+              "attempt": 1,
+              "text": "Hello Grace Hopper, this is a reminder"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 8,
+              "kind": "Reminder",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "email alert delivered on the first attempt",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "ada@example.com",
+              "kind": "Alert",
+              "channel": "Email",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, this is an alert"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "name with punctuation and accents is carried into the text",
+      "args": {
+        "recipient": {
+          "id": 9007199254740991,
+          "name": "Zoë O'Brien-\"ZB\"",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Receipt",
+              "channel": "Sms",
+              "attempt": 1,
+              "text": "Hello Zoë O'Brien-\"ZB\", your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 9007199254740991,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "empty name and address strings are passed through",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "",
+          "email": "",
+          "phone": "",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "",
+              "kind": "Reminder",
+              "channel": "Email",
+              "attempt": 1,
+              "text": "Hello , this is a reminder"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "fallback flag set but the preferred channel works",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "ada@example.com",
+              "kind": "Receipt",
+              "channel": "Email",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "fallback flag with a high limit still delivers on attempt 1",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 10,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Reminder",
+              "channel": "Sms",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, this is a reminder"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "email down, fallback allowed: delivered by sms on attempt 2",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Receipt",
+              "channel": "Sms",
+              "attempt": 2,
+              "text": "Hello Ada Lovelace, your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "sms down, fallback allowed: delivered by email on attempt 2",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 2,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "ada@example.com",
+              "kind": "Reminder",
+              "channel": "Email",
+              "attempt": 2,
+              "text": "Hello Ada Lovelace, this is a reminder"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Delivered",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "fallback needs a second attempt: limit 1 gives up",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 1,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Failed",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "limit 1 and fallback on the other channel is not tried for sms either",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 1,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Failed",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "fallback limit 2 is enough for the fallback channel",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 2,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Reminder",
+              "channel": "Sms",
+              "attempt": 2,
+              "text": "Hello Ada Lovelace, this is a reminder"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Delivered",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "fallback with limit 10 stops at the fallback delivery",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 10,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Receipt",
+              "channel": "Sms",
+              "attempt": 2,
+              "text": "Hello Ada Lovelace, your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "without fallback the retries stay on the failing channel",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 3
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Failed",
+              "attempts": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "without fallback, limit 2 on sms fails after 2 attempts",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 2,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Failed",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "without fallback, limit 1 fails after 1 attempt",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 1,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Failed",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "other channel down does not matter when not falling back",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Receipt",
+              "channel": "Sms",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "other channel down does not matter with fallback if preferred works",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Receipt",
+              "channel": "Sms",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "both down with fallback and limit 3: three attempts",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 3
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Failed",
+              "attempts": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "both down with fallback and limit 2: two attempts",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 2,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Failed",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "both down with fallback and limit 1: one attempt",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 1,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Failed",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "both down without fallback and limit 3",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 3
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Failed",
+              "attempts": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "TRAP: a limit above 3 never allows more than 3 attempts",
+      "trap": true,
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 10,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 3
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Failed",
+              "attempts": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a limit of 4 without fallback is capped at 3 attempts",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 4,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 3
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Failed",
+              "attempts": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a limit of 5 with sms preferred and fallback is capped at 3",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 5,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 3
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Failed",
+              "attempts": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a limit of 2 with a failed alert makes two attempts",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 2,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Failed",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out receipt is skipped",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": true
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Skipped",
+          "attempts": 0
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Skipped",
+              "attempts": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out reminder on sms is skipped",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": true
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Skipped",
+          "attempts": 0
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Skipped",
+              "attempts": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out receipt with both services down and fallback is still skipped",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": true
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Skipped",
+          "attempts": 0
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Receipt",
+              "outcome": "Skipped",
+              "attempts": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out reminder with a generous policy is skipped",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": true
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 10,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Skipped",
+          "attempts": 0
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Reminder",
+              "outcome": "Skipped",
+              "attempts": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out alert is delivered on the preferred email channel",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": true
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "ada@example.com",
+              "kind": "Alert",
+              "channel": "Email",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, this is an alert"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out alert is delivered on the preferred sms channel",
+      "args": {
+        "recipient": {
+          "id": 12,
+          "name": "Linus",
+          "email": "l@example.com",
+          "phone": "+61400999000",
+          "channel": "Sms",
+          "optedOut": true
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400999000",
+              "kind": "Alert",
+              "channel": "Sms",
+              "attempt": 1,
+              "text": "Hello Linus, this is an alert"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 12,
+              "kind": "Alert",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "TRAP: an opted-out alert gets no fallback and no retry",
+      "trap": true,
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": true
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Failed",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out alert on sms, sms down, no fallback, limit 5: one attempt only",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": true
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 5,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Failed",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out alert with both services down fails after one attempt",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": true
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 10,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Failed",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out alert is delivered when only the other channel is down",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": true
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "ada@example.com",
+              "kind": "Alert",
+              "channel": "Email",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, this is an alert"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "opted-out alert ignores a policy limit of 1",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Sms",
+          "optedOut": true
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 1,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Alert",
+              "channel": "Sms",
+              "attempt": 1,
+              "text": "Hello Ada Lovelace, this is an alert"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "alert for a subscribed recipient falls back like any notice",
+      "args": {
+        "recipient": {
+          "id": 7,
+          "name": "Ada Lovelace",
+          "email": "ada@example.com",
+          "phone": "+61400111222",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "+61400111222",
+              "kind": "Alert",
+              "channel": "Sms",
+              "attempt": 2,
+              "text": "Hello Ada Lovelace, this is an alert"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 7,
+              "kind": "Alert",
+              "outcome": "Delivered",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "TRAP: audit event holds ids and counts only, never name, email or phone",
+      "trap": true,
+      "args": {
+        "recipient": {
+          "id": 4242,
+          "name": "Marguerite Duras",
+          "email": "m.duras@example.org",
+          "phone": "+33612345678",
+          "channel": "Email",
+          "optedOut": false
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 1
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "m.duras@example.org",
+              "kind": "Receipt",
+              "channel": "Email",
+              "attempt": 1,
+              "text": "Hello Marguerite Duras, your receipt is ready"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 4242,
+              "kind": "Receipt",
+              "outcome": "Delivered",
+              "attempts": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a skipped notice is audited without personal data",
+      "args": {
+        "recipient": {
+          "id": 31,
+          "name": "Skip Person",
+          "email": "skip@example.org",
+          "phone": "+61411000111",
+          "channel": "Sms",
+          "optedOut": true
+        },
+        "kind": "Receipt",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": false
+        }
+      },
+      "host": {
+        "fail": [],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Skipped",
+          "attempts": 0
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 31,
+              "kind": "Receipt",
+              "outcome": "Skipped",
+              "attempts": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a failed notice is audited without personal data",
+      "args": {
+        "recipient": {
+          "id": 77,
+          "name": "Fail Person",
+          "email": "fail@example.org",
+          "phone": "+61422000222",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Reminder",
+        "policy": {
+          "maxAttempts": 3,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:email",
+            "op": "post"
+          },
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Failed",
+          "attempts": 3
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "recipient": 77,
+              "kind": "Reminder",
+              "outcome": "Failed",
+              "attempts": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a delivered fallback is audited without personal data",
+      "args": {
+        "recipient": {
+          "id": 0,
+          "name": "Zero Id",
+          "email": "zero@example.org",
+          "phone": "+61433000333",
+          "channel": "Sms",
+          "optedOut": false
+        },
+        "kind": "Alert",
+        "policy": {
+          "maxAttempts": 2,
+          "fallback": true
+        }
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "net:sms",
+            "op": "post"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "outcome": "Delivered",
+          "attempts": 2
+        },
+        "effects": {
+          "stored": [],
+          "sent": [
+            {
+              "to": "zero@example.org",
+              "kind": "Alert",
+              "channel": "Email",
+              "attempt": 2,
+              "text": "Hello Zero Id, this is an alert"
+            }
+          ],
+          "emitted": [
+            {
+              "recipient": 0,
+              "kind": "Alert",
+              "outcome": "Delivered",
+              "attempts": 2
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

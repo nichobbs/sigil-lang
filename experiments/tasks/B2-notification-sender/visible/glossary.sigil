@@ -1,0 +1,131 @@
+; Glossary for B2: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Channel, Kind, Outcome, Recipient, AttemptPolicy, Notice, Report,
+; notice-line, send-notice), so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a recipient {id:Int} named {name:Str} who prefers {ch:Channel}"
+    (set rid id)
+    (set rname name)
+    (set rch ch))
+
+  (given "the recipient's email is {e:Str}"
+    (set remail e))
+
+  (given "the recipient's phone is {p:Str}"
+    (set rphone p))
+
+  (given "the recipient has opted out"
+    (set optout true))
+
+  (given "the policy allows {n:Int} attempts"
+    (set maxn n))
+
+  (given "the policy allows a fallback channel"
+    (set fb true))
+
+  (given "the email service is unavailable"
+    (fail net:email post))
+
+  (given "the sms service is unavailable"
+    (fail net:sms post))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "a {k:Kind} notice is sent"
+    (default remail "none@example.com")
+    (default rphone "+61000000000")
+    (default optout false)
+    (default maxn 3)
+    (default fb false)
+    (call report send-notice (Recipient rid rname remail rphone rch optout) k (AttemptPolicy maxn fb)))
+
+  (when "an {k:Kind} notice is sent"
+    (default remail "none@example.com")
+    (default rphone "+61000000000")
+    (default optout false)
+    (default maxn 3)
+    (default fb false)
+    (call report send-notice (Recipient rid rname remail rphone rch optout) k (AttemptPolicy maxn fb)))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the notice is delivered on attempt {n:Int}"
+    (expect (= report (Report Delivered n))))
+
+  (then "the notice fails, attempts {n:Int}"
+    (expect (= report (Report Failed n))))
+
+  (then "the notice is skipped"
+    (expect (= report (Report Skipped 0))))
+
+  (then "the email service is sent {t:Str} for {addr:Str} on attempt {n:Int}"
+    (expect (= (map (sent net:email) (fn (x) x.text)) (list t)))
+    (expect (= (map (sent net:email) (fn (x) x.to)) (list addr)))
+    (expect (= (map (sent net:email) (fn (x) x.attempt)) (list n))))
+
+  (then "the sms service is sent {t:Str} for {addr:Str} on attempt {n:Int}"
+    (expect (= (map (sent net:sms) (fn (x) x.text)) (list t)))
+    (expect (= (map (sent net:sms) (fn (x) x.to)) (list addr)))
+    (expect (= (map (sent net:sms) (fn (x) x.attempt)) (list n))))
+
+  (then "the email service received {n:Int} notices"
+    (expect (= (len (sent net:email)) n)))
+
+  (then "the sms service received {n:Int} notices"
+    (expect (= (len (sent net:sms)) n)))
+
+  (then "no notice is sent"
+    (expect (= (len (sent net:email)) 0))
+    (expect (= (len (sent net:sms)) 0)))
+
+  (then "an audit event records {o:Outcome}, attempts {n:Int}"
+    (expect (= (len (emitted audit)) 1))
+    (expect (= (map (emitted audit) (fn (e) e.outcome)) (list o)))
+    (expect (= (map (emitted audit) (fn (e) e.attempts)) (list n))))
+
+  ; ---- Rules, properties and privacy ---------------------------------------------
+  (rule "The text of a notice depends on its kind" notice-line (Kind Str))
+
+  (always "A recipient who has opted out is never contacted. A Receipt or a Reminder for an opted-out recipient is not posted at all: the outcome is Skipped with 0 attempts. An Alert is the one exception: it is sent to an opted-out recipient as a single attempt on the preferred channel, with no retry and no fallback, whatever the attempt policy says; the outcome is Delivered or Failed with 1 attempt."
+    (forall ((r Recipient) (k Kind) (p AttemptPolicy))
+      (or (not r.optedOut)
+          (match k
+            (Alert (= (send-notice r k p) (Report Delivered 1)))
+            (Receipt (= (send-notice r k p) (Report Skipped 0)))
+            (Reminder (= (send-notice r k p) (Report Skipped 0)))))))
+
+  (always "A notice is posted to the channel the recipient prefers, as attempt 1. The notice is addressed to the recipient's email when the channel is Email and to the recipient's phone when it is Sms. Its text is \"Hello <name>, \" followed by the line for its kind."
+    (forall ((r Recipient) (k Kind) (p AttemptPolicy))
+      (match r.channel
+        (Email (= (send-notice (Recipient r.id r.name r.email r.phone Email false) k p) (Report Delivered 1)))
+        (Sms (= (send-notice (Recipient r.id r.name r.email r.phone Sms false) k p) (Report Delivered 1))))))
+
+  (always "When the post of an attempt fails, the next attempt is made if the attempt policy allows one. The policy allows at most its maxAttempts attempts, and never more than 3 attempts in total, whatever maxAttempts says. The attempt that succeeds ends the sending: the outcome is Delivered and the number of attempts is that attempt's number."
+    (forall ((r Recipient) (k Kind) (p AttemptPolicy))
+      (let [rep (send-notice r k p)]
+        (<= rep.attempts (min p.maxAttempts 3)))))
+
+  (always "Attempt 2 is made on the other channel when the policy's fallback flag is set; otherwise every attempt is made on the preferred channel. Attempt 3 is made on the preferred channel again. When the last allowed attempt fails the outcome is Failed, with the number of attempts made."
+    (forall ((r Recipient) (k Kind) (p AttemptPolicy))
+      (let [rep (send-notice r k p)]
+        (or (= rep.outcome Skipped) (<= 1 rep.attempts 3)))))
+
+  (always "Exactly one audit event is emitted for every call, after the sending is finished (also when the notice was skipped or failed). It records the recipient's id, the kind of the notice, the outcome and the number of attempts."
+    (forall ((r Recipient) (k Kind) (p AttemptPolicy))
+      (do (send-notice r k p)
+          (>= (len (emitted audit)) 1))))
+
+  (privacy "The recipient's name, email and phone number are only ever sent to the delivery services. They are never written to the audit log. Changing them must not change anything audited."
+    (source Recipient.name)
+    (allow net:email net:sms)
+    (run send-notice))
+
+  (privacy "The recipient's name, email and phone number are only ever sent to the delivery services. They are never written to the audit log. Changing them must not change anything audited."
+    (source Recipient.email)
+    (allow net:email net:sms)
+    (run send-notice))
+
+  (privacy "The recipient's name, email and phone number are only ever sent to the delivery services. They are never written to the audit log. Changing them must not change anything audited."
+    (source Recipient.phone)
+    (allow net:email net:sms)
+    (run send-notice)))
