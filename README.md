@@ -16,7 +16,7 @@ This repo is a feasibility prototype in TypeScript, not a compiler. There is no 
 
 ```
 npm install
-npm test                 # vitest, 48 tests
+npm test                 # vitest, 56 tests
 npm run check            # interval analysis, capabilities, information flow
 npm run verify           # check + scenarios + properties + privacy + mutation adequacy
 npm run compare          # syntax token comparison + single-token-deletion fragility
@@ -34,7 +34,7 @@ npm run compare          # syntax token comparison + single-token-deletion fragi
 
 ## Findings
 
-1. **Intervals prove safety; SMT closes the relational gap.** Intervals prove all range, overflow and divisor obligations and derive `i64` for `price-invoice` (max intermediate 2e16), but cannot prove `ensures (<= out (gross ls))`. `src/smt.ts` (z3, via `z3-solver`) now discharges it: `verify` reports it as PROVED (SMT). The encoding covers integer arithmetic, comparisons, `if`, `let`, enum `match` and record field reads; calls to other functions (here `gross`, `discount`) are abstracted as constants constrained only by the callee's declared output range, so a proof is conditional on the callee's own (separately checked) contract. This is sound but incomplete: what `sum` over a list means is not modelled, so an `ensures` that depends on it is `unsupported`/unproved and falls back to runtime checks. Mutation sanity checks: allowing a negative Pct (a surcharge) gives a counterexample, and a too-strong `<` ensures is refuted with a concrete plan (Free). One bug found while writing it: assuming the function's own declared output range as a premise makes the proof vacuous whenever the body can leave that range, so the range is not assumed.
+1. **Intervals prove safety; SMT closes the relational gap.** Intervals prove all range, overflow and divisor obligations and derive `i64` for `price-invoice` (max intermediate 2e16), but cannot prove `ensures (<= out (gross ls))`. `src/smt.ts` (z3, via `z3-solver`) now discharges it: `verify` reports it as PROVED (SMT). The encoding covers integer arithmetic, comparisons, `if`, `let`, enum `match`, record reads and construction, and bounded lists: a `(List T min max)` with max <= 6 becomes a length variable plus one symbolic element per slot, with `len`, `sum`, `map`, `filter` and `list` modelled exactly, and calls to user functions are inlined (so `gross` is unfolded and e.g. `gross (filter ls ...) <= gross ls` is provable). For larger lists only `len` is modelled; a call that cannot be inlined (such as `gross` over a 200-element list, as in `price-invoice`) falls back to a constant constrained by the callee's declared output range, which is sound given the callee's separately checked contract; anything else is `unsupported`. Mutation sanity checks: allowing a negative Pct (a surcharge) gives a counterexample, and a too-strong `<` ensures is refuted with a concrete plan (Free). One bug found while writing it: assuming the function's own declared output range as a premise makes the proof vacuous whenever the body can leave that range, so the range is not assumed.
 2. **Flow checking works on the example.** Telemetry leaks, pii laundered into a public field, untrusted strings into validated fields, and implicit flows are all rejected with a source-to-sink path (see `test/check.test.ts`).
 3. **Mutation testing finds spec gaps.** Of 22 mutants, 17 are killed. The 5 survivors are real gaps: receipt wording is unspecified, the audit emit is unspecified, and `:on-err MailFailed` is exactly the open question left in `Unresolved`. Removing the discount Rule table makes the Enterprise-rate mutant survive.
 4. **Syntax matters less than hoped, but delimiters cost.** Same AST, OpenAI tokenizers as a proxy (not a Claude tokenizer, so only the relative numbers mean anything), invoicing example:
@@ -52,7 +52,7 @@ npm run compare          # syntax token comparison + single-token-deletion fragi
 
 ## Not implemented
 
-Relational proofs through lists (no model of `sum`/`map`/`filter`), recursion and folds, declassifiers, covert-channel analysis (timing, size), capability-row inference, Wasm codegen, proof that a validator's `Ok` implies its predicate, and anything about an OS (deferred).
+Relational proofs through lists longer than 6 (elements are not modelled, so proofs there rely on callee ranges), recursion and folds, declassifiers, covert-channel analysis (timing, size), capability-row inference, Wasm codegen, proof that a validator's `Ok` implies its predicate, and anything about an OS (deferred).
 
 ## Layout
 

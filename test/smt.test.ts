@@ -10,16 +10,18 @@ describe('SMT discharge of relational ensures', () => {
   it('proves out <= gross ls for price-invoice', async () => {
     expect((await run(SRC)).status).toBe('proved');
   });
-  it('is conditional on callee contracts: allowing a negative Pct (a surcharge) breaks the proof', async () => {
-    const bad = SRC.replace(/\(type Pct\s+\(Int 0 100\)\)/, '(type Pct (Int -50 100))');
+  it('inlines discount, so a negative rate (a surcharge) in its body breaks the proof', async () => {
+    const bad = SRC.replace('(Free 0)', '(Free -50)');
     expect(bad).not.toBe(SRC);
-    expect((await run(bad)).status).toBe('counterexample');
+    const r = await run(bad);
+    expect(r.status).toBe('counterexample');
+    expect(r.note).toContain('p=Free');
   });
   it('refutes an ensures that is too strong', async () => {
     const bad = SRC.replace('(ensures (<= out (gross ls)))', '(ensures (< out (gross ls)))');
     const r = await run(bad);
     expect(r.status).toBe('counterexample');
-    expect(r.note).toContain('Free');
+    expect(r.note).toMatch(/p=(Free|Pro|Enterprise)/);
   }, 30000);
   it('reports unsupported rather than guessing outside the fragment', async () => {
     const r = (await proveEnsures(parseProgram(SRC.replace('(ensures (<= out (gross ls)))', '(ensures (<= out (sum (map ls (fn (l) l.unit)))))')))).find((x) => x.fn === 'price-invoice')!;
