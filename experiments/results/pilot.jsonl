@@ -31,3 +31,4 @@
 {"task":"A4","lang":"ts","model":"haiku","run":3,"passed":42,"total":42,"m1":true,"trapTotal":4,"trapViolations":0,"tokens":93672,"tools":7,"ms":76999,"failures":[]}
 {"task":"C2","lang":"sigil","model":"haiku","run":3,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":124674,"tools":23,"ms":162903,"failures":[]}
 {"task":"C3","lang":"sigil","model":"haiku","run":4,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":100508,"tools":3,"ms":43951,"failures":[]}
+{"task":"A4","lang":"sigil","model":"haiku","run":4,"passed":42,"total":42,"m1":true,"trapTotal":4,"trapViolations":0,"verify":"clean-pending-approval","tokens":111589,"tools":2,"ms":126524,"failures":[]}
