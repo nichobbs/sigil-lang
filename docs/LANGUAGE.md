@@ -114,8 +114,6 @@ Patterns. There is no mutable state: pass state in as parameters and return upda
     (Admin (if (<= amt paid) (ok amt) (err TooLarge)))
     (Member (err Denied))))
 
-(fn bulk-total (in (ls (List Line 0 50))) (out (Int 0 100000000000))
-  (sum (map (filter ls (fn (l) (>= l.qty 10))) (fn (l) (mul l.unit l.qty)))))
 ```
 
 ## Information flow
@@ -273,7 +271,7 @@ Feature: Shop
 
 ## Checks
 
-`npx tsx src/cli.ts check DIR` runs: parse; names, fields and arities; interval ranges (every call argument, record field and result must provably fit its declared type, no division by a possible zero); enum and Result matches; capabilities against `needs`, binds, targets and policy; confidentiality and integrity flow with a path from source to sink; `ensures` (intervals, then SMT). `verify` adds the feature scenarios, rules, properties, privacy runs and mutation testing. The exit code is non-zero on any error diagnostic or failed scenario. Lines marked `FAILED` or `UNPROVED` in the range evidence are also defects: fix them.
+`check` runs: parse; names, fields and arities; interval ranges (every call argument, record field and result must provably fit its declared type, no division by a possible zero); enum and Result matches; capabilities against `needs`, binds, targets and policy; confidentiality and integrity flow with a path from source to sink; `ensures` (intervals, then SMT). `verify` adds the feature scenarios, rules, properties, privacy runs and mutation testing. The exit code is non-zero on any error diagnostic or failed scenario. Lines marked `FAILED` or `UNPROVED` in the range evidence are also defects: fix them.
 
 | code | meaning | fix |
 |---|---|---|
@@ -286,15 +284,11 @@ Feature: Shop
 | E-integrity | untrusted data into a `:validated`/`:control` field | take a validated parameter type |
 | E-match | non-exhaustive match (warning if an arm can never match) | one arm per case |
 | E-try | `try` in a function not returning Result, or `:on-err` not an Err case | return a Result with enum Err |
-| E-lambda | lambda outside `map`/`filter` or not one-parameter | inline it in `map`/`filter` |
+| E-lambda | lambda outside `map`/`filter`/`fold`, or wrong parameter count (1, or 2 for `fold`) | inline it |
 | E-target | capability kind unavailable on a declared target | change targets or kind |
 | E-policy | bind exceeds `allow`, or declassifier undeclared or out of scope | lower the bind, or ask a human to change the policy |
-| E-entry | `entry` is not a function | name an existing fn |
-| E-declassify | declassifier applied but not in `declassifies` | add it |
-| W-depth | call chain deeper than 8 (recursion lands here), result unchecked | flatten helpers |
-| W-declassify | declared in `declassifies` but never applied | remove it |
 | (crash) `unknown type X` | a type name is not declared; the checker aborts with a stack trace | declare the type |
-| W-requires | `requires` is not statically used | move the constraint into types |
+| other | E-entry (`entry` not a fn), E-declassify (not in `declassifies`), W-depth (recursion), W-declassify (unused), W-requires | name a real fn, declare `declassifies`, flatten helpers, remove it, move the constraint into types |
 
 ## Not supported
 

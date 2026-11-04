@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 // sigil check   <dir>   static checks: ranges, capabilities, information flow
-// sigil verify  <dir>   check + scenarios + properties + privacy + mutation adequacy
+// sigil verify  <dir> [--fast]  check + scenarios + properties + privacy + mutation adequacy (--fast skips mutation)
 // sigil compare <dir>   token-cost comparison of alternative surface syntaxes
 
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -91,7 +91,9 @@ async function openEnsures(prog: Program, res: CheckResult): Promise<SmtResult[]
 }
 
 async function main() {
-  const [cmd, dir = 'examples/invoicing', outFile] = process.argv.slice(2);
+  const argv = process.argv.slice(2);
+  const fast = argv.includes('--fast'); // verify --fast: check + scenarios, no mutation testing
+  const [cmd, dir = 'examples/invoicing', outFile] = argv.filter((a) => a !== '--fast');
   try {
     switch (cmd) {
       case 'check': {
@@ -123,6 +125,10 @@ async function main() {
         if (!suite.unresolved.length) console.log('none');
         for (const u of suite.unresolved) console.log(`? ${u.text}`);
 
+        if (fast) {
+          console.log('\n(--fast: mutation testing skipped; run verify without --fast before you finish)');
+          process.exit(bad || errors(res).length ? 1 : 0);
+        }
         hr('Mutation adequacy (does the spec constrain the implementation?)');
         const m = runMutation(prog, pol, feature, (p) => parseGlossary(glossarySrc, p));
         const killed = m.killedByChecker + m.killedByScenarios + m.killedByContractsOnly;

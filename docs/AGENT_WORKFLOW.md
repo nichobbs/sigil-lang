@@ -3,11 +3,12 @@
 `DIR` holds `app.sigil` (yours), plus the human-owned `policy.sigil`, `glossary.sigil` and one `*.feature`. Edit only `app.sigil`.
 
 ```
-npx tsx src/cli.ts check  DIR    # fast: ranges, capabilities, flow, ensures
-npx tsx src/cli.ts verify DIR    # check + scenarios, rules, properties, privacy, mutation
+npx tsx src/cli.ts verify DIR --fast   # check + scenarios, rules, properties, privacy (seconds)
+npx tsx src/cli.ts verify DIR          # the same plus mutation testing (slow: run once, at the end)
+npx tsx src/cli.ts check  DIR          # ranges, capabilities, flow, ensures only
 ```
 
-Run `check` after every edit, `verify` when `check` is clean. Exit code 0 means no error diagnostics and no failed scenario; exit 2 means a parse error (`error: line:col: message`).
+Write the whole program in one go, then run `verify DIR --fast` and iterate on it (it includes `check`). Run the full `verify` once when `--fast` is clean. Exit code 0 means no error diagnostics and no failed scenario; exit 2 means a parse error (`error: line:col: message`).
 
 Reading the output, top to bottom:
 - Range evidence: one line per function. Lines `FAILED` or `UNPROVED` are defects even though they do not change the exit code. `PROVED (SMT)` is good.
