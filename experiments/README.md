@@ -238,3 +238,19 @@ E1 is B1 plus ticket DOC-142: an Editor may now publish their own document, and 
 - Harness bug found: in r1 the glossary's property still carried the old rule wording, so Sigil's `verify` exited 1 with an unbound-property ERR. Both Sigil r1 agents noticed and reported it instead of editing the human-owned glossary (a good behaviour). The glossary was fixed and the Sigil runs repeated as r2; r1 results are in `results/change.jsonl` (verify "exit 1"), all 60/60.
 - Useful as a mechanism check: in Sigil, a changed intent sentence with a stale glossary surfaces as a tool error, whereas the TS arm has no equivalent signal that the spec and the tests have drifted.
 - Next, if worth the budget: a change that touches several functions or reorders refusals, where a one-line edit is not enough.
+
+## Change-request task E2: three interacting changes (post-v1, n=1 per cell, not blind)
+
+E2 is B3 (audited refund) plus ticket PAY-310, which touches several functions at once: (1) the per-refund cap now depends on the reason (Goodwill halves it, so `refund-cap` takes a Role and a ReasonCode), (2) Support may refund a Disputed payment when the reason is Fraud, (3) OverCap is now reported before ExceedsRemaining. The intent spec, the glossary's rule and properties and the README were updated. 70 hidden cases (B3's 43 with recomputed expectations plus 27 new ones, 5 traps); both references pass 70/70; the unchanged programs fail 21. The TS arm gets the examples as scenario tests (2 of 12 fail on the unchanged program).
+
+| Arm | Model | Hidden | Traps | Changed lines (diff) | Tokens | Tool calls | verify |
+|---|---|---|---|---|---|---|---|
+| Sigil | Sonnet | 70/70 | 0 | 31 | 105k | 2 | clean |
+| Sigil | Haiku | 70/70 | 0 | 31 | 109k | 3 | clean |
+| TS | Sonnet | 70/70 | 0 | 10 | 92k | 2 | n/a |
+| TS | Haiku | 70/70 | 0 | 42 | 95k | 3 | n/a |
+
+- Ceiling again: all four runs implemented all three changes correctly on the first attempt, including the interaction cases (Goodwill cap on a Disputed payment, OverCap before ExceedsRemaining, Support Fraud still capped). A multi-function change was still not enough to separate the arms.
+- Sigil costs about 15% more tokens per change run (the language spec is in every brief), as in earlier rounds.
+- None of the runs wrote tests of their own beyond the provided scenarios; the Sigil runs relied on `verify --fast` and the updated properties, the TS runs on the 12 scenario tests.
+- Conclusion so far for change tasks (E1 and E2): no correctness difference at this program size; the remaining Sigil case rests on adversarial and untrusted-agent settings, not on change safety.

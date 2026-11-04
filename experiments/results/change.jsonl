@@ -4,3 +4,7 @@
 {"task":"E1","lang":"sigil","model":"haiku","run":1,"passed":60,"total":60,"m1":true,"trapTotal":5,"trapViolations":0,"verify":"exit 1","tokens":91643,"tools":2,"ms":0,"failures":[]}
 {"task":"E1","lang":"sigil","model":"sonnet","run":2,"passed":60,"total":60,"m1":true,"trapTotal":5,"trapViolations":0,"verify":"clean","tokens":87490,"tools":3,"ms":0,"failures":[]}
 {"task":"E1","lang":"sigil","model":"haiku","run":2,"passed":60,"total":60,"m1":true,"trapTotal":5,"trapViolations":0,"verify":"clean","tokens":90333,"tools":2,"ms":0,"failures":[]}
+{"task":"E2","lang":"ts","model":"sonnet","run":1,"passed":70,"total":70,"m1":true,"trapTotal":5,"trapViolations":0,"tokens":92012,"tools":2,"ms":0,"failures":[]}
+{"task":"E2","lang":"ts","model":"haiku","run":1,"passed":70,"total":70,"m1":true,"trapTotal":5,"trapViolations":0,"tokens":95390,"tools":3,"ms":0,"failures":[]}
+{"task":"E2","lang":"sigil","model":"sonnet","run":1,"passed":70,"total":70,"m1":true,"trapTotal":5,"trapViolations":0,"verify":"clean","tokens":105137,"tools":2,"ms":0,"failures":[]}
+{"task":"E2","lang":"sigil","model":"haiku","run":1,"passed":70,"total":70,"m1":true,"trapTotal":5,"trapViolations":0,"verify":"clean","tokens":108621,"tools":3,"ms":0,"failures":[]}
