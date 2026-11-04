@@ -1,0 +1,65 @@
+; B4 record import: reference implementation (Sigil).
+
+(type RawId    (Int -9007199254740991 9007199254740991))
+(type Quantity (Int 1 1000))
+(type Price    (Int 1 10000000))
+(type Category (Int 0 9))
+(type Count    (Int 0 20))
+(type Reason   (var Accepted BadId BadQuantity BadPrice UnknownCategory AlreadyImported DuplicateInBatch StoreFailed))
+
+(type Raw (rec (id RawId)
+               (quantity (Int -1000000 1000000))
+               (unitPrice (Int -1000000000000 1000000000000))
+               (category (Int -1000 1000))
+               (note Str :internal)))
+(type Clean (rec (id (Int 1 9007199254740991)) (quantity Quantity) (unitPrice Price) (category Category) (lineTotal (Int 1 10000000000))))
+(type Report (rec (imported Count) (badId Count) (badQuantity Count) (badPrice Count) (unknownCategory Count)
+                  (alreadyImported Count) (duplicateInBatch Count) (storeFailed Count)))
+(type ImportSummary (rec (received Count) (imported Count) (rejected Count)))
+
+(fn classify
+  (in (r Raw) (batch (List Raw 1 20)) (done (List RawId 0 500)))
+  (out Reason)
+  (if (< r.id 1) BadId
+    (if (or (< r.quantity 1) (> r.quantity 1000)) BadQuantity
+      (if (or (< r.unitPrice 1) (> r.unitPrice 10000000)) BadPrice
+        (if (or (< r.category 0) (> r.category 9)) UnknownCategory
+          (if (> (len (filter done (fn (i) (= i r.id)))) 0) AlreadyImported
+            (if (> (len (filter batch (fn (x) (= x.id r.id)))) 1) DuplicateInBatch
+              Accepted)))))))
+
+(fn import-one
+  (in (r Raw) (batch (List Raw 1 20)) (done (List RawId 0 500)))
+  (out Reason)
+  (needs store:records)
+  (let [q (min 1000 (max 1 r.quantity))
+        p (min 10000000 (max 1 r.unitPrice))
+        c (min 9 (max 0 r.category))
+        clean (Clean (max 1 r.id) q p c (mul q p))]
+    (let [v (classify r batch done)]
+      (if (= v Accepted)
+        (match (put store:records clean.id clean)
+          (ok _ Accepted)
+          (err _ StoreFailed))
+        v))))
+
+(fn count-of
+  (in (rs (List Reason 1 20)) (k Reason))
+  (out Count)
+  (len (filter rs (fn (x) (= x k)))))
+
+(fn import-batch
+  (in (records (List Raw 1 20)) (imported (List RawId 0 500)))
+  (out Report)
+  (needs store:records audit)
+  (let [rs (map records (fn (r) (import-one r records imported)))
+        n (count-of rs Accepted)]
+    (emit audit (ImportSummary (len records) n (max 0 (sub (len records) n))))
+    (Report n (count-of rs BadId) (count-of rs BadQuantity) (count-of rs BadPrice) (count-of rs UnknownCategory)
+            (count-of rs AlreadyImported) (count-of rs DuplicateInBatch) (count-of rs StoreFailed))))
+
+(program records
+  (targets server browser)
+  (entry import-batch
+    (bind store:records (store (ns "records/clean") (mode append)))
+    (bind audit (audit))))
