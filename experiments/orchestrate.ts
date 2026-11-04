@@ -73,7 +73,23 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
     writeFileSync(join(dir, 'package.json'), '{"name":"work","private":true,"type":"module"}\n');
     writeFileSync(join(dir, 'PROMPT.md'), tsPrompt(basename(td)));
   }
-  return { dir, prompt: `Read ${join(dir, 'PROMPT.md')} and follow it exactly. Your workspace is ${dir}; do not leave it.` };
+  if (process.env.NO_BRIEF) return { dir, prompt: `Read ${join(dir, 'PROMPT.md')} and follow it exactly. Your workspace is ${dir}; do not leave it.` };
+  // Single-file brief: everything required reading, in one read.
+  const rd = (f: string) => readFileSync(join(dir, f), 'utf8');
+  const fence = (name: string, body: string) => `\n\n===== ${name} =====\n${body.trimEnd()}\n`;
+  let brief = rd('PROMPT.md')
+    .replace('Read the task README (README.md), then the intent spec (intent.feature).', 'The task README and the intent spec are included below.')
+    .replace('Read LANGUAGE.md first (the language spec), then WORKFLOW.md (the tool loop).', 'The language spec and the tool loop are included below.');
+  brief += '\nEverything you need to read is in this file; do not re-read the sections below from disk.\n';
+  if (lang === 'sigil') {
+    brief += fence('README.md (task)', rd('README.md')) + fence('task/intent.feature', rd('task/intent.feature'));
+    for (const f of ['glossary.sigil', 'policy.sigil']) if (existsSync(join(dir, 'task', f))) brief += fence(`task/${f}`, rd(`task/${f}`));
+    brief += fence('WORKFLOW.md', rd('WORKFLOW.md')) + fence('LANGUAGE.md (language spec)', rd('LANGUAGE.md'));
+  } else {
+    brief += fence('README.md (task)', rd('README.md')) + fence('intent.feature', rd('intent.feature')) + fence('host.ts (read only)', rd('host.ts'));
+  }
+  writeFileSync(join(dir, 'BRIEF.md'), brief);
+  return { dir, prompt: `Read ${join(dir, 'BRIEF.md')} (one read; it contains all instructions and reference material) and follow it exactly. Your workspace is ${dir}; do not leave it.` };
 }
 
 export async function score(dir: string, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
