@@ -24,3 +24,9 @@
 {"task":"C1","lang":"sigil","model":"haiku","run":2,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","leakHints":[],"tokens":157404,"tools":17,"ms":481858,"failures":[]}
 {"task":"C2","lang":"sigil","model":"haiku","run":2,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","leakHints":[],"tokens":109981,"tools":14,"ms":385558,"failures":[]}
 {"task":"C3","lang":"sigil","model":"haiku","run":2,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","leakHints":[],"tokens":110874,"tools":9,"ms":84551,"failures":[]}
+{"task":"C3","lang":"ts","model":"haiku","run":3,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":90992,"tools":6,"ms":54051,"failures":[]}
+{"task":"A4","lang":"sigil","model":"haiku","run":3,"passed":42,"total":42,"m1":true,"trapTotal":4,"trapViolations":0,"verify":"exit 1","tokens":106502,"tools":3,"ms":59710,"failures":[]}
+{"task":"C3","lang":"sigil","model":"haiku","run":3,"passed":41,"total":43,"m1":false,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":105415,"tools":4,"ms":60853,"failures":[{"name":"100 items sorted by price ascending, page 3 of 20","trap":false,"reason":"runtime: out of fuel"},{"name":"100 items sorted by price descending, last page of 7","trap":false,"reason":"runtime: out of fuel"}]}
+{"task":"C2","lang":"ts","model":"haiku","run":3,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":91258,"tools":10,"ms":73149,"failures":[]}
+{"task":"A4","lang":"ts","model":"haiku","run":3,"passed":42,"total":42,"m1":true,"trapTotal":4,"trapViolations":0,"tokens":93672,"tools":7,"ms":76999,"failures":[]}
+{"task":"C2","lang":"sigil","model":"haiku","run":3,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":124674,"tools":23,"ms":162903,"failures":[]}

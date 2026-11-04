@@ -31,6 +31,10 @@ export function parseType(s: SExp): Type {
     switch (s.v) {
       case 'Str':
         return { k: 'str', validated: false };
+      case 'Int':
+        return fail('Int needs bounds: write (Int lo hi), for example (Int 0 1000)', s);
+      case 'List':
+        return fail('List needs an element type and bounds: (List T min max)', s);
       case 'Bool':
         return { k: 'bool' };
       case 'Unit':

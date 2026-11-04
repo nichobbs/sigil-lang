@@ -11,7 +11,7 @@
 // declassifiers only as human-declared policy entries, no covert channels, capability rows must be declared rather than inferred.
 
 import { Expr, FnDef, Policy, Program, Type, asDeclassify, resolveType } from './ast.js';
-import { CAP_OPS, KIND_TARGETS, isBuiltin, kindOfHandle } from './caps.js';
+import { BUILTIN_ARITY, CAP_OPS, KIND_TARGETS, isBuiltin, kindOfHandle } from './caps.js';
 import * as I from './interval.js';
 import { Interval } from './interval.js';
 import * as L from './labels.js';
@@ -28,6 +28,14 @@ export interface Obligation {
   desc: string;
   status: Status;
   note?: string;
+  fix?: Fix; // a mechanical edit that would make this obligation provable (see `sigil fix`)
+}
+
+/** A suggested edit: replace the expression printed as `old` with `new`. `why` says what the edit changes semantically. */
+export interface Fix {
+  old: string;
+  new: string;
+  why: string;
 }
 
 export interface Diag {
@@ -187,9 +195,9 @@ function diag(ctx: Ctx, level: Diag['level'], code: string, msg: string, paths?:
   ctx.acc.diags.push({ level, code, fn: ctx.root.name, msg, paths });
 }
 
-function oblige(ctx: Ctx, kind: Obligation['kind'], desc: string, status: Status, note?: string) {
+function oblige(ctx: Ctx, kind: Obligation['kind'], desc: string, status: Status, note?: string, fix?: Fix) {
   if (!ctx.report) return;
-  ctx.acc.obs.push({ fn: ctx.root.name, id: `${ctx.root.name}#${++ctx.acc.n}`, kind, desc, status, note });
+  ctx.acc.obs.push({ fn: ctx.root.name, id: `${ctx.root.name}#${++ctx.acc.n}`, kind, desc, status, note, ...(fix ? { fix } : {}) });
 }
 
 function track(ctx: Ctx, iv: Interval): Interval {
@@ -207,7 +215,13 @@ const MAX_INLINE_DEPTH = 8;
 // Conformance of an abstract value to a declared type (range / bounds / tag obligations)
 // ---------------------------------------------------------------------------
 
-function conforms(ctx: Ctx, a: AV | undefined, t: Type, where: string): void {
+/** The expression whose value a `let` or `do` returns (the one to wrap when a clamp is suggested). */
+function tailExpr(e: Expr): Expr {
+  return (e.k === 'let' || e.k === 'do') && e.body.length ? tailExpr(e.body[e.body.length - 1]) : e;
+}
+
+/** `src` is the expression producing `a`, when known; it lets an unproved range or length carry a mechanical fix. */
+function conforms(ctx: Ctx, a: AV | undefined, t: Type, where: string, src?: Expr): void {
   if (!ctx.report) return;
   const r = resolveType(ctx.prog, t);
   switch (r.k) {
@@ -215,11 +229,17 @@ function conforms(ctx: Ctx, a: AV | undefined, t: Type, where: string): void {
       const bound = { lo: r.lo, hi: r.hi };
       const num = a?.num;
       const desc = `${where} in ${I.showInterval(bound)}`;
-      if (num === undefined || num === 'top') oblige(ctx, 'range', desc, 'unproved', 'value is unbounded or untracked');
+      const clamp = (needLo: boolean, needHi: boolean): Fix | undefined => {
+        if (!src) return undefined;
+        const old = printExpr(src);
+        const nw = needLo && needHi ? `(max ${bound.lo} (min ${old} ${bound.hi}))` : needHi ? `(min ${old} ${bound.hi})` : `(max ${bound.lo} ${old})`;
+        return { old, new: nw, why: `clamps to ${I.showInterval(bound)}: a value outside it is replaced by the nearest bound. Use only if the spec allows that; otherwise the logic is wrong, not the range.` };
+      };
+      if (num === undefined || num === 'top') oblige(ctx, 'range', desc, 'unproved', 'value is unbounded or untracked', clamp(true, true));
       else if (I.within(num, bound)) oblige(ctx, 'range', desc, 'proved', `inferred ${I.showInterval(num)}`);
       else {
         const disjoint = num.hi < bound.lo || num.lo > bound.hi;
-        oblige(ctx, 'range', desc, disjoint ? 'failed' : 'unproved', `inferred ${I.showInterval(num)}`);
+        oblige(ctx, 'range', desc, disjoint ? 'failed' : 'unproved', `inferred ${I.showInterval(num)}`, disjoint ? undefined : clamp(num.lo < bound.lo, num.hi > bound.hi));
       }
       return;
     }
@@ -232,10 +252,14 @@ function conforms(ctx: Ctx, a: AV | undefined, t: Type, where: string): void {
       return;
     }
     case 'list': {
-      const bound = I.range(BigInt(r.min), BigInt(r.max));
+      const bound = { lo: BigInt(r.min), hi: BigInt(r.max) };
       const desc = `${where}.length in ${I.showInterval(bound)}`;
       if (!a || a.len === undefined || a.len === 'top') oblige(ctx, 'bounds', desc, 'unproved', 'length untracked');
-      else oblige(ctx, 'bounds', desc, I.within(a.len, bound) ? 'proved' : 'unproved', `inferred ${I.showInterval(a.len)}`);
+      else {
+        const tooLong = a.len.hi > bound.hi && a.len.lo >= bound.lo;
+        const fix: Fix | undefined = tooLong && src ? { old: printExpr(src), new: `(take ${printExpr(src)} ${bound.hi})`, why: `keeps at most ${bound.hi} elements: the rest are dropped. Use only if the spec allows dropping them.` } : undefined;
+        oblige(ctx, 'bounds', desc, I.within(a.len, bound) ? 'proved' : 'unproved', `inferred ${I.showInterval(a.len)}`, fix);
+      }
       if (a?.elem) conforms(ctx, a.elem, r.elem, `${where}[]`);
       return;
     }
@@ -246,7 +270,10 @@ function conforms(ctx: Ctx, a: AV | undefined, t: Type, where: string): void {
       return;
     }
     case 'rec': {
-      if (!a?.fields) return;
+      if (!a?.fields) {
+        if (a && a.num !== undefined && a.tags === undefined && a.len === undefined) diag(ctx, 'error', 'E-type', `${where} must be a record, but the value is a number${src ? ` (${printExpr(src)})` : ''}`);
+        return;
+      }
       for (const f of r.fields) conforms(ctx, a.fields.get(f.name), f.type, `${where}.${f.name}`);
       return;
     }
@@ -415,10 +442,54 @@ function evalCall(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   }
 
   if (!isBuiltin(name)) {
-    diag(ctx, 'error', 'E-name', `unknown function ${name}`);
+    diag(ctx, 'error', 'E-name', `unknown function ${name}${didYouMean(ctx.prog, name)}`);
     return topAV();
   }
   return evalBuiltin(e, env, ctx);
+}
+
+/** Common names from other languages, mapped to what Sigil has. */
+const ALIASES: Record<string, string> = {
+  'char-at': 'chars gives a list of code points: (at (chars s) i 0)',
+  'string-ref': 'chars gives a list of code points: (at (chars s) i 0)',
+  substring: 'take and drop work on lists: (from-chars (take (drop (chars s) from) n))',
+  slice: 'take and drop: (take (drop xs from) n)',
+  'str-len': 'len works on lists: (len (chars s))',
+  length: 'len works on lists: (len xs); for a string (len (chars s))',
+  'string-length': '(len (chars s))',
+  split: 'there is no split: scan with fold over (chars s)',
+  concat: 'there is no concat: fold with append',
+  push: 'append: (append xs x)',
+  head: 'at: (at xs 0 default)',
+  first: 'at: (at xs 0 default)',
+  nth: 'at: (at xs i default)',
+  get: 'get is not runnable; use at for lists',
+  reduce: 'fold: (fold xs Type init (fn (acc x) body))',
+  foldl: 'fold: (fold xs Type init (fn (acc x) body))',
+  'parse-int': 'no parse-int: fold over chars, (sub code 48) per digit',
+  'to-int': 'no parse-int: fold over chars, (sub code 48) per digit',
+  'string-append': 'text concatenates: (text a b)',
+  concatenate: 'text concatenates strings: (text a b)',
+  abs: '(max x (neg x))',
+  mod: 'no modulo: (sub a (mul (div-floor a b) b))',
+  'not-equal': '(not (= a b))',
+  '!=': '(not (= a b))',
+  '==': '(= a b)',
+  '+': 'add', '-': 'sub', '*': 'mul', '/': 'div-floor',
+  empty: '(list) is the empty list',
+};
+
+function didYouMean(prog: Program, name: string): string {
+  if (ALIASES[name]) return `. Hint: ${ALIASES[name]}`;
+  const names = [...Object.keys(BUILTIN_ARITY), ...Object.keys(CAP_OPS), ...prog.fns.keys()];
+  const dist = (a: string, b: string) => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  };
+  const best = names.map((n) => [n, dist(name, n)] as const).sort((x, y) => x[1] - y[1])[0];
+  return best && best[1] <= 2 ? `. Did you mean ${best[0]}?` : '';
 }
 
 function callFn(f: FnDef, args: AV[], site: Expr, ctx: Ctx): AV {
@@ -431,7 +502,7 @@ function callFn(f: FnDef, args: AV[], site: Expr, ctx: Ctx): AV {
   }
   const env: Env = new Map();
   f.params.forEach((p, i) => {
-    conforms(ctx, args[i], p.type, `${f.name}(${p.name})`);
+    conforms(ctx, args[i], p.type, `${f.name}(${p.name})`, site.k === 'call' ? site.args[i] : undefined);
     env.set(p.name, narrow(args[i], absOfType(ctx.prog, p.type, undefined, p.name)));
   });
   if (ctx.depth >= MAX_INLINE_DEPTH) {
@@ -564,7 +635,7 @@ function construct(
         [...fl.srcs].map(([src, path]) => ({ src, path: [...path, `-> ${where}`] })),
       );
     }
-    conforms(ctx, v, f.type, where);
+    conforms(ctx, v, f.type, where, ex);
     out.set(f.name, mapLabels(v, (l) => L.step(l, where)));
   });
   return mk({ fields: out });
@@ -667,7 +738,9 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
           break;
         default: {
           const nz = !I.containsZero(y);
-          oblige(ctx, 'div', `divisor ${printExpr(e.args[1])} is non-zero`, nz ? 'proved' : 'unproved', `divisor ${I.showInterval(y)}`);
+          const dv = e.args[1];
+          const divFix: Fix | undefined = !nz && y !== 'top' && y.lo >= 0n ? { old: printExpr(e), new: `(div-floor ${printExpr(e.args[0])} (max 1 ${printExpr(dv)}))`, why: 'a zero divisor becomes 1, so the result is the numerator itself. Use only if the spec says what a zero divisor means.' } : undefined;
+          oblige(ctx, 'div', `divisor ${printExpr(dv)} is non-zero`, nz ? 'proved' : 'unproved', `divisor ${I.showInterval(y)}`, divFix);
           r = nz ? I.divFloor(x, y) : I.TOP;
         }
       }
@@ -721,7 +794,7 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       const l = evalExpr(xsE, env, ctx);
       const init = evalExpr(initE, env, ctx);
       const T: Type = { k: 'named', name: tE.name };
-      conforms(ctx, init, T, `fold initial value (${tE.name})`);
+      conforms(ctx, init, T, `fold initial value (${tE.name})`, initE);
       const base = absOfType(ctx.prog, T, tE.name, 'fold accumulator');
       let lab = L.join(flatten(init), l.lab);
       const step = (c: Ctx): AV => {
@@ -733,7 +806,7 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       const quiet = { ...ctx, report: false };
       for (let i = 0; i < 2; i++) lab = L.join(lab, flatten(step(quiet))); // labels only join, so two passes reach the fixpoint
       const r = step(ctx);
-      conforms(ctx, r, T, `fold step result (${tE.name})`);
+      conforms(ctx, r, T, `fold step result (${tE.name})`, tailExpr(f.body));
       const lab2 = L.join(lab, flatten(r));
       return mapLabels(base, (x) => L.join(x, lab2));
     }
@@ -875,7 +948,7 @@ export function checkFn(prog: Program, pol: Policy, f: FnDef, into: CheckResult)
   }
 
   const out = evalExpr(f.body, env, ctx);
-  conforms(ctx, out, f.out, 'out');
+  conforms(ctx, out, f.out, 'out', tailExpr(f.body));
 
   f.ensures.forEach((en, i) => {
     const env2 = new Map(env);
@@ -904,9 +977,46 @@ function globMatch(pattern: string, value: string): boolean {
   return pattern.endsWith('*') ? value.startsWith(pattern.slice(0, -1)) : pattern === value;
 }
 
+/** Named types used but not declared, with where they are used. */
+function undeclaredTypes(prog: Program): [string, string][] {
+  const found = new Map<string, string>();
+  const walk = (t: Type, where: string) => {
+    switch (t.k) {
+      case 'named':
+        if (!prog.types.has(t.name) && !found.has(t.name)) found.set(t.name, where);
+        return;
+      case 'rec':
+        for (const f of t.fields) walk(f.type, where);
+        return;
+      case 'list':
+        walk(t.elem, where);
+        return;
+      case 'result':
+        walk(t.ok, where);
+        walk(t.err, where);
+        return;
+      default:
+        return;
+    }
+  };
+  for (const [n, t] of prog.types) walk(t, `type ${n}`);
+  for (const f of prog.fns.values()) {
+    for (const p of f.params) walk(p.type, `${f.name}(${p.name})`);
+    walk(f.out, `${f.name} out`);
+  }
+  return [...found];
+}
+
 export function check(prog: Program, pol: Policy): CheckResult {
   const res: CheckResult = { diags: [], evidence: new Map(), flows: [], manifest: [] };
   const wiring = (code: string, msg: string, level: Diag['level'] = 'error') => res.diags.push({ level, code, fn: '(program)', msg });
+
+  // A reference to a type that is not declared would crash later analysis: report it as an ordinary error and stop.
+  const missing = undeclaredTypes(prog);
+  if (missing.length) {
+    for (const [name, where] of missing) wiring('E-name', `unknown type ${name} (used in ${where}); declare it with (type ${name} ...), or write (Int lo hi) or (List T min max) inline`);
+    return res;
+  }
 
   for (const f of prog.fns.values()) checkFn(prog, pol, f, res);
 
