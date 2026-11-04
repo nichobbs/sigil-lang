@@ -1,7 +1,7 @@
 import json, os, shutil, sys
 T='/home/claude/sigil-lang/experiments/tasks'
 OUT=sys.argv[1]
-D=json.load(open('/home/claude/sigil-lang/experiments/m6/defects.json'))
+D=json.load(open(os.environ.get('DEFECTS','/home/claude/sigil-lang/experiments/m6/defects.json')))
 shutil.rmtree(OUT, ignore_errors=True)
 for t,d in D.items():
     td=[x for x in os.listdir(T) if x.startswith(t+'-')][0]

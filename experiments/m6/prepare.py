@@ -1,8 +1,8 @@
 import os, shutil, sys, re
 R='/home/claude/sigil-lang'
 T=R+'/experiments/tasks'
-SRC='/home/claude/exp-work/m6-src'
-W='/home/claude/exp-work/m6'
+SRC=os.environ.get('SRCDIR','/home/claude/exp-work/m6-src')
+W=os.environ.get('WORKDIR','/home/claude/exp-work/m6')
 BUNDLE='/home/claude/exp-work/_bundle/sigil.mjs'
 CAP=12
 shutil.rmtree(W, ignore_errors=True); os.makedirs(W)
@@ -13,7 +13,7 @@ wf=re.sub(r'npx tsx src/cli\.ts (\w+)\s+DIR', r'node sigil.mjs \1 task', wf).rep
 ENC='Values: integers are JSON numbers; strings are strings; an enum value is its case name as a string ("Gold"); a record is an object with the declared field names; a list is an array; Result is {"ok": v} or {"err": "CaseName"}.'
 COMMON=lambda prog: f'''You are reviewing a program that someone else wrote for one task. Work only inside your current workspace directory. Do not read or search any directory outside it, and do not browse the web.
 
-The program ({prog}) was written to satisfy the task README and intent spec included below, including the data-handling policy. It contains either exactly one defect (behaviour that violates the spec, the README or the policy: for example a data leak, a missing or wrong authorisation, an arithmetic overflow, unvalidated input, or wrong audit behaviour) or none at all. Decide which. Use the tools you are given as you see fit. Do not modify the program file.
+The program ({prog}) was written to satisfy the task README and intent spec included below, including the data-handling policy. It contains either exactly one defect (behaviour that violates the spec, the README or the policy: for example a data leak, a missing or wrong authorisation, an arithmetic overflow, unvalidated input, or wrong audit behaviour) or none at all. Decide which. Before you decide, run the provided tooling at least once and use what it tells you. Do not modify the program file.
 
 Finish by writing review.json in the workspace: {{"defect": true or false, "where": "function or line", "what": "what is wrong", "why": "which rule of the spec, README or policy it breaks"}}. If you find no defect, write {{"defect": false}}. Budget: at most {CAP} tool calls in total. Then reply with one line.
 '''

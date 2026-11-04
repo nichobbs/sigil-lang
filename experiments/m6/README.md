@@ -12,3 +12,18 @@ Findings (post-v1 language, tasks no longer blind, Haiku, n=1 per cell):
 - Sigil finding: B3's defect (an extra field on an audit event type that the human glossary also constructs) makes `verify` crash with a raw TypeError (constructor arity mismatch in the glossary is not diagnosed). The reviewer still caught the defect by reading. To fix: report E-arity for constructors in glossaries instead of crashing.
 
 Next: harder defects (subtle, cross-function, larger programs), TS scenario tests ported from `intent.feature`, and a second model.
+
+## Harder round (defects_hard.json, results_hard.jsonl)
+
+Eight subtle defects, each a violation of a stated spec rule, matched across languages (identical hidden-case failure counts; B2's defect fails no hidden case in either language): A1 80% floor rounded down; A2 a Fee adds to the amount spent; A3 burst flag not recorded; A4 exact approval limit needs approval; B1 Gone checked before authorisation; B2 fallback channel also on attempt 3; B3 earlier refunds ignored; B4 DuplicateInBatch checked before AlreadyImported. Reviewers are told to run the tooling at least once. Haiku, one run per cell, 8 defective plus 2 clean controls (A1, B3) per language.
+
+| | defects found | clean controls flagged | avg tokens | avg tool calls |
+|---|---|---|---|---|
+| Sigil | 7 / 8 (missed B4) | 0 / 2 | 98.5k | 3.0 |
+| TypeScript | 8 / 8 | 0 / 2 | 87.7k | 4.4 |
+
+- No advantage for Sigil: TS found everything and Sigil missed one. With n=1 per cell the difference is noise, but there is certainly no 20-point gain.
+- Sigil `verify --fast` detected only 4 of the 8 (A1 floor property, A2 example, B1, B3); A3, A4, B2 and B4 came back clean, because the visible examples and properties do not exercise those paths. The reviewer found A3, A4 and B2 by reading despite a clean tool run; for B4 the reviewer reported no defect after a clean run (possible anchoring on the clean `verify`, not shown).
+- TS reviewers wrote and ran their own probe tests in several runs (4 to 6 calls), which is how they confirmed A3, A4 and B1.
+- Cost: Sigil about 12% more tokens per review (the language spec is in every brief).
+- Conclusion for the pre-registered criterion: M6 (at least 20 points higher for Sigil with tool catches) is not met on either round. The tool signal helps when the spec's executable examples cover the defect (leaks, authorisation, audit in round one) and is silent when they do not.
