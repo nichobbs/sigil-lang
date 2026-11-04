@@ -1,0 +1,64 @@
+; C4 room booking conflicts: reference implementation (Sigil).
+
+(type Id      (Int 1 1000000))
+(type Blocker (Int 0 1000000))
+(type Minute  (Int 0 20000))
+(type Gap     (Int 0 1440))
+(type Role    (var Staff Manager))
+(type Status  (var Tentative Confirmed))
+(type Reason  (var BadRange Conflict StoreFailed))
+
+(type Booking         (rec (id Id) (start Minute) (end Minute) (status Status)))
+(type Accepted        (rec (id Id) (displaced (List Id 0 60))))
+(type Refusal         (rec (reason Reason) (blocker Blocker)))
+(type BookingAccepted (rec (role Role) (id Id) (displaced (List Id 0 60))))
+
+(fn conflicts
+  (in (b Booking) (start Minute) (end Minute) (buffer Gap))
+  (out Bool)
+  (and (< start (add b.end buffer)) (< b.start (add end buffer))))
+
+(fn overlapping
+  (in (existing (List Booking 0 60)) (start Minute) (end Minute) (buffer Gap))
+  (out (List Booking 0 60))
+  (filter existing (fn (b) (conflicts b start end buffer))))
+
+(fn blocking
+  (in (hits (List Booking 0 60)) (role Role))
+  (out (List Booking 0 60))
+  (match role
+    (Staff hits)
+    (Manager (filter hits (fn (b) (= b.status Confirmed))))))
+
+(fn lowest-id
+  (in (bs (List Booking 0 60)))
+  (out Blocker)
+  (min 1000000
+    (sum (map bs (fn (b) (if (= (len (filter bs (fn (o) (< o.id b.id)))) 0) b.id 0))))))
+
+(fn new-status
+  (in (role Role))
+  (out Status)
+  (match role (Staff Tentative) (Manager Confirmed)))
+
+(fn check-booking
+  (in (existing (List Booking 0 60)) (id Id) (start Minute) (end Minute) (buffer Gap) (role Role))
+  (out (Result Accepted Refusal))
+  (needs store:bookings audit)
+  (if (or (>= start end) (> end 10080))
+    (err (Refusal BadRange 0))
+    (let [hits (overlapping existing start end buffer)
+          blockers (blocking hits role)]
+      (if (> (len blockers) 0)
+        (err (Refusal Conflict (lowest-id blockers)))
+        (let [displaced (map hits (fn (b) b.id))]
+          (match (put store:bookings id (Booking id start end (new-status role)))
+            (ok _ (do (emit audit (BookingAccepted role id displaced))
+                      (ok (Accepted id displaced))))
+            (err _ (err (Refusal StoreFailed 0)))))))))
+
+(program bookings
+  (targets server browser)
+  (entry check-booking
+    (bind store:bookings (store (ns "bookings/bookings") (mode append)))
+    (bind audit          (audit))))
