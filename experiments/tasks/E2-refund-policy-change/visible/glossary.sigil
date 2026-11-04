@@ -1,0 +1,106 @@
+; Glossary for B3: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Role, PayStatus, ReasonCode, RefundError, Actor, Payment,
+; RefundIssued, RefundRefused, refund, refund-cap), so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "a {role:Role} actor {id:Int}"
+    (set actor (Actor id role)))
+
+  (given "an {role:Role} actor {id:Int}"
+    (set actor (Actor id role)))
+
+  (given "a {status:PayStatus} payment {id:Int} of {amount:Money} with {refunded:Money} already refunded on the card ending {card:Str}"
+    (set payment (Payment id amount refunded status card)))
+
+  (given "the payment store is unavailable"
+    (fail store:payments put))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "{amount:Money} is refunded as {reason:ReasonCode}"
+    (call result refund actor payment amount reason))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the refund succeeds"
+    (expect (match result (ok r true) (err e false))))
+
+  (then "the refund is refused as {why:RefundError}"
+    (expect (= result (err why))))
+
+  (then "the refund fails because the payment could not be stored"
+    (expect (= result (err StoreFailed))))
+
+  (then "the stored payment holds {refunded:Money} refunded"
+    (expect (= (map (stored store:payments) (fn (x) x.refunded)) (list refunded))))
+
+  (then "the stored payment keeps the card ending {card:Str}"
+    (expect (= (map (stored store:payments) (fn (x) x.card)) (list card))))
+
+  (then "the remaining amount to refund is {remaining:Money}"
+    (expect (match result (ok r (= r.remaining remaining)) (err e false))))
+
+  (then "nothing is stored"
+    (expect (= (len (stored store:payments)) 0)))
+
+  (then "an audit event records the refund of {amount:Money} as {reason:ReasonCode}"
+    (expect (= (emitted audit) (list (RefundIssued actor.id payment.id amount reason)))))
+
+  (then "an audit event records the refusal of {amount:Money} as {reason:ReasonCode} because {why:RefundError}"
+    (expect (= (emitted audit) (list (RefundRefused actor.id payment.id amount reason why)))))
+
+  ; ---- Rules, properties and privacy -------------------------------------------
+  (rule "The most one refund may return depends on the role of the actor and on the reason (a Goodwill refund has half the cap)" refund-cap (Role ReasonCode Money))
+
+  (always "Only a Settled payment can be refunded. A Voided payment is refused as NotRefundable. A Disputed payment can be refunded only by a Manager or an Admin: a Support actor is refused as NeedsManager, except when the reason is Fraud, which Support may refund on a Disputed payment like on a Settled one."
+    (forall ((a Actor) (p Payment) (m (Int 0 1000000000000)) (r ReasonCode))
+      (and (= (= (refund a p m r) (err NotRefundable)) (= p.status Voided))
+           (= (= (refund a p m r) (err NeedsManager))
+              (and (= p.status Disputed) (= a.role Support) (not (= r Fraud)))))))
+
+  (always "A refund must be at least 1 cent, otherwise it is refused as BadAmount."
+    (forall ((p Payment) (r ReasonCode))
+      (= (refund (Actor 1 Admin) (Payment p.id p.amount p.refunded Settled p.card) 0 r) (err BadAmount))))
+
+  (always "A payment can be refunded in several parts, but never for more than it was paid. A refund is refused as ExceedsRemaining when it is more than what is left to refund, which is the amount of the payment minus everything already refunded. Refunding exactly what is left is allowed."
+    (forall ((p Payment) (m (Int 1 1000000000000)) (r ReasonCode))
+      (or (> p.refunded p.amount)
+          (= (= (refund (Actor 1 Admin) (Payment p.id p.amount p.refunded Settled p.card) m r) (err ExceedsRemaining))
+             (and (> m (sub p.amount p.refunded)) (<= m (refund-cap Admin r)))))))
+
+  (always "A single refund may not be more than the cap for the role of the actor and the reason of the refund (Goodwill refunds have half the cap of the other reasons). Refunding exactly the cap is allowed. The cap applies to each refund on its own, not to the running total refunded on the payment. A refund over the cap is refused as OverCap."
+    (forall ((m (Int 1 1000000000000)) (r ReasonCode))
+      (and (= (= (refund (Actor 1 Support) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m (refund-cap Support r)))
+           (= (= (refund (Actor 2 Manager) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m (refund-cap Manager r)))
+           (= (= (refund (Actor 3 Admin) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m (refund-cap Admin r)))
+           (= (refund-cap Support Goodwill) 10000)
+           (= (refund-cap Manager Goodwill) 50000)
+           (= (refund-cap Admin Goodwill) 500000)
+           (= (refund-cap Support Defective) 20000)
+           (or (> m (refund-cap Support r)) (not (= (refund (Actor 1 Support) (Payment 7 1000000000000 900000 Settled "0000") m r) (err OverCap)))))))
+
+  (always "When more than one refusal applies, the first of these is reported: NotRefundable, NeedsManager, BadAmount, OverCap, ExceedsRemaining."
+    (forall ((p Payment) (r ReasonCode))
+      (and (= (refund (Actor 1 Admin) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable))
+           (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Disputed p.card) 0 Defective) (err NeedsManager))
+           (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 0 r) (err BadAmount))
+           (= (refund (Actor 1 Support) (Payment p.id 1000000 0 Settled p.card) 5000000 r) (err OverCap))
+           (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 15000 Defective) (err ExceedsRemaining)))))
+
+  (always "A refund that is not refused stores the updated payment, with the amount added to what has been refunded and everything else unchanged, and the audit log records one RefundIssued event with the actor, the payment, the amount and the reason."
+    (forall ((a Actor) (p Payment) (m (Int 0 1000000000000)) (r ReasonCode))
+      (match (refund a p m r)
+        (ok x (and (= x.payment p.id) (= x.refund m) (= x.refunded (add p.refunded m))
+                   (= x.remaining (sub p.amount x.refunded))))
+        (err e true))))
+
+  (always "Every refusal, and a failure to store the payment, is recorded in the audit log as a RefundRefused event with the actor, the payment, the amount, the reason and the cause, and stores nothing."
+    (forall ((a Actor) (p Payment) (m (Int 0 1000000000000)) (r ReasonCode))
+      (match (refund a p m r)
+        (ok x true)
+        (err e (not (= e StoreFailed))))))
+
+  (privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused."
+    (source Payment.card)
+    (allow store:payments)
+    (run refund)))

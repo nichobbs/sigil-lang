@@ -1,0 +1,3076 @@
+{
+ "entry": "refund",
+ "cases": [
+  {
+   "name": "support refunds part of a settled payment",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 6000,
+      "refunded": 6000,
+      "remaining": 9000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 6000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Defective"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support refunds exactly the cap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 500000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "1234"
+    },
+    "amount": 20000,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 20000,
+      "refunded": 20000,
+      "remaining": 480000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 500000,
+       "refunded": 20000,
+       "status": "Settled",
+       "card": "1234"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 20000,
+       "reason": "Duplicate"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "manager refunds exactly the Manager cap",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 500000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "9876"
+    },
+    "amount": 100000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5001,
+       "amount": 100000,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin refunds exactly the Admin cap",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 5000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "5555"
+    },
+    "amount": 1000000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 1000000,
+      "refunded": 1000000,
+      "remaining": 4000000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 5000000,
+       "refunded": 1000000,
+       "status": "Settled",
+       "card": "5555"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5001,
+       "amount": 1000000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "manager refunds above the Support cap",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 80000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "0007"
+    },
+    "amount": 75000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5001,
+       "amount": 75000,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin refunds above the Manager cap",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 500000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "1111"
+    },
+    "amount": 400000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 400000,
+      "refunded": 400000,
+      "remaining": 100000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 500000,
+       "refunded": 400000,
+       "status": "Settled",
+       "card": "1111"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5001,
+       "amount": 400000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support one cent",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 1,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 1,
+      "refunded": 1,
+      "remaining": 14999
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 1,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 1,
+       "reason": "Duplicate"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "second refund adds to the first",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 6000,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 9000,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 9000,
+      "refunded": 15000,
+      "remaining": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 15000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 9000,
+       "reason": "Duplicate"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "refunding exactly what is left empties the payment",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 5000,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 5000,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 5000,
+      "refunded": 10000,
+      "remaining": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 10000,
+       "refunded": 10000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 5000,
+       "reason": "Defective"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "refunding exactly what is left of a large payment, left one cent",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 100001,
+     "refunded": 100000,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 1,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 1,
+      "refunded": 100001,
+      "remaining": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 100001,
+       "refunded": 100001,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 1,
+       "reason": "Goodwill"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap is per refund: support refunds again after earlier refunds exceeded the cap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000,
+     "refunded": 900000,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 15000,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 15000,
+      "refunded": 915000,
+      "remaining": 85000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 1000000,
+       "refunded": 915000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 15000,
+       "reason": "Defective"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "manager refunds a disputed payment in full",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5004,
+     "amount": 30000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "9999"
+    },
+    "amount": 30000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5004,
+      "refund": 30000,
+      "refunded": 30000,
+      "remaining": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5004,
+       "amount": 30000,
+       "refunded": 30000,
+       "status": "Disputed",
+       "card": "9999"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5004,
+       "amount": 30000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin refunds part of a disputed payment",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5004,
+     "amount": 300000,
+     "refunded": 100000,
+     "status": "Disputed",
+     "card": "8080"
+    },
+    "amount": 150000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5004,
+      "refund": 150000,
+      "refunded": 250000,
+      "remaining": 50000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5004,
+       "amount": 300000,
+       "refunded": 250000,
+       "status": "Disputed",
+       "card": "8080"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5004,
+       "amount": 150000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "status is kept on a full refund",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 50000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "6060"
+    },
+    "amount": 50000,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 50000,
+      "refunded": 50000,
+      "remaining": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 50000,
+       "refunded": 50000,
+       "status": "Settled",
+       "card": "6060"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5001,
+       "amount": 50000,
+       "reason": "Duplicate"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "card with leading zeros is stored as text",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "0042"
+    },
+    "amount": 100,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 100,
+      "refunded": 100,
+      "remaining": 14900
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 100,
+       "status": "Settled",
+       "card": "0042"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 100,
+       "reason": "Goodwill"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "reason Duplicate recorded",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "3141"
+    },
+    "amount": 2500,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 2500,
+      "refunded": 2500,
+      "remaining": 12500
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 2500,
+       "status": "Settled",
+       "card": "3141"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 2500,
+       "reason": "Duplicate"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "reason Defective recorded",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 90000,
+     "refunded": 10000,
+     "status": "Settled",
+     "card": "2718"
+    },
+    "amount": 2500,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 2500,
+      "refunded": 12500,
+      "remaining": 77500
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 90000,
+       "refunded": 12500,
+       "status": "Settled",
+       "card": "2718"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5001,
+       "amount": 2500,
+       "reason": "Defective"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "large ids stay exact",
+   "args": {
+    "actor": {
+     "id": 9007199254740991,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 9007199254740990,
+     "amount": 20000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4321"
+    },
+    "amount": 20000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 9007199254740990,
+      "refund": 20000,
+      "refunded": 20000,
+      "remaining": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 9007199254740990,
+       "amount": 20000,
+       "refunded": 20000,
+       "status": "Settled",
+       "card": "4321"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 9007199254740991,
+       "payment": 9007199254740990,
+       "amount": 20000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "payment at the top of the range refunds to the cent",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 999999000000,
+     "status": "Settled",
+     "card": "1010"
+    },
+    "amount": 1000000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5001,
+       "amount": 1000000,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "TRAP cumulative: second refund beyond what is left is refused",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5010,
+     "amount": 10000,
+     "refunded": 5000,
+     "status": "Settled",
+     "card": "7001"
+    },
+    "amount": 6000,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "ExceedsRemaining"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5010,
+       "amount": 6000,
+       "reason": "Defective",
+       "why": "ExceedsRemaining"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "TRAP support one cent over the cap is refused and audited",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5011,
+     "amount": 500000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "7002"
+    },
+    "amount": 20001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5011,
+       "amount": 20001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "TRAP card digits never reach the audit event of a refund",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5012,
+     "amount": 90000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "6789"
+    },
+    "amount": 45000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5012,
+      "refund": 45000,
+      "refunded": 45000,
+      "remaining": 45000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5012,
+       "amount": 90000,
+       "refunded": 45000,
+       "status": "Settled",
+       "card": "6789"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5012,
+       "amount": 45000,
+       "reason": "Goodwill"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support refunds one cent over the cap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 500000,
+     "refunded": 100000,
+     "status": "Settled",
+     "card": "8888"
+    },
+    "amount": 20001,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 20001,
+       "reason": "Defective",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "manager one cent over the Manager cap",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 500000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "8801"
+    },
+    "amount": 100001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5001,
+       "amount": 100001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin one cent over the Admin cap",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 5000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "8802"
+    },
+    "amount": 1000001,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5001,
+       "amount": 1000001,
+       "reason": "Fraud",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "refund of more than the payment",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5006,
+     "amount": 10000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "3333"
+    },
+    "amount": 12000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "ExceedsRemaining"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5006,
+       "amount": 12000,
+       "reason": "Goodwill",
+       "why": "ExceedsRemaining"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "one cent more than is left",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 5000,
+     "status": "Settled",
+     "card": "3334"
+    },
+    "amount": 5001,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "ExceedsRemaining"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 5001,
+       "reason": "Duplicate",
+       "why": "ExceedsRemaining"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "fully refunded payment refuses one cent",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 10000,
+     "status": "Settled",
+     "card": "3335"
+    },
+    "amount": 1,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "ExceedsRemaining"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 1,
+       "reason": "Duplicate",
+       "why": "ExceedsRemaining"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "voided payment refused for support",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 0,
+     "status": "Voided",
+     "card": "2222"
+    },
+    "amount": 100,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NotRefundable"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 100,
+       "reason": "Goodwill",
+       "why": "NotRefundable"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "voided payment refused for an admin",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5005,
+     "amount": 10000,
+     "refunded": 0,
+     "status": "Voided",
+     "card": "2223"
+    },
+    "amount": 100,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NotRefundable"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5005,
+       "amount": 100,
+       "reason": "Duplicate",
+       "why": "NotRefundable"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support cannot refund a disputed payment",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5004,
+     "amount": 30000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "9999"
+    },
+    "amount": 1000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NeedsManager"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5004,
+       "amount": 1000,
+       "reason": "Goodwill",
+       "why": "NeedsManager"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "manager over the Manager cap on a disputed payment",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5004,
+     "amount": 500000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "9990"
+    },
+    "amount": 100001,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5004,
+       "amount": 100001,
+       "reason": "Fraud",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "zero amount refused as BadAmount",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "3336"
+    },
+    "amount": 0,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "BadAmount"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 0,
+       "reason": "Goodwill",
+       "why": "BadAmount"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "precedence: voided before BadAmount",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 0,
+     "status": "Voided",
+     "card": "4001"
+    },
+    "amount": 0,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NotRefundable"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5001,
+       "amount": 0,
+       "reason": "Goodwill",
+       "why": "NotRefundable"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "precedence: NeedsManager before BadAmount",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4002"
+    },
+    "amount": 0,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NeedsManager"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 0,
+       "reason": "Goodwill",
+       "why": "NeedsManager"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "precedence: NeedsManager before ExceedsRemaining and OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 9000,
+     "status": "Disputed",
+     "card": "4003"
+    },
+    "amount": 900000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NeedsManager"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 900000,
+       "reason": "Goodwill",
+       "why": "NeedsManager"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "precedence: BadAmount before ExceedsRemaining",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 10000,
+     "refunded": 10000,
+     "status": "Settled",
+     "card": "4004"
+    },
+    "amount": 0,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "BadAmount"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 0,
+       "reason": "Goodwill",
+       "why": "BadAmount"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "precedence: ExceedsRemaining before OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 60000,
+     "refunded": 30000,
+     "status": "Settled",
+     "card": "4005"
+    },
+    "amount": 50000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 50000,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "precedence: ExceedsRemaining before OverCap for an admin",
+   "args": {
+    "actor": {
+     "id": 13,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 2000000,
+     "refunded": 1500000,
+     "status": "Settled",
+     "card": "4006"
+    },
+    "amount": 600000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 13,
+       "payment": 5001,
+       "amount": 600000,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "store failure is audited as a refusal with StoreFailed",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "5151"
+    },
+    "amount": 5000,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1,
+    "fail": [
+     {
+      "handle": "store:payments",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 5000,
+       "reason": "Defective",
+       "why": "StoreFailed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "store failure for a manager on a disputed payment",
+   "args": {
+    "actor": {
+     "id": 12,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 90000,
+     "refunded": 20000,
+     "status": "Disputed",
+     "card": "5152"
+    },
+    "amount": 30000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1,
+    "fail": [
+     {
+      "handle": "store:payments",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 12,
+       "payment": 5001,
+       "amount": 30000,
+       "reason": "Fraud",
+       "why": "StoreFailed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "a refusal does not touch the store even when it would fail",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 500000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "5153"
+    },
+    "amount": 20001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1,
+    "fail": [
+     {
+      "handle": "store:payments",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 20001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "refusal event carries no card",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "6677"
+    },
+    "amount": 99999,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 99999,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill support exactly the halved cap is allowed",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 10000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 10000,
+      "refunded": 10000,
+      "remaining": 999999990000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 1000000000000,
+       "refunded": 10000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 10000,
+       "reason": "Goodwill"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill support one cent over the halved cap is OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 10001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 10001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill manager exactly the halved cap is allowed",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 50000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 50000,
+      "refunded": 50000,
+      "remaining": 999999950000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 1000000000000,
+       "refunded": 50000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 50000,
+       "reason": "Goodwill"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill manager one cent over the halved cap is OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 50001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 50001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill admin exactly the halved cap is allowed",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 500000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 500000,
+      "refunded": 500000,
+      "remaining": 999999500000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 1000000000000,
+       "refunded": 500000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 500000,
+       "reason": "Goodwill"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill admin one cent over the halved cap is OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 500001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 500001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "defective support keeps the full cap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 20000,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 20000,
+      "refunded": 20000,
+      "remaining": 999999980000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 1000000000000,
+       "refunded": 20000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 20000,
+       "reason": "Defective"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "duplicate manager keeps the full cap and is over at one more",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 100001,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 100001,
+       "reason": "Duplicate",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "fraud admin keeps the full cap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 1000000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 1000000,
+      "refunded": 1000000,
+      "remaining": 999999000000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 1000000000000,
+       "refunded": 1000000,
+       "status": "Settled",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 1000000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill cap applies on a disputed payment for a manager",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 50001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 50001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support refunds a disputed payment as Fraud",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 6000,
+      "refunded": 6000,
+      "remaining": 9000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 6000,
+       "status": "Disputed",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support fraud on a disputed payment is still capped",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 20001,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 20001,
+       "reason": "Fraud",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support fraud on a disputed payment exactly the cap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 20000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 20000,
+      "refunded": 20000,
+      "remaining": 999999980000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 1000000000000,
+       "refunded": 20000,
+       "status": "Disputed",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 20000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support fraud on a disputed payment of nothing is BadAmount",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 0,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "BadAmount"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 0,
+       "reason": "Fraud",
+       "why": "BadAmount"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support fraud on a disputed payment beyond the remainder is ExceedsRemaining",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 10000,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "ExceedsRemaining"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Fraud",
+       "why": "ExceedsRemaining"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support disputed Defective is still NeedsManager",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NeedsManager"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Defective",
+       "why": "NeedsManager"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support disputed Duplicate is still NeedsManager",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NeedsManager"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Duplicate",
+       "why": "NeedsManager"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support disputed Goodwill over the cap is NeedsManager first",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 12000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NeedsManager"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 12000,
+       "reason": "Goodwill",
+       "why": "NeedsManager"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "support fraud on a voided payment is NotRefundable",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Voided",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "NotRefundable"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Fraud",
+       "why": "NotRefundable"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "manager disputed Fraud is unchanged",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Manager"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 15000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 15000,
+      "refunded": 15000,
+      "remaining": 0
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 15000,
+       "status": "Disputed",
+       "card": "4242"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 15000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "over the cap and beyond the remainder reports OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 30000,
+     "refunded": 5000,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 25001,
+    "reason": "Defective"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 25001,
+       "reason": "Defective",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "goodwill over the halved cap and beyond the remainder reports OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 10000,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 10001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 10001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "within the cap but beyond the remainder reports ExceedsRemaining",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 10000,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "ExceedsRemaining"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Goodwill",
+       "why": "ExceedsRemaining"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "admin over the cap on a nearly refunded payment reports OverCap",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Admin"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 1000000000000,
+     "refunded": 999999999995,
+     "status": "Settled",
+     "card": "4242"
+    },
+    "amount": 1000001,
+    "reason": "Duplicate"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 1000001,
+       "reason": "Duplicate",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "store failure on a support fraud refund of a disputed payment",
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "4242"
+    },
+    "amount": 6000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1,
+    "fail": [
+     {
+      "handle": "store:payments",
+      "op": "put"
+     }
+    ]
+   },
+   "expect": {
+    "result": {
+     "err": "StoreFailed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Fraud",
+       "why": "StoreFailed"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "card digits never reach the audit event of a support fraud refund",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Disputed",
+     "card": "0042"
+    },
+    "amount": 6000,
+    "reason": "Fraud"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": {
+      "payment": 5001,
+      "refund": 6000,
+      "refunded": 6000,
+      "remaining": 9000
+     }
+    },
+    "effects": {
+     "stored": [
+      {
+       "id": 5001,
+       "amount": 15000,
+       "refunded": 6000,
+       "status": "Disputed",
+       "card": "0042"
+      }
+     ],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 6000,
+       "reason": "Fraud"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "card digits never reach the audit event of a goodwill OverCap refusal",
+   "trap": true,
+   "args": {
+    "actor": {
+     "id": 11,
+     "role": "Support"
+    },
+    "payment": {
+     "id": 5001,
+     "amount": 15000,
+     "refunded": 0,
+     "status": "Settled",
+     "card": "0042"
+    },
+    "amount": 10001,
+    "reason": "Goodwill"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "OverCap"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": [
+      {
+       "actor": 11,
+       "payment": 5001,
+       "amount": 10001,
+       "reason": "Goodwill",
+       "why": "OverCap"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
