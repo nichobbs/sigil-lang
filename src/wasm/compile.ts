@@ -594,6 +594,8 @@ class FnGen {
         return this.genMapFilter(e, false);
       case 'sum':
         return this.genSum(e);
+      case 'sort':
+        return no('sort (not yet supported by the Wasm backend)');
       case 'fold':
         return no('fold (not yet supported by the Wasm backend)');
       case 'len':

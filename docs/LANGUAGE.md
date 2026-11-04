@@ -56,7 +56,7 @@ Clauses in order: `in`, `out`, then optional `needs`, `declassifies`, `requires`
 | `(do e1 e2)` | evaluate in order, value of last |
 | `(if c a b)` | `c` must be Bool; both branches required |
 | `(match e (Case body)... )` | on an enum: one arm per case. On a Result: `(ok v body)` and `(err e body)`, both required. Binder is optional for enum arms |
-| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map` or `filter`. `fold` takes a two-parameter lambda `(fn (acc x) body)` |
+| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map` or `filter`. `fold` takes a two-parameter lambda `(fn (acc x) body)`, `sort` a two-parameter comparator `(fn (a b) before)` |
 | `(try e :on-err Case)` | `e` is a Result: Ok gives its value, Err returns `(err Case)` from the whole function (function must return a Result with enum Err containing `Case`) |
 | `(ok e)` `(err e)` | build a Result |
 
@@ -70,6 +70,7 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | `sum` | 1 list of Int | Int |
 | `len` | 1 list | Int |
 | `map` `filter` | list, lambda | list (`filter` length becomes 0..max) |
+| `sort` | list, `(fn (a b) before)` | the same list, reordered. `before` is true when `a` must come strictly before `b`; the sort is stable (ties keep their input order), so break ties inside `before`, e.g. `(or (< a.price b.price) (and (= a.price b.price) (< a.id b.id)))`. Same length bound and element facts; labels of the comparator flow into the result. About n log n comparisons: use it instead of counting ranks by hand (which is quadratic and can run out of fuel). Not yet compiled to Wasm |
 | `fold` | list, Type, init, `(fn (acc x) body)` | a value of Type. Loops over the list in order; `Type` (a declared type name, e.g. `Cents` or a record) is the accumulator's invariant: `init` and every step result must fit it (checked as obligations and at run time), and inside the body `acc` is assumed to be any value of Type. Clamp with `min`/`max` so each step provably fits. Not yet compiled to Wasm |
 | `list` | n | list of exactly n elements: `(list)` is the empty list, `(list 0)` is a list holding one 0 (not an empty list) |
 | `=` | 2 | Bool, structural equality on any values |
@@ -284,7 +285,7 @@ Feature: Shop
 | E-integrity | untrusted data into a `:validated`/`:control` field | take a validated parameter type |
 | E-match | non-exhaustive match (warning if an arm can never match) | one arm per case |
 | E-try | `try` in a function not returning Result, or `:on-err` not an Err case | return a Result with enum Err |
-| E-lambda | lambda outside `map`/`filter`/`fold`, or wrong parameter count (1, or 2 for `fold`) | inline it |
+| E-lambda | lambda outside `map`/`filter`/`fold`/`sort`, or wrong parameter count (1, or 2 for `fold` and `sort`) | inline it |
 | E-target | capability kind unavailable on a declared target | change targets or kind |
 | E-policy | bind exceeds `allow`, or declassifier undeclared or out of scope | lower the bind, or ask a human to change the policy |
 | (crash) `unknown type X` | a type name is not declared; the checker aborts with a stack trace | declare the type |
@@ -292,4 +293,4 @@ Feature: Shop
 
 ## Not supported
 
-No recursion, loops (other than `fold` over a bounded list), mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money`, `=` and taking a bounded Str apart with `chars` / putting one back with `from-chars` (no split, regex match, case change, formatting widths: build them with `chars` and `fold`; digits to a number is `(sub code 48)` in a fold), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no sorting, `concat`, `zip` or `reverse` (build them with `fold` and `append`), no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`sum`/`len`/`fold`, or report the gap instead of faking it.
+No recursion, loops (other than `fold` over a bounded list), mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money`, `=` and taking a bounded Str apart with `chars` / putting one back with `from-chars` (no split, regex match, case change, formatting widths: build them with `chars` and `fold`; digits to a number is `(sub code 48)` in a fold), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no `concat`, `zip` or `reverse` (build them with `fold` and `append`), no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`sum`/`len`/`fold`, or report the gap instead of faking it.
