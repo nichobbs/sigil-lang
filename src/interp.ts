@@ -179,7 +179,8 @@ export class Interp {
         if (v < r.lo || v > r.hi) return bad(`${v} outside [${r.lo}, ${r.hi}]`);
         return;
       case 'str':
-        if (typeof v !== 'string') bad(`expected Str, got ${showVal(v)}`);
+        if (typeof v !== 'string') return bad(`expected Str, got ${showVal(v)}`);
+        if (r.max !== undefined && Array.from(v).length > r.max) bad(`string of ${Array.from(v).length} characters exceeds :max ${r.max}`);
         return;
       case 'bool':
         if (typeof v !== 'boolean') bad('expected Bool');
@@ -393,6 +394,26 @@ export class Interp {
       };
       return name === 'map' ? xs.map(run) : xs.filter((x) => run(x) === true);
     }
+    if (name === 'fold') {
+      // (fold xs T init (fn (acc x) body)): T is the accumulator's declared type, checked on every step.
+      const [xsE, tE, initE, fE] = e.args;
+      if (e.args.length !== 4 || tE.k !== 'var' || !this.prog.types.has(tE.name)) throw new RuntimeFault('fold: expected (fold list Type init (fn (acc x) body))');
+      const xs = this.eval(xsE, env);
+      if (!Array.isArray(xs)) throw new RuntimeFault('fold: expected a list');
+      const c = this.lambda(fE, env);
+      if (c.params.length !== 2) throw new RuntimeFault('fold: lambda needs two parameters (acc x)');
+      const T: Type = { k: 'named', name: tE.name };
+      let acc = this.eval(initE, env);
+      this.checkType(acc, T, 'fold initial value');
+      xs.forEach((x, i) => {
+        const env2 = new Map(c.env);
+        env2.set(c.params[0], acc);
+        env2.set(c.params[1], x);
+        acc = this.eval(c.body, env2);
+        this.checkType(acc, T, `fold step ${i}`);
+      });
+      return acc;
+    }
     // short-circuit logic
     if (name === 'and') {
       for (const a of e.args) if (this.eval(a, env) !== true) return false;
@@ -430,6 +451,32 @@ export class Interp {
       case 'len':
         if (!Array.isArray(a[0])) throw new RuntimeFault('len: expected a list');
         return BigInt(a[0].length);
+      case 'chars':
+        if (typeof a[0] !== 'string') throw new RuntimeFault('chars: expected a Str');
+        return Array.from(a[0]).map((c) => BigInt(c.codePointAt(0)!));
+      case 'from-chars': {
+        if (!Array.isArray(a[0])) throw new RuntimeFault('from-chars: expected a list of code points');
+        return a[0].map((c) => {
+          const n = this.num(c, 'from-chars');
+          if (n < 0n || n > 1114111n) throw new RuntimeFault(`from-chars: ${n} is not a code point`);
+          return String.fromCodePoint(Number(n));
+        }).join('');
+      }
+      case 'append':
+        if (!Array.isArray(a[0])) throw new RuntimeFault('append: expected a list');
+        return [...a[0], a[1]];
+      case 'take':
+      case 'drop': {
+        if (!Array.isArray(a[0])) throw new RuntimeFault(`${name}: expected a list`);
+        const n = this.num(a[1], name);
+        const k = n < 0n ? 0 : n > BigInt(a[0].length) ? a[0].length : Number(n);
+        return name === 'take' ? a[0].slice(0, k) : a[0].slice(k);
+      }
+      case 'at': {
+        if (!Array.isArray(a[0])) throw new RuntimeFault('at: expected a list');
+        const i = this.num(a[1], 'at');
+        return i >= 0n && i < BigInt(a[0].length) ? a[0][Number(i)] : a[2];
+      }
       case 'text':
         return a.map((x) => (typeof x === 'string' ? x : showVal(x))).join('');
       case 'money': {

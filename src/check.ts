@@ -130,7 +130,7 @@ function absOfType(p: Program, t: Type, typeName: string | undefined, at: string
     case 'unit':
       return unitAV();
     case 'str':
-      return mk({ lab: lab(r.validated ? 'validated' : 'untrusted') });
+      return mk({ lab: lab(r.validated ? 'validated' : 'untrusted'), ...(r.max !== undefined ? { len: I.range(0n, BigInt(r.max)) } : {}) });
     case 'enum':
       return mk({ tags: new Set(r.cases), lab: lab('validated') });
     case 'list':
@@ -221,6 +221,14 @@ function conforms(ctx: Ctx, a: AV | undefined, t: Type, where: string): void {
         const disjoint = num.hi < bound.lo || num.lo > bound.hi;
         oblige(ctx, 'range', desc, disjoint ? 'failed' : 'unproved', `inferred ${I.showInterval(num)}`);
       }
+      return;
+    }
+    case 'str': {
+      if (r.max === undefined) return;
+      const bound = I.range(0n, BigInt(r.max));
+      const desc = `${where}.length in ${I.showInterval(bound)}`;
+      if (!a || a.len === undefined || a.len === 'top') oblige(ctx, 'bounds', desc, 'unproved', 'length untracked');
+      else oblige(ctx, 'bounds', desc, I.within(a.len, bound) ? 'proved' : 'unproved', `inferred ${I.showInterval(a.len)}`);
       return;
     }
     case 'list': {
@@ -621,7 +629,7 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   };
   const labOf = (xs: AV[]) => L.joinAll(xs.map(flatten));
   // Evaluate arguments first so one arity slip does not hide every other mistake in the call.
-  const higherOrder = name === 'map' || name === 'filter';
+  const higherOrder = name === 'map' || name === 'filter' || name === 'fold';
   const xs: AV[] = higherOrder ? [] : e.args.map((a) => evalExpr(a, env, ctx));
 
   switch (name) {
@@ -696,6 +704,75 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       if (name === 'map') return mk({ len: l.len, elem: r, lab: l.lab });
       const hi = l.len === undefined || l.len === 'top' ? I.TOP : I.range(0n, l.len.hi);
       return mk({ len: hi, elem: l.elem, lab: L.join(l.lab, flatten(r)) });
+    }
+    case 'fold': {
+      // (fold xs T init (fn (acc x) body)): T is the loop invariant. The initial value and every step result must
+      // fit T (obligations); inside the body acc is assumed to be any value of T. The result is any value of T.
+      if (!ar(4)) return topAV();
+      const [xsE, tE, initE, f] = e.args;
+      if (tE.k !== 'var' || tE.path.length || !ctx.prog.types.has(tE.name)) {
+        diag(ctx, 'error', 'E-type', `fold: second argument must be the name of a declared type for the accumulator, in ${printExpr(e)}`);
+        return topAV();
+      }
+      if (f.k !== 'lam' || f.params.length !== 2) {
+        diag(ctx, 'error', 'E-lambda', 'fold needs a two-parameter lambda (fn (acc x) body) as fourth argument');
+        return topAV();
+      }
+      const l = evalExpr(xsE, env, ctx);
+      const init = evalExpr(initE, env, ctx);
+      const T: Type = { k: 'named', name: tE.name };
+      conforms(ctx, init, T, `fold initial value (${tE.name})`);
+      const base = absOfType(ctx.prog, T, tE.name, 'fold accumulator');
+      let lab = L.join(flatten(init), l.lab);
+      const step = (c: Ctx): AV => {
+        const env2 = new Map(env);
+        env2.set(f.params[0], mapLabels(base, (x) => L.join(x, lab)));
+        env2.set(f.params[1], l.elem ?? topAV());
+        return evalExpr(f.body, env2, c);
+      };
+      const quiet = { ...ctx, report: false };
+      for (let i = 0; i < 2; i++) lab = L.join(lab, flatten(step(quiet))); // labels only join, so two passes reach the fixpoint
+      const r = step(ctx);
+      conforms(ctx, r, T, `fold step result (${tE.name})`);
+      const lab2 = L.join(lab, flatten(r));
+      return mapLabels(base, (x) => L.join(x, lab2));
+    }
+    case 'chars': {
+      if (!ar(1)) return topAV();
+      const s = xs[0];
+      if (s.len === undefined || s.len === 'top') {
+        diag(ctx, 'error', 'E-type', `chars needs a string with a declared (Str :max N), in ${printExpr(e)}`);
+        return topAV();
+      }
+      return mk({ len: s.len, elem: mk({ num: I.range(0n, 1114111n), lab: s.lab }), lab: s.lab });
+    }
+    case 'from-chars': {
+      if (!ar(1)) return topAV();
+      const l = xs[0];
+      const cp = I.range(0n, 1114111n);
+      const en = l.elem?.num;
+      oblige(ctx, 'range', `from-chars elements are code points ${I.showInterval(cp)}`, en === undefined || en === 'top' ? 'unproved' : I.within(en, cp) ? 'proved' : 'unproved', en && en !== 'top' ? `inferred ${I.showInterval(en)}` : 'elements untracked');
+      return mk({ len: l.len, lab: flatten(l) });
+    }
+    case 'append': {
+      if (!ar(2)) return topAV();
+      const [l, x] = xs;
+      return mk({ len: I.add(l.len ?? I.TOP, I.point(1n)), elem: l.elem ? joinAV(l.elem, x) : x, lab: L.join(l.lab, flatten(x)) });
+    }
+    case 'take': {
+      if (!ar(2)) return topAV();
+      const [l, n] = xs;
+      return mk({ len: I.imin(l.len ?? I.TOP, I.imax(n.num ?? I.TOP, I.point(0n))), elem: l.elem, lab: L.join(l.lab, flatten(n)) });
+    }
+    case 'drop': {
+      if (!ar(2)) return topAV();
+      const [l, n] = xs;
+      return mk({ len: I.imax(I.point(0n), I.sub(l.len ?? I.TOP, I.imax(n.num ?? I.TOP, I.point(0n)))), elem: l.elem, lab: L.join(l.lab, flatten(n)) });
+    }
+    case 'at': {
+      if (!ar(3)) return topAV();
+      const [l, i, d] = xs;
+      return l.elem ? joinAV({ ...l.elem, lab: L.join(l.elem.lab, flatten(i)) }, d) : mk({ lab: L.join(flatten(i), flatten(d)) });
     }
     case 'text':
       return mk({ lab: labOf(xs) });

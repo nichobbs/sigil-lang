@@ -11,6 +11,7 @@ You write one file, `app.sigil`: types, validators, functions, and one `program`
 (type Plan (var Free Pro Enterprise))   ; enum; case names are global, so unique across all enums
 (type Err (var TooSmall StoreFailed MailFailed))
 (type Email (Str :validated))           ; Str = text; :validated = must come from a validator
+(type Note (Str :max 200))              ; :max N = at most N characters (code points); needed before `chars`
 (type Line (rec (unit (Int 0 1000000)) (qty (Int 1 1000))))
 (type Customer (rec (id (Int 0 1000000)) (name Str :pii) (email Email :pii) (plan Plan :internal)))
 (type Mail (rec (to Email :pii) (subject Str) (body Str :pii)))   ; (field Type flags...)
@@ -55,7 +56,7 @@ Clauses in order: `in`, `out`, then optional `needs`, `declassifies`, `requires`
 | `(do e1 e2)` | evaluate in order, value of last |
 | `(if c a b)` | `c` must be Bool; both branches required |
 | `(match e (Case body)... )` | on an enum: one arm per case. On a Result: `(ok v body)` and `(err e body)`, both required. Binder is optional for enum arms |
-| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map` or `filter` |
+| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map` or `filter`. `fold` takes a two-parameter lambda `(fn (acc x) body)` |
 | `(try e :on-err Case)` | `e` is a Result: Ok gives its value, Err returns `(err Case)` from the whole function (function must return a Result with enum Err containing `Case`) |
 | `(ok e)` `(err e)` | build a Result |
 
@@ -69,6 +70,7 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | `sum` | 1 list of Int | Int |
 | `len` | 1 list | Int |
 | `map` `filter` | list, lambda | list (`filter` length becomes 0..max) |
+| `fold` | list, Type, init, `(fn (acc x) body)` | a value of Type. Loops over the list in order; `Type` (a declared type name, e.g. `Cents` or a record) is the accumulator's invariant: `init` and every step result must fit it (checked as obligations and at run time), and inside the body `acc` is assumed to be any value of Type. Clamp with `min`/`max` so each step provably fits. Not yet compiled to Wasm |
 | `list` | n | list of exactly n elements |
 | `=` | 2 | Bool, structural equality on any values |
 | `< <= > >=` | 2 or more | Bool, chained: `(<= 0 x 100)` |
@@ -76,6 +78,11 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | `not` | 1 | Bool |
 | `text` | n | Str, concatenates strings and renders other values |
 | `money` | 1 Int cents | Str `"$12.34"` |
+| `chars` | 1 Str with `:max N` | list of code points, `(List (Int 0 1114111) 0 N)`. Counts characters, not UTF-16 units. A Str without `:max` is `E-type` |
+| `from-chars` | 1 list of code points | Str (each element must be 0..1114111; unproved if its range is wider) |
+| `append` | list, element | the list with the element at the end (length grows by 1: wrap in `take` to fit a declared max) |
+| `take` `drop` | list, n | first n elements, or all but the first n; n below 0 counts as 0, above the length as the length |
+| `at` | list, index, default | the element at a 0-based index, or the default when the index is out of range (total, never fails) |
 | `ok err` | 1 | Result |
 | `put get post emit fresh` | see Capabilities | |
 | `declassify` | name, expr | see Declassifiers |
@@ -96,7 +103,7 @@ Ranges are interval-based and path-insensitive: `if` conditions do not narrow ra
 (fn clamp-sub (in (a Cents) (b Cents)) (out Cents) (max 0 (sub a b)))
 ```
 
-Patterns. There is no mutable state: pass state in as parameters and return updated values by building a new record. Authorization is a `match` on a role enum returning `Err`. Counting and totalling use `filter`, `map`, `len`, `sum`.
+Patterns. There is no mutable state: pass state in as parameters and return updated values by building a new record. Authorization is a `match` on a role enum returning `Err`. Counting and totalling use `filter`, `map`, `len`, `sum`; anything stateful across a list (running totals, caps on a running balance, first match) uses `fold`, with a record type as the accumulator when you need several values: `(fold xs Acc (Acc 0 0) (fn (a x) (Acc (min (add a.sum x) 1000000000000000) (min (add a.n 1) 1000))))`.
 
 ```sigil
 (type Role (var Admin Member))
@@ -291,4 +298,4 @@ Feature: Shop
 
 ## Not supported
 
-No recursion, loops, mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money` and `=` (no length, slice, split, parse, regex match, case change, formatting widths), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no list indexing, folds beyond `sum`, no sorting, `concat`, `zip` or `reverse`, no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`sum`/`len`, or report the gap instead of faking it.
+No recursion, loops (other than `fold` over a bounded list), mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money`, `=` and taking a bounded Str apart with `chars` / putting one back with `from-chars` (no split, regex match, case change, formatting widths: build them with `chars` and `fold`; digits to a number is `(sub code 48)` in a fold), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no sorting, `concat`, `zip` or `reverse` (build them with `fold` and `append`), no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`sum`/`len`/`fold`, or report the gap instead of faking it.

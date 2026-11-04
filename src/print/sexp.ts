@@ -9,7 +9,7 @@ export function printType(t: Type): string {
     case 'int':
       return `(Int ${t.lo} ${t.hi})`;
     case 'str':
-      return t.validated ? '(Str :validated)' : 'Str';
+      return t.validated || t.max !== undefined ? `(Str${t.validated ? ' :validated' : ''}${t.max !== undefined ? ` :max ${t.max}` : ''})` : 'Str';
     case 'bool':
       return 'Bool';
     case 'unit':

@@ -50,9 +50,19 @@ export function parseType(s: SExp): Type {
       return { k: 'int', lo: rest[0].v, hi: rest[1].v };
     }
     case 'Str': {
-      const flags = rest.map((r) => (isKeyword(r) ? r.v : fail('(Str ...) takes only flags', r)));
-      for (const f of flags) if (f !== ':validated') fail(`unknown Str flag ${f}`, s);
-      return { k: 'str', validated: flags.includes(':validated') };
+      let validated = false;
+      let max: number | undefined;
+      for (let i = 0; i < rest.length; i++) {
+        const r = rest[i];
+        if (!isKeyword(r)) return fail('(Str ...) takes only flags (:validated, :max N)', r);
+        if (r.v === ':validated') validated = true;
+        else if (r.v === ':max') {
+          const n = rest[++i];
+          if (!n || n.t !== 'int' || n.v < 0n) return fail('(Str :max N) needs a non-negative integer literal', r);
+          max = Number(n.v);
+        } else return fail(`unknown Str flag ${r.v}`, s);
+      }
+      return max === undefined ? { k: 'str', validated } : { k: 'str', validated, max };
     }
     case 'var': {
       if (rest.length === 0) return fail('(var ...) needs at least one case', s);

@@ -12,7 +12,7 @@ export interface Field {
 
 export type Type =
   | { k: 'int'; lo: bigint; hi: bigint }
-  | { k: 'str'; validated: boolean }
+  | { k: 'str'; validated: boolean; max?: number } // max: longest allowed length in characters (code points)
   | { k: 'bool' }
   | { k: 'unit' }
   | { k: 'enum'; cases: string[] }

@@ -594,6 +594,8 @@ class FnGen {
         return this.genMapFilter(e, false);
       case 'sum':
         return this.genSum(e);
+      case 'fold':
+        return no('fold (not yet supported by the Wasm backend)');
       case 'len':
         return this.genLen(e);
       case 'list':
