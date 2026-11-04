@@ -27,3 +27,16 @@ Eight subtle defects, each a violation of a stated spec rule, matched across lan
 - TS reviewers wrote and ran their own probe tests in several runs (4 to 6 calls), which is how they confirmed A3, A4 and B1.
 - Cost: Sigil about 12% more tokens per review (the language spec is in every brief).
 - Conclusion for the pre-registered criterion: M6 (at least 20 points higher for Sigil with tool catches) is not met on either round. The tool signal helps when the spec's executable examples cover the defect (leaks, authorisation, audit in round one) and is silent when they do not.
+
+## Fair TS arm: ported scenario tests (results_hard_scenarios.jsonl)
+
+The hard round gave Sigil reviewers executable examples (`verify --fast`) but TS reviewers only the examples as prose. This rerun gives the TS reviewers the same examples as ready-made vitest cases (`scenarios.test.ts`, generated from `intent.feature` by `experiments/export-scenarios.ts`; `./check.sh` runs them). Same eight hard defects and the two clean controls, Haiku, n=1, post-v1, not blind.
+
+| | defects found | clean controls flagged | avg tokens | avg tool calls |
+|---|---|---|---|---|
+| TypeScript, prose examples (before) | 8 / 8 | 0 / 2 | 87.7k | 4.4 |
+| TypeScript, ported scenario tests | 8 / 8 | 0 / 2 | 76.9k (defects) | 3.9 |
+| Sigil (before) | 7 / 8 | 0 / 2 | 98.5k | 3.0 |
+
+- The ported scenarios alone fail on 2 of the 8 defective programs (A2, A3); the rest were found by reading the code and the reviewer's own probe tests. Properties and the `Always` rules were not ported.
+- Giving TS the same executable examples did not change detection (8/8 either way) and lowered cost. The fair comparison therefore still shows no Sigil advantage on review at this program size.
