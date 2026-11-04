@@ -48,3 +48,11 @@
 {"task":"C3","lang":"ts","model":"sonnet","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":86007,"tools":6,"ms":46742,"failures":[]}
 {"task":"C4","lang":"ts","model":"sonnet","run":1,"passed":41,"total":41,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":85295,"tools":3,"ms":44913,"failures":[]}
 {"task":"C1","lang":"sigil","model":"sonnet","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":106784,"tools":3,"ms":92458,"failures":[]}
+{"task":"B1","lang":"sigil","model":"haiku","run":1,"passed":44,"total":44,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":99138,"tools":3,"ms":59940,"failures":[]}
+{"task":"B1","lang":"ts","model":"haiku","run":1,"passed":44,"total":44,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":83125,"tools":5,"ms":42957,"failures":[]}
+{"task":"B2","lang":"sigil","model":"haiku","run":1,"passed":42,"total":42,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":101218,"tools":5,"ms":57742,"failures":[]}
+{"task":"B2","lang":"ts","model":"haiku","run":1,"passed":42,"total":42,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":83837,"tools":8,"ms":49377,"failures":[]}
+{"task":"B3","lang":"sigil","model":"haiku","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":97159,"tools":4,"ms":48516,"failures":[]}
+{"task":"B3","lang":"ts","model":"haiku","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":87928,"tools":11,"ms":67291,"failures":[]}
+{"task":"B4","lang":"sigil","model":"haiku","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","tokens":102359,"tools":4,"ms":77136,"failures":[]}
+{"task":"B4","lang":"ts","model":"haiku","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"tokens":84410,"tools":5,"ms":49914,"failures":[]}
