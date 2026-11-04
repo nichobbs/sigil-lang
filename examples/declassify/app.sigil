@@ -1,0 +1,20 @@
+; Declassifier demo (separate from the invoicing example).
+; The salary is :pii. The audit log accepts only :internal. The only way for any information about the
+; salary to reach the audit log is the policy-declared declassifier `salary-band`, named explicitly below.
+
+(type AppId   (Int 0 1000000))
+(type Salary  (Int 0 10000000))
+(type Applicant (rec (id AppId) (salary Salary :pii)))
+(type Screened  (rec (id AppId) (band (Int 0 1000) :internal)))
+
+(fn screen
+  (in (a Applicant))
+  (out Unit)
+  (needs audit)
+  (declassifies salary-band)
+  (emit audit (Screened a.id (declassify salary-band (div-floor a.salary 10000)))))
+
+(program screening
+  (targets server)
+  (entry screen
+    (bind audit (audit))))

@@ -60,14 +60,17 @@ function printCheck(res: CheckResult, ensuresTested?: Map<string, number>, smt: 
   }
 
   hr('Capability manifest');
-  for (const m of res.manifest) console.log(`${pad(m.fn, 16)} needs ${m.needs.join(', ')}`);
+  for (const m of res.manifest) {
+    const parts = [m.needs.length ? `needs ${m.needs.join(', ')}` : '', m.declassifies.length ? `declassifies ${m.declassifies.map((d) => `${d.name} ("${d.reason}")`).join(', ')}` : ''];
+    console.log(`${pad(m.fn, 16)} ${parts.filter(Boolean).join('; ')}`);
+  }
 
   hr('Flow matrix (labelled source -> sinks reached)');
   const srcs = [...new Set(res.flows.map((f) => f.src))].sort();
   if (!srcs.length) console.log('(no labelled data reaches any sink)');
   for (const s of srcs) {
     const fs = res.flows.filter((f) => f.src === s);
-    console.log(`${pad(s, 18)} ${fs.map((f) => `${f.sink}${f.ok ? '' : ' (REJECTED)'}`).join(', ')}`);
+    console.log(`${pad(s, 18)} ${fs.map((f) => `${f.sink}${f.via ? ` (via declassify ${f.via.map((v) => `${v.name}: "${v.reason}"`).join(', ')})` : ''}${f.ok ? '' : ' (REJECTED)'}`).join(', ')}`);
   }
 
   hr('Diagnostics');

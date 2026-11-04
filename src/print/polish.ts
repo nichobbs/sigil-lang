@@ -73,6 +73,7 @@ function fnTokens(a: Arity, f: FnDef): string[] {
     ...tyTokens(f.out),
     String(f.needs.length),
     ...f.needs,
+    ...(f.declassifies.length ? ['declassifies', String(f.declassifies.length), ...f.declassifies] : []),
     String(f.requires.length),
     ...f.requires.flatMap((r) => exprTokens(a, r)),
     String(f.ensures.length),

@@ -8,14 +8,15 @@
 //   * the derived machine representation of each function's arithmetic
 //
 // Limits (deliberate, for the spike): intervals only (no relational reasoning), no recursion,
-// no declassifiers, no covert channels, capability rows must be declared rather than inferred.
+// declassifiers only as human-declared policy entries, no covert channels, capability rows must be declared rather than inferred.
 
-import { Expr, FnDef, Policy, Program, Type, resolveType } from './ast.js';
+import { Expr, FnDef, Policy, Program, Type, asDeclassify, resolveType } from './ast.js';
 import { CAP_OPS, KIND_TARGETS, isBuiltin, kindOfHandle } from './caps.js';
 import * as I from './interval.js';
 import { Interval } from './interval.js';
 import * as L from './labels.js';
 import { Label } from './labels.js';
+import { Conf } from './ast.js';
 import { printExpr } from './print/sexp.js';
 
 export type Status = 'proved' | 'unproved' | 'failed';
@@ -42,6 +43,8 @@ export interface FlowEdge {
   sink: string;
   ok: boolean;
   path: string[];
+  /** Declassifiers this flow passed through (with the policy's reason); absent for a direct flow. */
+  via?: { name: string; reason: string }[];
 }
 
 export interface FnEvidence {
@@ -55,7 +58,7 @@ export interface CheckResult {
   diags: Diag[];
   evidence: Map<string, FnEvidence>;
   flows: FlowEdge[];
-  manifest: { fn: string; needs: string[] }[];
+  manifest: { fn: string; needs: string[]; declassifies: { name: string; reason: string }[] }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +165,7 @@ interface Ctx {
   prog: Program;
   pol: Policy;
   root: FnDef;
+  cur: FnDef; // the function whose body is being evaluated (differs from root while inlining a callee)
   depth: number;
   report: boolean; // emit range obligations / magnitude tracking (root function only)
   pc: Label;
@@ -171,6 +175,7 @@ interface Ctx {
     flows: FlowEdge[];
     maxAbs: bigint;
     seen: Set<string>;
+    declUsed: Set<string>; // declassifiers applied lexically in the root function
     n: number;
   };
 }
@@ -378,6 +383,9 @@ function evalMatch(e: Extract<Expr, { k: 'match' }>, env: Env, ctx: Ctx): AV {
 function evalCall(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   const name = e.fn;
 
+  // --- declassification (policy-declared, explicit, named) --------------------
+  if (name === 'declassify') return evalDeclassify(e, env, ctx);
+
   // --- capability operations -------------------------------------------------
   if (name in CAP_OPS) return evalOp(e, env, ctx);
 
@@ -422,9 +430,71 @@ function callFn(f: FnDef, args: AV[], site: Expr, ctx: Ctx): AV {
     diag(ctx, 'warn', 'W-depth', `inlining depth limit reached at ${f.name}; result is unconstrained`);
     return topAV();
   }
-  const sub: Ctx = { ...ctx, depth: ctx.depth + 1, report: false };
+  const sub: Ctx = { ...ctx, cur: f, depth: ctx.depth + 1, report: false };
   const r = evalExpr(f.body, env, sub);
   return mapLabels(r, (l) => L.step(l, `${f.name}()`));
+}
+
+/** Does labelled source `Type.field` hold data above `to`? Unknown sources are treated as needing release. */
+function sourceNeedsRelease(prog: Program, src: string, to: Conf): boolean {
+  const [tn, fn] = src.split('.');
+  const t = prog.types.get(tn);
+  if (!t || !fn) return true;
+  const r = resolveType(prog, t);
+  const f = r.k === 'rec' ? r.fields.find((x) => x.name === fn) : undefined;
+  return f ? !L.confLE(f.conf, to) : true;
+}
+
+/**
+ * (declassify name expr): controlled release. Only the policy can create a declassifier; the code can only
+ * name one. Lowers confidentiality from `from` (or below) to `to`, leaves integrity alone, and leaves the
+ * implicit-flow label (ctx.pc) alone, so a release under a secret branch still carries the branch label.
+ */
+function evalDeclassify(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
+  const d = asDeclassify(e);
+  if (!d) {
+    diag(ctx, 'error', 'E-arity', `declassify is (declassify name expr), got ${printExpr(e)}`);
+    e.args.slice(1).forEach((a) => evalExpr(a, env, ctx));
+    return topAV();
+  }
+  const v = evalExpr(d.expr, env, ctx);
+  const decl = ctx.pol.declassifiers.get(d.name);
+  if (!decl) {
+    diag(ctx, 'error', 'E-policy', `declassifier ${d.name} is not declared in the policy (code cannot invent declassifiers)`);
+    return v; // labels unchanged: the leak will also be reported where it lands
+  }
+  if (ctx.depth === 0) {
+    ctx.acc.declUsed.add(d.name);
+    if (!ctx.cur.declassifies.includes(d.name)) {
+      diag(ctx, 'error', 'E-declassify', `${ctx.cur.name} applies declassifier ${d.name} but does not declare it in (declassifies ...)`);
+    }
+  }
+  if (decl.fns && !decl.fns.includes(ctx.cur.name)) {
+    diag(ctx, 'error', 'E-policy', `declassifier ${d.name} may only be used in ${decl.fns.join(', ')}, not ${ctx.cur.name}`);
+  }
+  const fl = flatten(v);
+  if (decl.fields) {
+    const stray = [...fl.srcs.keys()].filter((s) => !decl.fields!.includes(s));
+    if (stray.length) {
+      diag(ctx, 'error', 'E-policy', `declassifier ${d.name} is restricted to ${decl.fields.join(', ')}, but ${printExpr(d.expr)} carries ${stray.join(', ')}`);
+    }
+  }
+  if (!L.confLE(fl.conf, decl.from)) {
+    diag(
+      ctx,
+      'error',
+      'E-flow',
+      `${fl.conf} data reaches declassifier ${d.name}, which releases only up to ${decl.from} (value: ${printExpr(d.expr)})`,
+      [...fl.srcs].map(([src, path]) => ({ src, path: [...path, `-> declassify ${d.name}`] })),
+    );
+    return v; // not released
+  }
+  return mapLabels(v, (l) => L.declassifyLabel(l, decl.to, d.name, decl.from, (src) => sourceNeedsRelease(ctx.prog, src, decl.to)));
+}
+
+function viaOf(ctx: Ctx, path: string[]): FlowEdge['via'] {
+  const names = [...new Set(L.viaNames(path))];
+  return names.length ? names.map((name) => ({ name, reason: ctx.pol.declassifiers.get(name)?.reason ?? '' })) : undefined;
 }
 
 function construct(
@@ -515,7 +585,7 @@ function evalOp(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   const sink = ctx.pol.sinks.get(handle) ?? { accepts: 'public' as const };
   const ok = L.confLE(data.conf, sink.accepts);
   for (const [src, path] of data.srcs) {
-    if (ctx.report || ctx.depth > 0) ctx.acc.flows.push({ src, sink: handle, ok, path: [...path, `-> ${handle}`] });
+    if (ctx.report || ctx.depth > 0) ctx.acc.flows.push({ src, sink: handle, ok, path: [...path, `-> ${handle}`], via: viaOf(ctx, path) });
   }
   if (!ok) {
     diag(
@@ -707,11 +777,15 @@ function trackAll(ctx: Ctx, av: AV | undefined, depth = 0): void {
 }
 
 export function checkFn(prog: Program, pol: Policy, f: FnDef, into: CheckResult): void {
-  const acc: Ctx['acc'] = { diags: into.diags, obs: [], flows: into.flows, maxAbs: 0n, seen: new Set(), n: 0 };
-  const ctx: Ctx = { prog, pol, root: f, depth: 0, report: true, pc: L.bottom(), acc };
+  const acc: Ctx['acc'] = { diags: into.diags, obs: [], flows: into.flows, maxAbs: 0n, seen: new Set(), declUsed: new Set(), n: 0 };
+  const ctx: Ctx = { prog, pol, root: f, cur: f, depth: 0, report: true, pc: L.bottom(), acc };
 
   for (const n of f.needs) {
     if (!prog.binds.has(n)) diag(ctx, 'error', 'E-cap', `${f.name} needs ${n}, but the program wiring has no (bind ${n} ...)`);
+  }
+
+  for (const n of f.declassifies) {
+    if (!pol.declassifiers.has(n)) diag(ctx, 'error', 'E-policy', `${f.name} declares declassifier ${n}, which is not declared in the policy`);
   }
 
   const env: Env = new Map();
@@ -736,6 +810,9 @@ export function checkFn(prog: Program, pol: Policy, f: FnDef, into: CheckResult)
     else oblige(ctx, 'ensures', desc, 'unproved', 'intervals are not enough (relational property); needs SMT or tests');
     void i;
   });
+  for (const n of f.declassifies) {
+    if (pol.declassifiers.has(n) && !acc.declUsed.has(n)) diag(ctx, 'warn', 'W-declassify', `${f.name} declares declassifier ${n} but never applies it`);
+  }
   if (f.requires.length) diag(ctx, 'warn', 'W-requires', 'requires clauses are not used by the interval analysis');
 
   into.evidence.set(f.name, {
@@ -786,14 +863,24 @@ export function check(prog: Program, pol: Policy): CheckResult {
   }
 
   // Manifest: what each capability-using function may touch.
-  for (const f of prog.fns.values()) if (f.needs.length) res.manifest.push({ fn: f.name, needs: f.needs });
+  for (const f of prog.fns.values()) {
+    if (f.needs.length || f.declassifies.length) {
+      res.manifest.push({
+        fn: f.name,
+        needs: f.needs,
+        declassifies: f.declassifies.map((name) => ({ name, reason: pol.declassifiers.get(name)?.reason ?? '(undeclared)' })),
+      });
+    }
+  }
 
   // De-duplicate flow edges (keep shortest path per src->sink, preferring violations).
   const best = new Map<string, FlowEdge>();
   for (const fe of res.flows) {
     const k = `${fe.src}|${fe.sink}`;
     const cur = best.get(k);
-    if (!cur || (!fe.ok && cur.ok) || (fe.ok === cur.ok && fe.path.length < cur.path.length)) best.set(k, fe);
+    // Prefer violations, then direct flows over declassified ones (a direct flow is the stronger claim), then shorter paths.
+    const viaRank = (x: FlowEdge) => (x.via ? 1 : 0);
+    if (!cur || (!fe.ok && cur.ok) || (fe.ok === cur.ok && (viaRank(fe) < viaRank(cur) || (viaRank(fe) === viaRank(cur) && fe.path.length < cur.path.length)))) best.set(k, fe);
   }
   res.flows = [...best.values()];
   return res;

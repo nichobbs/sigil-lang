@@ -69,6 +69,7 @@ function fn(a: Arity, f: FnDef): string {
     `(${f.params.map((p) => `(${p.name} ${ty(p.type)})`).join(' ')})`,
     ty(f.out),
     f.needs.length ? `(needs ${f.needs.join(' ')})` : '',
+    f.declassifies.length ? `(declassifies ${f.declassifies.join(' ')})` : '',
     ...f.requires.map((r) => `(req ${expr(a, r)})`),
     ...f.ensures.map((r) => `(ens ${expr(a, r)})`),
     f.body.k === 'do' ? f.body.body.map((b) => expr(a, b)).join(' ') : expr(a, f.body),

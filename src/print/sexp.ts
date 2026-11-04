@@ -68,6 +68,7 @@ export function printFn(f: FnDef): string {
     `(in ${f.params.map((p) => `(${p.name} ${printType(p.type)})`).join(' ')})`,
     `(out ${printType(f.out)})`,
     f.needs.length ? `(needs ${f.needs.join(' ')})` : '',
+    f.declassifies.length ? `(declassifies ${f.declassifies.join(' ')})` : '',
     ...f.requires.map((r) => `(requires ${printExpr(r)})`),
     ...f.ensures.map((r) => `(ensures ${printExpr(r)})`),
   ].filter(Boolean);

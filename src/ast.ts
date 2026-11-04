@@ -39,6 +39,7 @@ export interface FnDef {
   params: { name: string; type: Type }[];
   out: Type;
   needs: string[]; // capability handles, e.g. store:invoices
+  declassifies: string[]; // declassifiers (declared in the policy) this function may apply
   requires: Expr[];
   ensures: Expr[];
   body: Expr;
@@ -72,9 +73,31 @@ export interface SinkPolicy {
   accepts: Conf;
 }
 
+/** A human-declared, auditable release of labelled data: confidentiality `from` (or below) becomes `to`. */
+export interface Declassifier {
+  name: string;
+  from: Conf;
+  to: Conf;
+  reason: string;
+  fields?: string[]; // restriction: only data whose labelled sources are among these (e.g. Customer.name)
+  fns?: string[]; // restriction: only these functions may apply it
+}
+
 export interface Policy {
   allow: { kind: string; key?: string; pattern?: string }[];
   sinks: Map<string, SinkPolicy>;
+  declassifiers: Map<string, Declassifier>;
+}
+
+/**
+ * `(declassify name expr)` is represented as an ordinary call whose first argument is the declassifier
+ * name. (A dedicated Expr kind would force every exhaustive switch, including the Wasm backend, to change.)
+ */
+export const DECLASSIFY = 'declassify';
+export function asDeclassify(e: Expr): { name: string; expr: Expr } | null {
+  if (e.k !== 'call' || e.fn !== DECLASSIFY || e.kw.length || e.args.length !== 2) return null;
+  const n = e.args[0];
+  return n.k === 'var' && n.path.length === 0 ? { name: n.name, expr: e.args[1] } : null;
 }
 
 export const CONFS: Conf[] = ['public', 'internal', 'pii', 'secret'];

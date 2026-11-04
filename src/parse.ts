@@ -1,6 +1,7 @@
 import {
   Conf,
   CONFS,
+  Declassifier,
   Expr,
   Field,
   FnDef,
@@ -153,6 +154,10 @@ function parseForm(s: Extract<SExp, { t: 'list' }>): Expr {
       if (rest.length === 0) return fail('empty do', s);
       return { k: 'do', body: rest.map(parseExpr) };
     }
+    case 'declassify': {
+      if (rest.length !== 2 || !isSym(rest[0]) || rest[0].v.startsWith(':') || rest[0].v.includes('.')) return fail('(declassify name expr), where name is declared in the policy', s);
+      return { k: 'call', fn: 'declassify', args: [{ k: 'var', name: rest[0].v, path: [] }, parseExpr(rest[1])], kw: [] };
+    }
     case 'try': {
       if (rest.length !== 3 || !isSym(rest[1], ':on-err')) return fail('(try expr :on-err Variant)', s);
       return { k: 'try', expr: parseExpr(rest[0]), onErr: sym(rest[2], 'error variant', s) };
@@ -179,11 +184,11 @@ function parseForm(s: Extract<SExp, { t: 'list' }>): Expr {
 // Top-level forms
 // ---------------------------------------------------------------------------
 
-const FN_CLAUSES = new Set(['in', 'out', 'needs', 'requires', 'ensures']);
+const FN_CLAUSES = new Set(['in', 'out', 'needs', 'declassifies', 'requires', 'ensures']);
 
 function parseFn(s: Extract<SExp, { t: 'list' }>): FnDef {
   const name = sym(s.items[1], 'function name', s);
-  const fn: FnDef = { name, params: [], out: { k: 'unit' }, needs: [], requires: [], ensures: [], body: { k: 'int', v: 0n } };
+  const fn: FnDef = { name, params: [], out: { k: 'unit' }, needs: [], declassifies: [], requires: [], ensures: [], body: { k: 'int', v: 0n } };
   let i = 2;
   let sawOut = false;
   for (; i < s.items.length; i++) {
@@ -205,6 +210,9 @@ function parseFn(s: Extract<SExp, { t: 'list' }>): FnDef {
         break;
       case 'needs':
         fn.needs = body.map((b) => sym(b, 'capability handle', c));
+        break;
+      case 'declassifies':
+        fn.declassifies = body.map((b) => sym(b, 'declassifier name', c));
         break;
       case 'requires':
         fn.requires.push(...body.map(parseExpr));
@@ -239,6 +247,7 @@ export function parseProgram(src: string, into: Program = emptyProgram()): Progr
       }
       case 'fn': {
         const fn = parseFn(form);
+        if (fn.name === 'declassify') fail('declassify is a reserved form name', form);
         if (p.fns.has(fn.name)) fail(`duplicate fn ${fn.name}`, form);
         p.fns.set(fn.name, fn);
         break;
@@ -318,8 +327,42 @@ export function parseProgram(src: string, into: Program = emptyProgram()): Progr
   return p;
 }
 
+const DECL_FORM = '(declassify name (from conf) (to conf) (reason "...") [(fields Type.field ...)] [(fns fn ...)])';
+
+function parseDeclassifier(c: Extract<SExp, { t: 'list' }>): Declassifier | undefined {
+  if (c.items.length < 2 || !isSym(c.items[1])) return fail(DECL_FORM, c);
+  const name = sym(c.items[1], 'declassifier name', c);
+  const conf = (x: SExp | undefined, what: string): Conf => {
+    const w = x && x.t === 'sym' ? x.v : '';
+    if (!(CONFS as string[]).includes(w)) return fail(`${what}: unknown confidentiality ${w || '(missing)'}`, c);
+    return w as Conf;
+  };
+  let from: Conf | undefined;
+  let to: Conf | undefined;
+  let reason: string | undefined;
+  let fields: string[] | undefined;
+  let fns: string[] | undefined;
+  for (const cl of c.items.slice(2)) {
+    if (!isList(cl) || !isSym(cl.items[0])) return fail(DECL_FORM, cl);
+    const tag = (cl.items[0] as { v: string }).v;
+    if (tag === 'from') from = conf(cl.items[1], 'from');
+    else if (tag === 'to') to = conf(cl.items[1], 'to');
+    else if (tag === 'reason') {
+      const r = cl.items[1];
+      if (!r || r.t !== 'str' || !r.v.trim() || cl.items.length !== 2) return fail('(reason "non-empty human-readable justification")', cl);
+      reason = r.v;
+    } else if (tag === 'fields') fields = cl.items.slice(1).map((x) => sym(x, 'Type.field', cl));
+    else if (tag === 'fns') fns = cl.items.slice(1).map((x) => sym(x, 'function name', cl));
+    else return fail(`unknown declassify clause ${tag}`, cl);
+  }
+  if (!from || !to || reason === undefined) return fail(`declassifier ${name} needs (from ...), (to ...) and a (reason "...")`, c);
+  if (CONFS.indexOf(to) >= CONFS.indexOf(from)) return fail(`declassifier ${name}: (to ${to}) must be strictly lower than (from ${from})`, c);
+  if ((fields && !fields.length) || (fns && !fns.length)) return fail(`declassifier ${name}: empty restriction list`, c);
+  return { name, from, to, reason, fields, fns };
+}
+
 export function parsePolicy(src: string): Policy {
-  const pol: Policy = { allow: [], sinks: new Map() };
+  const pol: Policy = { allow: [], sinks: new Map(), declassifiers: new Map() };
   for (const form of readAll(src)) {
     if (!isList(form) || !isSym(form.items[0], 'policy')) {
       fail('expected (policy ...)', form);
@@ -349,6 +392,12 @@ export function parsePolicy(src: string): Policy {
         const w = sym(acc.items[1], 'confidentiality level', acc);
         if (!(CONFS as string[]).includes(w)) fail(`unknown confidentiality ${w}`, acc);
         pol.sinks.set(handle, { accepts: w as Conf });
+      } else if (tag === 'declassify') {
+        const d = parseDeclassifier(c);
+        if (d) {
+          if (pol.declassifiers.has(d.name)) fail(`duplicate declassifier ${d.name}`, c);
+          pol.declassifiers.set(d.name, d);
+        }
       } else fail(`unknown policy clause ${tag}`, c);
     }
   }
