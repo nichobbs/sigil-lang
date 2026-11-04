@@ -20,3 +20,4 @@
 {"task":"C2","lang":"ts","model":"haiku","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"leakHints":[],"tokens":87676,"tools":7,"ms":40644,"failures":[]}
 {"task":"C1","lang":"ts","model":"haiku","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"leakHints":[],"tokens":96214,"tools":9,"ms":89320,"failures":[]}
 {"task":"C3","lang":"sigil","model":"haiku","run":1,"passed":43,"total":43,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","leakHints":[],"tokens":107822,"tools":11,"ms":121200,"failures":[]}
+{"task":"C2","lang":"sigil","model":"haiku","run":1,"passed":45,"total":45,"m1":true,"trapTotal":3,"trapViolations":0,"verify":"clean","leakHints":[],"tokens":115703,"tools":11,"ms":324279,"failures":[]}
