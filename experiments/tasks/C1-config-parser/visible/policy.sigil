@@ -1,0 +1,3 @@
+; Human-owned policy for C1: the parser is a pure function and asks for no capability.
+
+(policy)

@@ -1,0 +1,1269 @@
+{
+  "entry": "parse-config",
+  "cases": [
+    {
+      "name": "empty text has no settings",
+      "args": {
+        "text": ""
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": []
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "only comments and blank lines",
+      "args": {
+        "text": "# hello\n\n   \t# indented comment\n# a = 1\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": []
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "no spaces around the equals sign",
+      "args": {
+        "text": "a=1"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "a",
+                "kind": "IntValue",
+                "num": 1,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "tabs and spaces around key and value",
+      "args": {
+        "text": "\ta\t=\t5\t \n  b   =   true  "
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "a",
+                "kind": "IntValue",
+                "num": 5,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "b",
+                "kind": "BoolValue",
+                "num": 0,
+                "flag": true,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "booleans, and settings come in file order",
+      "args": {
+        "text": "z = true\ny = false\nx = true\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "z",
+                "kind": "BoolValue",
+                "num": 0,
+                "flag": true,
+                "text": ""
+              },
+              {
+                "key": "y",
+                "kind": "BoolValue",
+                "num": 0,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "x",
+                "kind": "BoolValue",
+                "num": 0,
+                "flag": true,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "empty string",
+      "args": {
+        "text": "s = \"\"\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "s",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "comment character inside a quoted string is kept",
+      "trap": true,
+      "args": {
+        "text": "url = \"http://example.com/#top\"  # the url\nmsg = \"a # b\"\ntag = \"#\"\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "url",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "http://example.com/#top"
+              },
+              {
+                "key": "msg",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "a # b"
+              },
+              {
+                "key": "tag",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "#"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "comment right after a closing quote and quotes inside the comment",
+      "args": {
+        "text": "a = \"x\" #\"y\"\nb = \"z\"#c\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "a",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "x"
+              },
+              {
+                "key": "b",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "z"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "equals signs inside a string",
+      "args": {
+        "text": "eq = \"a=b=c\"\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "eq",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "a=b=c"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "signs and zero",
+      "args": {
+        "text": "a = +5\nb = -5\nc = -0\nd = 0\ne = +0\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "a",
+                "kind": "IntValue",
+                "num": 5,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "b",
+                "kind": "IntValue",
+                "num": -5,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "c",
+                "kind": "IntValue",
+                "num": 0,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "d",
+                "kind": "IntValue",
+                "num": 0,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "e",
+                "kind": "IntValue",
+                "num": 0,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "integer range limits are accepted",
+      "args": {
+        "text": "hi = 2147483647\nlo = -2147483648\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "hi",
+                "kind": "IntValue",
+                "num": 2147483647,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "lo",
+                "kind": "IntValue",
+                "num": -2147483648,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "integer one above the range is refused",
+      "trap": true,
+      "args": {
+        "text": "n = 2147483648\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "integer one below the range is refused",
+      "args": {
+        "text": "ok = 1\nn = -2147483649\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "integer with many digits is refused",
+      "args": {
+        "text": "n = 99999999999999999999\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "leading zeros do not count against the range",
+      "args": {
+        "text": "n = 0000000000000000000000000000000000000042\nm = -0002147483648\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "n",
+                "kind": "IntValue",
+                "num": 42,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "m",
+                "kind": "IntValue",
+                "num": -2147483648,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "comment right after an integer and after a boolean",
+      "args": {
+        "text": "n = 5#c\nb = true # yes\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "n",
+                "kind": "IntValue",
+                "num": 5,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "b",
+                "kind": "BoolValue",
+                "num": 0,
+                "flag": true,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "key charset: letters, digits, underscore, dot, hyphen; case matters",
+      "args": {
+        "text": "A_b.c-d9 = 1\n_x = 2\nPort = 3\nport = 4\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "A_b.c-d9",
+                "kind": "IntValue",
+                "num": 1,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "_x",
+                "kind": "IntValue",
+                "num": 2,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "Port",
+                "kind": "IntValue",
+                "num": 3,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "port",
+                "kind": "IntValue",
+                "num": 4,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "a key of 64 characters is accepted",
+      "args": {
+        "text": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk = 1\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+                "kind": "IntValue",
+                "num": 1,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "a key of 65 characters is refused",
+      "args": {
+        "text": "ok = 1\nkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk = 1\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "key starting with a digit",
+      "args": {
+        "text": "1a = 1\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "key containing a space",
+      "args": {
+        "text": "my key = 1\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "key containing a hash",
+      "args": {
+        "text": "a#b = 1\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "line without an equals sign",
+      "args": {
+        "text": "# c\nport\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "empty key",
+      "args": {
+        "text": "= 5\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "non-ASCII key",
+      "args": {
+        "text": "café = 1\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "missing value",
+      "args": {
+        "text": "a = \n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "comment where the value should be",
+      "args": {
+        "text": "ok = 1\na =# c\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "boolean spelling is exact",
+      "args": {
+        "text": "a = True\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "not an integer: fraction",
+      "args": {
+        "text": "a = 1.5\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "a sign alone is not an integer",
+      "args": {
+        "text": "a = -\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "two values on one line",
+      "args": {
+        "text": "a = 5 6\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "text after a closing quote",
+      "args": {
+        "text": "a = \"x\" y\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "a quote inside a bare token is a bad value, not unterminated",
+      "args": {
+        "text": "a = x\"y\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "unterminated string",
+      "args": {
+        "text": "a = \"abc\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "Unterminated"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "unterminated string containing a hash",
+      "args": {
+        "text": "ok = 1\na = \"abc # not closed\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "Unterminated"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "line numbers count comments and blank lines",
+      "args": {
+        "text": "# c\n\n  \nbad line\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 4,
+            "reason": "BadKey"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "duplicate key is refused, not overwritten",
+      "trap": true,
+      "args": {
+        "text": "a = 1\na = 2\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "Duplicate"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "duplicate key with another type, after other settings and a comment",
+      "args": {
+        "text": "a = 1\nb = 2\n# note\na = true\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 4,
+            "reason": "Duplicate"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "keys that differ only in case are not duplicates",
+      "args": {
+        "text": "a = 1\nA = 2\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "a",
+                "kind": "IntValue",
+                "num": 1,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "A",
+                "kind": "IntValue",
+                "num": 2,
+                "flag": false,
+                "text": ""
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "a bad value on a duplicate key line is reported as a bad value",
+      "args": {
+        "text": "a = 1\na = nope\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "the first offending line wins",
+      "args": {
+        "text": "a = 1\nb = x\nc\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 2,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "carriage returns are ordinary characters",
+      "args": {
+        "text": "a = 1\r\nb = 2\r\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "line": 1,
+            "reason": "BadValue"
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "non-ASCII text in strings and comments",
+      "args": {
+        "text": "n = \"café\"  # über\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "n",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "café"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "a realistic file",
+      "args": {
+        "text": "# server\nhost = \"db.internal\"\nport = 5432\nssl = true\n\n# limits\nmax_conn = 100  # per node\nretry-delay = -1\nbanner = \"# not a comment\"\n"
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "host",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "db.internal"
+              },
+              {
+                "key": "port",
+                "kind": "IntValue",
+                "num": 5432,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "ssl",
+                "kind": "BoolValue",
+                "num": 0,
+                "flag": true,
+                "text": ""
+              },
+              {
+                "key": "max_conn",
+                "kind": "IntValue",
+                "num": 100,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "retry-delay",
+                "kind": "IntValue",
+                "num": -1,
+                "flag": false,
+                "text": ""
+              },
+              {
+                "key": "banner",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "# not a comment"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "text of exactly 2000 characters",
+      "args": {
+        "text": "s = \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "settings": [
+              {
+                "key": "s",
+                "kind": "TextValue",
+                "num": 0,
+                "flag": false,
+                "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    }
+  ]
+}

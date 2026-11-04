@@ -1,0 +1,106 @@
+; Glossary for C1: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and function named in README.md (Config, Setting, Kind, ParseError, Reason, parse-config),
+; so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "the config line {l:Str}"
+    (default cfg "")
+    (set cfg (text cfg l "\n")))
+
+  ; a setting line "key = "value"" whose value is a quoted string
+  (given "the string setting {k:Str} is {v:Str}"
+    (default cfg "")
+    (set cfg (text cfg k " = \"" v "\"\n")))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "the config is parsed"
+    (default cfg "")
+    (call result parse-config cfg))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the config has {n:Int} settings"
+    (expect (match result (ok c (= (len c.settings) n)) (err e false))))
+
+  (then "the setting {key:Str} is the integer {v:Int}"
+    (expect (match result
+              (ok c (= (len (filter c.settings (fn (s) (and (= s.key key) (= s.kind IntValue) (= s.num v))))) 1))
+              (err e false))))
+
+  (then "the setting {key:Str} is true"
+    (expect (match result
+              (ok c (= (len (filter c.settings (fn (s) (and (= s.key key) (= s.kind BoolValue) s.flag)))) 1))
+              (err e false))))
+
+  (then "the setting {key:Str} is false"
+    (expect (match result
+              (ok c (= (len (filter c.settings (fn (s) (and (= s.key key) (= s.kind BoolValue) (not s.flag))))) 1))
+              (err e false))))
+
+  (then "the setting {key:Str} is the text {t:Str}"
+    (expect (match result
+              (ok c (= (len (filter c.settings (fn (s) (and (= s.key key) (= s.kind TextValue) (= s.text t))))) 1))
+              (err e false))))
+
+  (then "the parse fails on line {n:Int} with {why:Reason}"
+    (expect (= result (err (ParseError n why)))))
+
+  ; ---- Properties -------------------------------------------------------------
+  (always "The text is read line by line. Lines are separated by a newline character; the first line is line 1, and blank lines and comment lines count. A line is blank when it holds only spaces and tabs, and a comment line when its first character after any spaces and tabs is a hash. Blank lines and comment lines are skipped."
+    (forall ((b Bool))
+      (and
+           (= (parse-config "# c\n\n  \nbad line\n") (err (ParseError 4 BadKey)))
+           (= (parse-config "  \t\n# x = 1\n") (ok (Config (list)))))))
+
+  (always "A setting line is a key, an equals sign and a value, with any number of spaces and tabs around the key, around the equals sign and around the value. After the value, a hash starts a comment that runs to the end of the line."
+    (forall ((n (Int -2147483648 2147483647)))
+      (= (parse-config (text "k\t=  " n " # c")) (ok (Config (list (Setting "k" IntValue n false "")))))))
+
+  (always "A key starts with a letter or an underscore, continues with letters, digits, underscores, dots and hyphens, and has at most 64 characters. Letters are the plain English letters A to Z and a to z, and case matters. The key is everything before the first equals sign on the line, without the spaces and tabs around it. A line whose key is not valid, or that has no equals sign, is refused as BadKey."
+    (forall ((b Bool))
+      (and
+           (= (parse-config "A_b.c-d9 = 1") (ok (Config (list (Setting "A_b.c-d9" IntValue 1 false "")))))
+           (= (parse-config "1a = 1") (err (ParseError 1 BadKey)))
+           (= (parse-config "port") (err (ParseError 1 BadKey)))
+           (= (parse-config "my key = 1") (err (ParseError 1 BadKey)))
+           (= (parse-config "a = 1\nA = 2") (ok (Config (list (Setting "a" IntValue 1 false "") (Setting "A" IntValue 2 false ""))))))))
+
+  (always "A value is an integer, a boolean or a quoted string. An integer is an optional plus or minus sign and then one or more digits, with any number of leading zeros, and its value must be from -2147483648 to 2147483647 inclusive; any other whole number is refused as BadValue. A boolean is exactly true or exactly false in lower case."
+    (forall ((n (Int 0 2147483647)))
+      (and (= (parse-config (text "n = 000" n)) (ok (Config (list (Setting "n" IntValue n false "")))))
+           (= (parse-config "n = 2147483648") (err (ParseError 1 BadValue)))
+           (= (parse-config "n = -2147483648") (ok (Config (list (Setting "n" IntValue -2147483648 false "")))))
+           (= (parse-config "n = -2147483649") (err (ParseError 1 BadValue)))
+           (= (parse-config "b = True") (err (ParseError 1 BadValue)))
+           (= (parse-config "b = true") (ok (Config (list (Setting "b" BoolValue 0 true ""))))))))
+
+  (always "A quoted string starts with a double quote and ends at the next double quote on the same line. It can hold any other characters, including hashes, equals signs, spaces and tabs, and it has no escape sequences. A hash inside a quoted string is part of the string and never starts a comment. A string that starts with a double quote and has no closing double quote on its line is refused as Unterminated."
+    (forall ((b Bool))
+      (and
+           (= (parse-config "s = \"a # b = c\"  # d") (ok (Config (list (Setting "s" TextValue 0 false "a # b = c")))))
+           (= (parse-config "s = \"abc # d") (err (ParseError 1 Unterminated))))))
+
+  (always "Anything else in the value position, and anything other than spaces, tabs or a comment after the value, is refused as BadValue. A missing value, or a comment where the value should be, is refused as BadValue. A carriage return is an ordinary character, not a space."
+    (forall ((b Bool))
+      (and
+           (= (parse-config "a = 1.5") (err (ParseError 1 BadValue)))
+           (= (parse-config "a = 5 6") (err (ParseError 1 BadValue)))
+           (= (parse-config "a = ") (err (ParseError 1 BadValue)))
+           (= (parse-config "a =# c") (err (ParseError 1 BadValue)))
+           (= (parse-config "a = \"x\" y") (err (ParseError 1 BadValue))))))
+
+  (always "A key may be set only once. A second setting line for a key that an earlier line already set is refused as Duplicate, and keys that differ in case are different keys. The first of the checks on a line that fails decides its reason, in this order: BadKey, then Unterminated or BadValue for the value, then Duplicate."
+    (forall ((b Bool))
+      (and
+           (= (parse-config "a = 1\na = 2") (err (ParseError 2 Duplicate)))
+           (= (parse-config "a = 1\na = nope") (err (ParseError 2 BadValue)))
+           (= (parse-config "a = 1\na = \"oops") (err (ParseError 2 Unterminated)))
+           (= (parse-config "a = 1\nb = 2\n# c\na = 3") (err (ParseError 4 Duplicate))))))
+
+  (always "The result lists the settings in the order of their lines. When any line is refused, the result is only the error: the number of the first refused line and its reason. Lines after that line are not examined."
+    (forall ((b Bool))
+      (and
+           (= (parse-config "a = 1\nb = x\nc\n") (err (ParseError 2 BadValue)))
+           (= (parse-config "z = true\ny = false") (ok (Config (list (Setting "z" BoolValue 0 true "") (Setting "y" BoolValue 0 false ""))))))))
+)
