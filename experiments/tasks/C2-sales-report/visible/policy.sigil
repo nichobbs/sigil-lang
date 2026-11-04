@@ -1,0 +1,4 @@
+; Human-owned policy for C2: what a program may request, and what each sink may receive.
+; The report is a pure computation over its inputs: no capability is needed, so none is allowed.
+
+(policy)
