@@ -253,8 +253,7 @@ describe('wasm backend: numeric fixture', () => {
     expect(rep('sum-line').compilable, rep('sum-line').reason).toBe(true); // lists compile now
     expect(rep('uses-unsafe').compilable).toBe(false);
     expect(rep('uses-unsafe').reason).toMatch(/unsafe-div.*not compilable.*not proved/);
-    expect(rep('passes-record').compilable).toBe(false);
-    expect(rep('passes-record').reason).toMatch(/record|scalar/);
+    expect(rep('passes-record').compilable, rep('passes-record').reason).toBe(true); // records are first-class values now
     expect(rep('unsafe-div').compilable).toBe(false);
     expect(rep('unsafe-div').reason).toMatch(/not proved/);
   });

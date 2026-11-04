@@ -287,12 +287,11 @@ describe('wasm lists: fixture', () => {
   it('refuses the still-unsupported things, with reasons', () => {
     expect(rep('str-list').compilable).toBe(false);
     expect(rep('str-list').reason).toMatch(/str/);
-    expect(rep('res-fn').compilable).toBe(false);
-    expect(rep('res-fn').reason).toMatch(/Result|result|ok/);
+    expect(rep('res-fn').compilable, rep('res-fn').reason).toBe(true); // Results are first-class values now
     expect(rep('cap-fn').compilable).toBe(false);
     expect(rep('cap-fn').reason).toMatch(/capabilit/);
     expect(rep('list-result').compilable).toBe(false);
-    expect(rep('list-result').reason).toMatch(/result has type list/);
+    expect(rep('list-result').reason).toMatch(/Str fields/); // list results are supported, but not while Str fields are unstored
     expect(rep('nested-list').compilable).toBe(false);
     expect(rep('nested-list').reason).toMatch(/nested list/);
   });
