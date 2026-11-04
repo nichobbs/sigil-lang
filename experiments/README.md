@@ -166,3 +166,7 @@ and are not part of this score.
 - Caps are advisory: 40 tool calls stated in the prompt; tokens and tool calls are read from the agent's reported usage afterwards.
 - Hidden-case isolation is by instruction and audit (the transcript is searched for hidden/ref paths), not by sandbox.
 - The independent reviewer pass for the TypeScript arm is not part of the pilot.
+
+### Scorer notes from the cost probe
+- Sigil arguments bind by name when every parameter name matches the case file, otherwise by position (the task README fixes the order; the agent chooses names). The first probe named a parameter `ls` for `lines` and scored 0/32 under strict naming; this was a scorer fix applied to all runs, not a solution fix.
+- `leakHints` searches the agent transcript for hidden or reference paths; it is a hint, to be read by hand.
