@@ -1,0 +1,70 @@
+; A3 rate limiter: reference implementation (Sigil).
+
+(type Tokens  (Int 0 1000000000))
+(type Cost    (Int 1 1000000))
+(type Millis  (Int 0 1000000000000000))
+(type Seconds (Int 0 1000000000000000))
+(type ApiKey  (Int 0 9007199254740991))
+(type Plan    (var Free Pro Enterprise))
+(type Reason  (var TooLarge Denied))
+
+(type Request   (rec (key ApiKey :pii) (plan Plan) (cost Cost) (now Millis)))
+(type State     (rec (start Millis) (used Tokens) (burst Bool)))
+(type Decision  (rec (remaining Tokens) (burst Bool)))
+(type Rejection (rec (reason Reason) (retryAfter Seconds)))
+(type Admitted  (rec (plan Plan) (cost Cost) (remaining Tokens) (burst Bool)))
+(type Refused   (rec (plan Plan) (cost Cost) (reason Reason) (retryAfter Seconds)))
+
+(fn allowance
+  (in (p Plan))
+  (out Tokens)
+  (match p (Free 100) (Pro 1000) (Enterprise 10000)))
+
+(fn burst-size
+  (in (p Plan))
+  (out Tokens)
+  (if (= p Free) 0 (div-floor (allowance p) 10)))
+
+(fn expired
+  (in (s State) (now Millis))
+  (out Bool)
+  (>= now (add s.start 60000)))
+
+(fn current
+  (in (s State) (now Millis))
+  (out State)
+  (if (expired s now) (State now 0 false) s))
+
+(fn retry-after
+  (in (s State) (now Millis))
+  (out Seconds)
+  (max 1 (div-floor (add (sub (add s.start 60000) now) 999) 1000)))
+
+(fn admit
+  (in (req Request) (state State))
+  (out (Result Decision Rejection))
+  (needs store:limits audit)
+  (let [cur   (current state req.now)
+        allow (allowance req.plan)
+        total (add cur.used req.cost)
+        extra (burst-size req.plan)]
+    (if (> req.cost allow)
+      (do (emit audit (Refused req.plan req.cost TooLarge 0))
+          (err (Rejection TooLarge 0)))
+      (if (<= total allow)
+        (do (put store:limits 0 (State cur.start (min total 1000000000) cur.burst))
+            (emit audit (Admitted req.plan req.cost (max 0 (sub allow total)) false))
+            (ok (Decision (max 0 (sub allow total)) false)))
+        (if (and (not cur.burst) (<= total (add allow extra)) (> extra 0))
+          (do (put store:limits 0 (State cur.start (min total 1000000000) true))
+              (emit audit (Admitted req.plan req.cost 0 true))
+              (ok (Decision 0 true)))
+          (let [r (retry-after cur req.now)]
+            (emit audit (Refused req.plan req.cost Denied r))
+            (err (Rejection Denied r))))))))
+
+(program limiter
+  (targets server browser)
+  (entry admit
+    (bind store:limits (store (ns "limits/limits") (mode append)))
+    (bind audit        (audit))))

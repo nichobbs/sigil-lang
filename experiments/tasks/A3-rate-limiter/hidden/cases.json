@@ -1,0 +1,1982 @@
+{
+  "entry": "admit",
+  "cases": [
+    {
+      "name": "TRAP exactly 60s after the start is a new window",
+      "trap": true,
+      "args": {
+        "req": {
+          "key": 7340100003,
+          "plan": "Free",
+          "cost": 30,
+          "now": 70000
+        },
+        "state": {
+          "start": 10000,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 70,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 70000,
+              "used": 30,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 30,
+              "remaining": 70,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100003"
+        ]
+      }
+    },
+    {
+      "name": "1 ms before the boundary is still the old window",
+      "args": {
+        "req": {
+          "key": 7340100010,
+          "plan": "Free",
+          "cost": 30,
+          "now": 69999
+        },
+        "state": {
+          "start": 10000,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 1
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 30,
+              "reason": "Denied",
+              "retryAfter": 1
+            }
+          ]
+        },
+        "forbid": [
+          "7340100010"
+        ]
+      }
+    },
+    {
+      "name": "1 ms after the boundary is a new window",
+      "args": {
+        "req": {
+          "key": 7340100017,
+          "plan": "Free",
+          "cost": 30,
+          "now": 70001
+        },
+        "state": {
+          "start": 10000,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 70,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 70001,
+              "used": 30,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 30,
+              "remaining": 70,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100017"
+        ]
+      }
+    },
+    {
+      "name": "far past the window: new window starts at now",
+      "args": {
+        "req": {
+          "key": 7340100024,
+          "plan": "Free",
+          "cost": 100,
+          "now": 5000000
+        },
+        "state": {
+          "start": 10000,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 5000000,
+              "used": 100,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 100,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100024"
+        ]
+      }
+    },
+    {
+      "name": "boundary at start 0",
+      "args": {
+        "req": {
+          "key": 7340100031,
+          "plan": "Free",
+          "cost": 1,
+          "now": 60000
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 99,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 60000,
+              "used": 1,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 1,
+              "remaining": 99,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100031"
+        ]
+      }
+    },
+    {
+      "name": "boundary resets the burst flag",
+      "args": {
+        "req": {
+          "key": 7340100038,
+          "plan": "Pro",
+          "cost": 10,
+          "now": 1700000060000
+        },
+        "state": {
+          "start": 1700000000000,
+          "used": 1100,
+          "burst": true
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 990,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 1700000060000,
+              "used": 10,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 10,
+              "remaining": 990,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100038"
+        ]
+      }
+    },
+    {
+      "name": "boundary resets the used count for a Pro plan",
+      "args": {
+        "req": {
+          "key": 7340100045,
+          "plan": "Pro",
+          "cost": 1000,
+          "now": 160000
+        },
+        "state": {
+          "start": 100000,
+          "used": 1000,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 160000,
+              "used": 1000,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 1000,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100045"
+        ]
+      }
+    },
+    {
+      "name": "just inside the window the used count carries over",
+      "args": {
+        "req": {
+          "key": 7340100052,
+          "plan": "Pro",
+          "cost": 1,
+          "now": 159999
+        },
+        "state": {
+          "start": 100000,
+          "used": 1000,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": true
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 100000,
+              "used": 1001,
+              "burst": true
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 1,
+              "remaining": 0,
+              "burst": true
+            }
+          ]
+        },
+        "forbid": [
+          "7340100052"
+        ]
+      }
+    },
+    {
+      "name": "TRAP retry-after rounds up to the next whole second",
+      "trap": true,
+      "args": {
+        "req": {
+          "key": 7340100059,
+          "plan": "Free",
+          "cost": 1,
+          "now": 10900
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 50
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 1,
+              "reason": "Denied",
+              "retryAfter": 50
+            }
+          ]
+        },
+        "forbid": [
+          "7340100059"
+        ]
+      }
+    },
+    {
+      "name": "retry-after with 1 ms left is 1, not 0",
+      "args": {
+        "req": {
+          "key": 7340100066,
+          "plan": "Free",
+          "cost": 1,
+          "now": 59999
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 1
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 1,
+              "reason": "Denied",
+              "retryAfter": 1
+            }
+          ]
+        },
+        "forbid": [
+          "7340100066"
+        ]
+      }
+    },
+    {
+      "name": "retry-after with exactly 1000 ms left is 1",
+      "args": {
+        "req": {
+          "key": 7340100073,
+          "plan": "Free",
+          "cost": 1,
+          "now": 59000
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 1
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 1,
+              "reason": "Denied",
+              "retryAfter": 1
+            }
+          ]
+        },
+        "forbid": [
+          "7340100073"
+        ]
+      }
+    },
+    {
+      "name": "retry-after with 1001 ms left is 2",
+      "args": {
+        "req": {
+          "key": 7340100080,
+          "plan": "Free",
+          "cost": 1,
+          "now": 58999
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 2
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 1,
+              "reason": "Denied",
+              "retryAfter": 2
+            }
+          ]
+        },
+        "forbid": [
+          "7340100080"
+        ]
+      }
+    },
+    {
+      "name": "retry-after is exact when ms left is a multiple of 1000",
+      "args": {
+        "req": {
+          "key": 7340100087,
+          "plan": "Free",
+          "cost": 5,
+          "now": 10000
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 50
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 5,
+              "reason": "Denied",
+              "retryAfter": 50
+            }
+          ]
+        },
+        "forbid": [
+          "7340100087"
+        ]
+      }
+    },
+    {
+      "name": "retry-after right after the window opened is 60",
+      "args": {
+        "req": {
+          "key": 7340100094,
+          "plan": "Free",
+          "cost": 1,
+          "now": 0
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 60
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 1,
+              "reason": "Denied",
+              "retryAfter": 60
+            }
+          ]
+        },
+        "forbid": [
+          "7340100094"
+        ]
+      }
+    },
+    {
+      "name": "retry-after with 59999 ms left is 60",
+      "args": {
+        "req": {
+          "key": 7340100101,
+          "plan": "Free",
+          "cost": 1,
+          "now": 1
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 60
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 1,
+              "reason": "Denied",
+              "retryAfter": 60
+            }
+          ]
+        },
+        "forbid": [
+          "7340100101"
+        ]
+      }
+    },
+    {
+      "name": "retry-after for a window that started at a large epoch time",
+      "args": {
+        "req": {
+          "key": 7340100108,
+          "plan": "Pro",
+          "cost": 300,
+          "now": 1700000012345
+        },
+        "state": {
+          "start": 1700000000000,
+          "used": 900,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 48
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 300,
+              "reason": "Denied",
+              "retryAfter": 48
+            }
+          ]
+        },
+        "forbid": [
+          "7340100108"
+        ]
+      }
+    },
+    {
+      "name": "retry-after for Enterprise mid-window",
+      "args": {
+        "req": {
+          "key": 7340100115,
+          "plan": "Enterprise",
+          "cost": 5000,
+          "now": 1700000031001
+        },
+        "state": {
+          "start": 1700000000000,
+          "used": 9000,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 29
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 5000,
+              "reason": "Denied",
+              "retryAfter": 29
+            }
+          ]
+        },
+        "forbid": [
+          "7340100115"
+        ]
+      }
+    },
+    {
+      "name": "exactly the allowance is allowed (Free)",
+      "args": {
+        "req": {
+          "key": 7340100122,
+          "plan": "Free",
+          "cost": 50,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 50,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 100,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 50,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100122"
+        ]
+      }
+    },
+    {
+      "name": "one over the allowance is denied (Free)",
+      "args": {
+        "req": {
+          "key": 7340100129,
+          "plan": "Free",
+          "cost": 51,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 50,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 55
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 51,
+              "reason": "Denied",
+              "retryAfter": 55
+            }
+          ]
+        },
+        "forbid": [
+          "7340100129"
+        ]
+      }
+    },
+    {
+      "name": "exactly the allowance is allowed (Pro)",
+      "args": {
+        "req": {
+          "key": 7340100136,
+          "plan": "Pro",
+          "cost": 400,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 600,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 1000,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 400,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100136"
+        ]
+      }
+    },
+    {
+      "name": "exactly the allowance is allowed (Enterprise)",
+      "args": {
+        "req": {
+          "key": 7340100143,
+          "plan": "Enterprise",
+          "cost": 2500,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 7500,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 10000,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 2500,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100143"
+        ]
+      }
+    },
+    {
+      "name": "Enterprise within burst room is borrowed, not denied",
+      "args": {
+        "req": {
+          "key": 7340100150,
+          "plan": "Enterprise",
+          "cost": 2501,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 7500,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": true
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 10001,
+              "burst": true
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 2501,
+              "remaining": 0,
+              "burst": true
+            }
+          ]
+        },
+        "forbid": [
+          "7340100150"
+        ]
+      }
+    },
+    {
+      "name": "TRAP the api key never reaches the store or the audit log",
+      "trap": true,
+      "args": {
+        "req": {
+          "key": 7340100157,
+          "plan": "Pro",
+          "cost": 120,
+          "now": 25000
+        },
+        "state": {
+          "start": 5000,
+          "used": 300,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 580,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 5000,
+              "used": 420,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 120,
+              "remaining": 580,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100157"
+        ]
+      }
+    },
+    {
+      "name": "api key absent from a denied request audit event",
+      "args": {
+        "req": {
+          "key": 7340100164,
+          "plan": "Free",
+          "cost": 60,
+          "now": 25000
+        },
+        "state": {
+          "start": 5000,
+          "used": 70,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 40
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 60,
+              "reason": "Denied",
+              "retryAfter": 40
+            }
+          ]
+        },
+        "forbid": [
+          "7340100164"
+        ]
+      }
+    },
+    {
+      "name": "cost equal to the whole allowance in a fresh window is allowed",
+      "args": {
+        "req": {
+          "key": 7340100171,
+          "plan": "Free",
+          "cost": 100,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 0,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 100,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 100,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100171"
+        ]
+      }
+    },
+    {
+      "name": "a small request in the middle of the window",
+      "args": {
+        "req": {
+          "key": 7340100178,
+          "plan": "Pro",
+          "cost": 25,
+          "now": 30000
+        },
+        "state": {
+          "start": 0,
+          "used": 200,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 775,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 225,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 25,
+              "remaining": 775,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100178"
+        ]
+      }
+    },
+    {
+      "name": "allowed request keeps the window start",
+      "args": {
+        "req": {
+          "key": 7340100185,
+          "plan": "Enterprise",
+          "cost": 1,
+          "now": 59000
+        },
+        "state": {
+          "start": 1000,
+          "used": 5,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 9994,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 1000,
+              "used": 6,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 1,
+              "remaining": 9994,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100185"
+        ]
+      }
+    },
+    {
+      "name": "cost one over the Free allowance is too large",
+      "args": {
+        "req": {
+          "key": 7340100192,
+          "plan": "Free",
+          "cost": 101,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 0,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "TooLarge",
+            "retryAfter": 0
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 101,
+              "reason": "TooLarge",
+              "retryAfter": 0
+            }
+          ]
+        },
+        "forbid": [
+          "7340100192"
+        ]
+      }
+    },
+    {
+      "name": "too large even when the burst would cover it (Pro)",
+      "args": {
+        "req": {
+          "key": 7340100199,
+          "plan": "Pro",
+          "cost": 1001,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 0,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "TooLarge",
+            "retryAfter": 0
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 1001,
+              "reason": "TooLarge",
+              "retryAfter": 0
+            }
+          ]
+        },
+        "forbid": [
+          "7340100199"
+        ]
+      }
+    },
+    {
+      "name": "too large (Enterprise)",
+      "args": {
+        "req": {
+          "key": 7340100206,
+          "plan": "Enterprise",
+          "cost": 10001,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 0,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "TooLarge",
+            "retryAfter": 0
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 10001,
+              "reason": "TooLarge",
+              "retryAfter": 0
+            }
+          ]
+        },
+        "forbid": [
+          "7340100206"
+        ]
+      }
+    },
+    {
+      "name": "too large in an expired window consumes nothing and changes no state",
+      "args": {
+        "req": {
+          "key": 7340100213,
+          "plan": "Free",
+          "cost": 500,
+          "now": 200000
+        },
+        "state": {
+          "start": 0,
+          "used": 90,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "TooLarge",
+            "retryAfter": 0
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 500,
+              "reason": "TooLarge",
+              "retryAfter": 0
+            }
+          ]
+        },
+        "forbid": [
+          "7340100213"
+        ]
+      }
+    },
+    {
+      "name": "too large far above the allowance",
+      "args": {
+        "req": {
+          "key": 7340100220,
+          "plan": "Pro",
+          "cost": 1000000,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 10,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "TooLarge",
+            "retryAfter": 0
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 1000000,
+              "reason": "TooLarge",
+              "retryAfter": 0
+            }
+          ]
+        },
+        "forbid": [
+          "7340100220"
+        ]
+      }
+    },
+    {
+      "name": "Pro borrows the burst",
+      "args": {
+        "req": {
+          "key": 7340100227,
+          "plan": "Pro",
+          "cost": 50,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 990,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": true
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 1040,
+              "burst": true
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 50,
+              "remaining": 0,
+              "burst": true
+            }
+          ]
+        },
+        "forbid": [
+          "7340100227"
+        ]
+      }
+    },
+    {
+      "name": "Pro burst up to exactly allowance plus 10%",
+      "args": {
+        "req": {
+          "key": 7340100234,
+          "plan": "Pro",
+          "cost": 100,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 1000,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": true
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 1100,
+              "burst": true
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 100,
+              "remaining": 0,
+              "burst": true
+            }
+          ]
+        },
+        "forbid": [
+          "7340100234"
+        ]
+      }
+    },
+    {
+      "name": "Pro one past allowance plus 10% is denied",
+      "args": {
+        "req": {
+          "key": 7340100241,
+          "plan": "Pro",
+          "cost": 101,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 1000,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 55
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 101,
+              "reason": "Denied",
+              "retryAfter": 55
+            }
+          ]
+        },
+        "forbid": [
+          "7340100241"
+        ]
+      }
+    },
+    {
+      "name": "Enterprise burst up to exactly allowance plus 10%",
+      "args": {
+        "req": {
+          "key": 7340100248,
+          "plan": "Enterprise",
+          "cost": 1500,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 9500,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": true
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 11000,
+              "burst": true
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 1500,
+              "remaining": 0,
+              "burst": true
+            }
+          ]
+        },
+        "forbid": [
+          "7340100248"
+        ]
+      }
+    },
+    {
+      "name": "Enterprise one past allowance plus 10% is denied",
+      "args": {
+        "req": {
+          "key": 7340100255,
+          "plan": "Enterprise",
+          "cost": 1501,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 9500,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 55
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 1501,
+              "reason": "Denied",
+              "retryAfter": 55
+            }
+          ]
+        },
+        "forbid": [
+          "7340100255"
+        ]
+      }
+    },
+    {
+      "name": "Free never borrows",
+      "args": {
+        "req": {
+          "key": 7340100262,
+          "plan": "Free",
+          "cost": 5,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 100,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 55
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 5,
+              "reason": "Denied",
+              "retryAfter": 55
+            }
+          ]
+        },
+        "forbid": [
+          "7340100262"
+        ]
+      }
+    },
+    {
+      "name": "Free just over the allowance is denied, not burst",
+      "args": {
+        "req": {
+          "key": 7340100269,
+          "plan": "Free",
+          "cost": 11,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 95,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 55
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Free",
+              "cost": 11,
+              "reason": "Denied",
+              "retryAfter": 55
+            }
+          ]
+        },
+        "forbid": [
+          "7340100269"
+        ]
+      }
+    },
+    {
+      "name": "the burst can be borrowed only once per window",
+      "args": {
+        "req": {
+          "key": 7340100276,
+          "plan": "Pro",
+          "cost": 10,
+          "now": 20000
+        },
+        "state": {
+          "start": 0,
+          "used": 1040,
+          "burst": true
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 40
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 10,
+              "reason": "Denied",
+              "retryAfter": 40
+            }
+          ]
+        },
+        "forbid": [
+          "7340100276"
+        ]
+      }
+    },
+    {
+      "name": "a request that fits never uses the burst",
+      "args": {
+        "req": {
+          "key": 7340100283,
+          "plan": "Pro",
+          "cost": 100,
+          "now": 5000
+        },
+        "state": {
+          "start": 0,
+          "used": 900,
+          "burst": false
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 0,
+              "used": 1000,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 100,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100283"
+        ]
+      }
+    },
+    {
+      "name": "a fresh window offers the burst again",
+      "args": {
+        "req": {
+          "key": 7340100290,
+          "plan": "Pro",
+          "cost": 200,
+          "now": 130000
+        },
+        "state": {
+          "start": 0,
+          "used": 1040,
+          "burst": true
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 800,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 130000,
+              "used": 200,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 200,
+              "remaining": 800,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100290"
+        ]
+      }
+    },
+    {
+      "name": "burst already used: Enterprise denied with retry-after",
+      "args": {
+        "req": {
+          "key": 7340100297,
+          "plan": "Enterprise",
+          "cost": 100,
+          "now": 45500
+        },
+        "state": {
+          "start": 0,
+          "used": 10050,
+          "burst": true
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": {
+            "reason": "Denied",
+            "retryAfter": 15
+          }
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Enterprise",
+              "cost": 100,
+              "reason": "Denied",
+              "retryAfter": 15
+            }
+          ]
+        },
+        "forbid": [
+          "7340100297"
+        ]
+      }
+    },
+    {
+      "name": "burst is evaluated after the window reset",
+      "args": {
+        "req": {
+          "key": 7340100304,
+          "plan": "Pro",
+          "cost": 1000,
+          "now": 60000
+        },
+        "state": {
+          "start": 0,
+          "used": 1040,
+          "burst": true
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "remaining": 0,
+            "burst": false
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "start": 60000,
+              "used": 1000,
+              "burst": false
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "plan": "Pro",
+              "cost": 1000,
+              "remaining": 0,
+              "burst": false
+            }
+          ]
+        },
+        "forbid": [
+          "7340100304"
+        ]
+      }
+    }
+  ]
+}

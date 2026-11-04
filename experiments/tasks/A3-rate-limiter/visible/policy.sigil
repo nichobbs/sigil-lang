@@ -1,0 +1,10 @@
+; Human-owned policy for A3: what a program may request, and what each sink may receive.
+; Sinks are deny-by-default. Neither sink accepts pii, so an API key must never reach the window store or
+; the audit log.
+
+(policy
+  (allow store (ns "limits/*"))
+  (allow audit)
+
+  (sink store:limits (accepts internal))
+  (sink audit        (accepts internal)))
