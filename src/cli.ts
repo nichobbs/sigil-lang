@@ -23,12 +23,38 @@ function load(dir: string) {
   const featureFile = files.find((f) => f.endsWith('.feature'));
   const prog = parseProgram(read('app.sigil'));
   const pol = parsePolicy(read('policy.sigil'));
+  // Optional proposed-policy.sigil: declassifiers an agent proposes. They are applied for checking but stay pending a human.
+  const proposed: string[] = [];
+  if (files.includes('proposed-policy.sigil')) {
+    const prop = parsePolicy(read('proposed-policy.sigil'));
+    if (prop.allow.length || prop.sinks.size) throw new SigilError('proposed-policy.sigil may contain only (declassify ...) entries; allow and sink rules are human-owned');
+    for (const [name, d] of prop.declassifiers) {
+      if (pol.declassifiers.has(name)) throw new SigilError(`proposed-policy.sigil: declassifier ${name} already exists in policy.sigil`);
+      pol.declassifiers.set(name, d);
+      proposed.push(name);
+    }
+  }
   return {
     prog,
     pol,
+    proposed,
     glossarySrc: read('glossary.sigil'),
     feature: featureFile ? parseFeature(read(featureFile)) : undefined,
   };
+}
+
+function printPending(res: CheckResult, proposed: string[], pol: ReturnType<typeof parsePolicy>): boolean {
+  const used = proposed.filter((n) => res.manifest.some((m) => m.declassifies.some((d) => d.name === n)));
+  if (!used.length) return false;
+  hr('PENDING HUMAN APPROVAL (proposed-policy.sigil)');
+  for (const n of used) {
+    const d = pol.declassifiers.get(n)!;
+    const fns = res.manifest.filter((m) => m.declassifies.some((x) => x.name === n)).map((m) => m.fn);
+    console.log(`declassifier ${n}: releases ${d.from} -> ${d.to} in ${fns.join(', ')}${d.fields ? ` (fields ${d.fields.join(', ')})` : ''}`);
+    console.log(`    reason: ${d.reason}`);
+  }
+  console.log('A human must accept or reject these releases. Until then the program is complete but not approved.');
+  return true;
 }
 
 const pad = (s: string, n: number) => (s.length >= n ? s : s + ' '.repeat(n - s.length));
@@ -98,19 +124,21 @@ async function main() {
   try {
     switch (cmd) {
       case 'check': {
-        const { prog, pol } = load(dir);
+        const { prog, pol, proposed } = load(dir);
         const res = check(prog, pol);
         printCheck(res, undefined, await openEnsures(prog, res));
+        printPending(res, proposed, pol);
         process.exit(errors(res).length ? 1 : 0);
         break;
       }
       case 'verify': {
-        const { prog, pol, glossarySrc, feature } = load(dir);
+        const { prog, pol, glossarySrc, feature, proposed } = load(dir);
         if (!feature) throw new SigilError('no .feature file found');
         const res = check(prog, pol);
         const g = parseGlossary(glossarySrc, prog);
         const suite = runSuite(prog, feature, g, res, DEFAULT_SUITE);
         printCheck(res, suite.ensuresStats, await openEnsures(prog, res));
+        const pending = printPending(res, proposed, pol);
 
         hr('Scenarios, rules, properties, privacy');
         let bad = 0;
@@ -128,6 +156,7 @@ async function main() {
 
         if (fast) {
           console.log('\n(--fast: mutation testing skipped; run verify without --fast before you finish)');
+          if (pending && !bad && !errors(res).length) console.log('RESULT: CLEAN, PENDING HUMAN APPROVAL (this is a finished state for an agent)');
           process.exit(bad || errors(res).length ? 1 : 0);
         }
         hr('Mutation adequacy (does the spec constrain the implementation?)');
@@ -144,6 +173,7 @@ async function main() {
           console.log(`    - ${s.fn}: ${s.desc}${open ? '   [OPEN QUESTION: see Unresolved above; stays a survivor until a human answers]' : ''}`);
         }
 
+        if (pending && !bad && !errors(res).length) console.log('RESULT: CLEAN, PENDING HUMAN APPROVAL');
         process.exit(bad || errors(res).length ? 1 : 0);
         break;
       }

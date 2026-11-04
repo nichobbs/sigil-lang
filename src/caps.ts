@@ -47,6 +47,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   map: 2,
   filter: 2,
   fold: 4,
+  sort: 2,
   chars: 1,
   'from-chars': 1,
   append: 2,

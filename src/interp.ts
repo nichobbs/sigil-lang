@@ -394,6 +394,33 @@ export class Interp {
       };
       return name === 'map' ? xs.map(run) : xs.filter((x) => run(x) === true);
     }
+    if (name === 'sort') {
+      // (sort xs (fn (a b) before)): stable merge sort; before(a, b) true means a goes strictly before b.
+      const xs = this.eval(e.args[0], env);
+      if (!Array.isArray(xs)) throw new RuntimeFault('sort: expected a list');
+      const c = this.lambda(e.args[1], env);
+      if (c.params.length !== 2) throw new RuntimeFault('sort: lambda needs two parameters (a b)');
+      const before = (a: Val, b: Val): boolean => {
+        const env2 = new Map(c.env);
+        env2.set(c.params[0], a);
+        env2.set(c.params[1], b);
+        return this.eval(c.body, env2) === true;
+      };
+      const msort = (v: Val[]): Val[] => {
+        if (v.length <= 1) return v;
+        const mid = v.length >> 1;
+        const l = msort(v.slice(0, mid));
+        const r = msort(v.slice(mid));
+        const out: Val[] = [];
+        let i = 0;
+        let j = 0;
+        while (i < l.length && j < r.length) out.push(before(r[j], l[i]) ? r[j++] : l[i++]);
+        while (i < l.length) out.push(l[i++]);
+        while (j < r.length) out.push(r[j++]);
+        return out;
+      };
+      return msort(xs);
+    }
     if (name === 'fold') {
       // (fold xs T init (fn (acc x) body)): T is the accumulator's declared type, checked on every step.
       const [xsE, tE, initE, fE] = e.args;

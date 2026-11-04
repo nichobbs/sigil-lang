@@ -620,7 +620,7 @@ function construct(
         ctx,
         'error',
         'E-flow',
-        `${fl.conf} data flows into field ${where}, which is declared ${f.conf} (value: ${printExpr(ex)})`,
+        `${fl.conf} data flows into field ${where}, which is declared ${f.conf} (value: ${printExpr(ex)}). If the spec requires this release (a reason or flag that depends on a comparison of ${fl.conf} data is a one-bit release), do not relabel: add to task/proposed-policy.sigil (policy (declassify NAME (from ${fl.conf}) (to ${f.conf}) (reason "why the spec needs it") (fns ${ctx.cur.name}))), then in ${ctx.cur.name} write (declassifies NAME) and wrap the value in (declassify NAME expr)`,
         [...fl.srcs].map(([src, path]) => ({ src, path: [...path, `-> ${where}`] })),
       );
     }
@@ -700,7 +700,7 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   };
   const labOf = (xs: AV[]) => L.joinAll(xs.map(flatten));
   // Evaluate arguments first so one arity slip does not hide every other mistake in the call.
-  const higherOrder = name === 'map' || name === 'filter' || name === 'fold';
+  const higherOrder = name === 'map' || name === 'filter' || name === 'fold' || name === 'sort';
   const xs: AV[] = higherOrder ? [] : e.args.map((a) => evalExpr(a, env, ctx));
 
   switch (name) {
@@ -777,6 +777,22 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       if (name === 'map') return mk({ len: l.len, elem: r, lab: l.lab });
       const hi = l.len === undefined || l.len === 'top' ? I.TOP : I.range(0n, l.len.hi);
       return mk({ len: hi, elem: l.elem, lab: L.join(l.lab, flatten(r)) });
+    }
+    case 'sort': {
+      // (sort xs (fn (a b) before)): stable merge sort; (before a b) true means a goes strictly before b. The result is a
+      // permutation of xs: same length, same element facts. Labels of the comparator flow into the order, so they join in.
+      if (!ar(2)) return topAV();
+      const l = evalExpr(e.args[0], env, ctx);
+      const f = e.args[1];
+      if (f.k !== 'lam' || f.params.length !== 2) {
+        diag(ctx, 'error', 'E-lambda', 'sort needs a two-parameter lambda (fn (a b) before) as second argument, true when a goes strictly before b');
+        return topAV();
+      }
+      const env2 = new Map(env);
+      env2.set(f.params[0], l.elem ?? topAV());
+      env2.set(f.params[1], l.elem ?? topAV());
+      const r = evalExpr(f.body, env2, ctx);
+      return mk({ len: l.len, elem: l.elem, lab: L.join(l.lab, flatten(r)) });
     }
     case 'fold': {
       // (fold xs T init (fn (acc x) body)): T is the loop invariant. The initial value and every step result must
