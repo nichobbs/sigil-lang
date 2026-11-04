@@ -315,3 +315,95 @@ describe('experiments harness: A4 authorised transfer', () => {
     });
   }, 30_000);
 });
+
+// ---- A3: rate limiter ---------------------------------------------------------------------------------------------
+
+const TASK3 = 'A3-rate-limiter';
+const REF3_SIGIL = `experiments/tasks/${TASK3}/ref/sigil/app.sigil`;
+const REF3_TS = `experiments/tasks/${TASK3}/ref/ts/solution.ts`;
+
+interface Variant3 extends Variant {
+  also?: { from: string; to: string }; // a second edit, for variants that need two coordinated changes
+}
+
+function variantFile3(refPath: string, v: Variant3, ext: 'sigil' | 'ts', idx: number): string {
+  let src = readFileSync(refPath, 'utf8');
+  for (const e of [{ from: v.from, to: v.to }, ...(v.also ? [v.also] : [])]) {
+    if (src.split(e.from).length !== 2) throw new Error(`variant "${v.name}": the reference must contain the text to replace exactly once`);
+    src = src.replace(e.from, e.to);
+  }
+  const file = join(tmp, `a3-${ext}-${idx}.${ext}`);
+  writeFileSync(file, src);
+  return file;
+}
+
+const A3_SIGIL_VARIANTS: Variant3[] = [
+  { name: 'trap: the window boundary belongs to the old window', from: '(>= now (add s.start 60000))', to: '(> now (add s.start 60000))', trap: true },
+  { name: 'trap: retry-after rounds down', from: '(add (sub (add s.start 60000) now) 999)', to: '(sub (add s.start 60000) now)', trap: true },
+  {
+    name: 'trap: the api key leaks into the audit event',
+    from: '(type Admitted  (rec (plan Plan)',
+    to: '(type Admitted  (rec (who ApiKey) (plan Plan)',
+    also: { from: '(emit audit (Admitted req.plan req.cost (max 0 (sub allow total)) false))', to: '(emit audit (Admitted req.key req.plan req.cost (max 0 (sub allow total)) false))' },
+    trap: true,
+  },
+  { name: 'off-by-one: exactly the allowance is denied', from: '(if (<= total allow)', to: '(if (< total allow)', trap: false },
+  { name: 'a Free request may borrow the burst', from: '(if (= p Free) 0 (div-floor (allowance p) 10))', to: '(div-floor (allowance p) 10)', trap: false },
+  { name: 'missing effect: an allowed request does not store the window', from: '(put store:limits 0 (State cur.start (min total 1000000000) cur.burst))', to: '', trap: false },
+  { name: 'a request larger than the allowance may use the burst', from: '(if (> req.cost allow)', to: '(if (> req.cost (add allow extra))', trap: false },
+  { name: 'a new window keeps the old burst flag', from: '(State now 0 false)', to: '(State now 0 s.burst)', trap: false },
+  { name: 'a new window keeps the old start', from: '(State now 0 false)', to: '(State s.start 0 false)', trap: false },
+];
+
+const A3_TS_VARIANTS: Variant3[] = [
+  { name: 'trap: the window boundary belongs to the old window', from: 'req.now >= state.start + WINDOW_MS', to: 'req.now > state.start + WINDOW_MS', trap: true },
+  { name: 'trap: retry-after rounds down', from: 'Math.ceil((cur.start', to: 'Math.floor((cur.start', trap: true },
+  { name: 'trap: the api key leaks into the audit event', from: '{ plan: req.plan, cost: req.cost, remaining, burst: false }', to: '{ plan: req.plan, cost: req.cost, remaining, burst: false, who: req.key }', trap: true },
+  { name: 'off-by-one: exactly the allowance is denied', from: 'if (total <= allow) {', to: 'if (total < allow) {', trap: false },
+  { name: 'a Free request may borrow the burst', from: "(p === 'Free' ? 0 : Math.floor(allowanceOf(p) / 10))", to: '(Math.floor(allowanceOf(p) / 10))', trap: false },
+  { name: 'missing effect: an allowed request does not store the window', from: "await host.store.put('store:limits', 0, { start: cur.start, used: total, burst: cur.burst });", to: '', trap: false },
+  { name: 'a request larger than the allowance may use the burst', from: 'if (req.cost > allow) {', to: 'if (req.cost > allow + burstOf(req.plan)) {', trap: false },
+  { name: 'a new window keeps the old burst flag', from: '{ start: req.now, used: 0, burst: false }', to: '{ start: req.now, used: 0, burst: state.burst }', trap: false },
+  { name: 'a new window keeps the old start', from: '{ start: req.now, used: 0, burst: false }', to: '{ start: state.start, used: 0, burst: false }', trap: false },
+];
+
+describe('experiments harness: A3 rate limiter, Sigil runner', () => {
+  it('reference solution passes 100%', async () => {
+    const s = await runTask(TASK3, 'sigil', REF3_SIGIL);
+    expect(s.failures).toEqual([]);
+    expect(s.passed).toBe(s.total);
+    expect(s.total).toBeGreaterThanOrEqual(28);
+    expect(s.trapTotal).toBe(3);
+    expect(s.trapViolations).toBe(0);
+  });
+
+  A3_SIGIL_VARIANTS.forEach((v, i) => {
+    it(`catches: ${v.name}`, async () => {
+      const s = await runTask(TASK3, 'sigil', variantFile3(REF3_SIGIL, v, 'sigil', i));
+      expect(s.passed).toBeLessThan(s.total);
+      if (v.trap) expect(s.trapViolations).toBeGreaterThan(0);
+      else expect(s.failures.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('experiments harness: A3 rate limiter, TypeScript runner', () => {
+  it('reference solution passes 100%', async () => {
+    const s = await runTask(TASK3, 'ts', REF3_TS);
+    expect(s.failures).toEqual([]);
+    expect(s.passed).toBe(s.total);
+    expect(s.total).toBeGreaterThanOrEqual(28);
+    expect(s.trapTotal).toBe(3);
+    expect(s.trapViolations).toBe(0);
+  }, 30_000);
+
+  it('catches every broken variant (and flags trap violations)', async () => {
+    const results = await Promise.all(A3_TS_VARIANTS.map((v, i) => runTask(TASK3, 'ts', variantFile3(REF3_TS, v, 'ts', i))));
+    results.forEach((s, i) => {
+      const v = A3_TS_VARIANTS[i];
+      expect(s.passed, v.name).toBeLessThan(s.total);
+      if (v.trap) expect(s.trapViolations, v.name).toBeGreaterThan(0);
+      else expect(s.failures.length, v.name).toBeGreaterThan(0);
+    });
+  }, 30_000);
+});
