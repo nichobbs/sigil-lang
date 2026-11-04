@@ -157,3 +157,12 @@ and are not part of this score.
   the payloads distinguishable.
 - The timeout is per case on a worker thread; a solution that spins in a native call or starves the event loop is killed, but memory exhaustion
   inside the worker is bounded only by Node's defaults.
+
+## Orchestration (pilot and full runs)
+
+`experiments/orchestrate.ts prepare <task> <sigil|ts> <model> <run>` builds a clean workspace under `$EXP_WORK` (default `/home/claude/exp-work`) and prints the prompt to give a fresh agent; `score <dir> [--tokens N --tools N --ms N --transcript FILE]` scores the result with the hidden cases (read from this repo, never copied into a workspace) and appends a record to `experiments/results/pilot.jsonl`.
+- Sigil workspace: the bundled checker (`sigil.mjs`, not the source tree), `LANGUAGE.md`, `WORKFLOW.md`, and `task/` with the visible files.
+- TypeScript workspace: `experiments/ts-kit` (strict tsc, eslint with the security plugin, vitest, a mock host), `README.md` and `intent.feature`. It does not get `glossary.sigil` or `policy.sigil` (Sigil bindings); the classification is in the README prose. The agent writes its own vitest tests from the examples, rather than receiving ported ones.
+- Caps are advisory: 40 tool calls stated in the prompt; tokens and tool calls are read from the agent's reported usage afterwards.
+- Hidden-case isolation is by instruction and audit (the transcript is searched for hidden/ref paths), not by sandbox.
+- The independent reviewer pass for the TypeScript arm is not part of the pilot.
