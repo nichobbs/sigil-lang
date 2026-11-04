@@ -1,0 +1,3 @@
+; Human-owned policy for C3: search is a pure function; it uses no capability, so there is nothing to allow.
+
+(policy)
