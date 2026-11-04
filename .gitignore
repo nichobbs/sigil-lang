@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# a symlinked node_modules (worktrees) is not matched by "node_modules/"
+node_modules
