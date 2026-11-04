@@ -11,9 +11,10 @@
     "check": "tsx src/cli.ts check examples/invoicing",
     "verify": "tsx src/cli.ts verify examples/invoicing",
     "compare": "tsx src/cli.ts compare examples/invoicing",
-    "docs:build": "esbuild apps/docs/src/browser.ts --bundle --format=iife --loader:.sigil=text --outfile=apps/docs/web/app.js --log-level=warning",
+    "docs:build": "esbuild apps/docs/src/browser.ts --bundle --format=iife --loader:.sigil=text --outfile=apps/docs/web/app.js --log-level=warning && tsx apps/docs/build-wasm.ts",
     "docs:serve": "tsx apps/docs/src/server.ts",
-    "docs:e2e": "npm run -s docs:build && tsx apps/docs/test/e2e.ts"
+    "docs:e2e": "npm run -s docs:build && tsx apps/docs/test/e2e.ts",
+    "docs:serve:wasm": "DOCS_ENGINE=wasm tsx apps/docs/src/server.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

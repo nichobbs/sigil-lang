@@ -12,7 +12,7 @@ export const STATUS_OF: Record<DocError, number> = {
   StoreFailed: 503,
 };
 
-export type Route = { method: string; pattern: RegExp; kind: 'view' | 'act' | 'audit'; op?: Op };
+export type Route = { method: string; pattern: RegExp; kind: 'view' | 'act' | 'audit' | 'engine'; op?: Op };
 
 export const ROUTES: Route[] = [
   { method: 'GET', pattern: /^\/docs\/(\d+)$/, kind: 'view' },
@@ -20,4 +20,5 @@ export const ROUTES: Route[] = [
   { method: 'DELETE', pattern: /^\/docs\/(\d+)$/, kind: 'act', op: 'Delete' },
   { method: 'POST', pattern: /^\/docs\/(\d+)\/publish$/, kind: 'act', op: 'Publish' },
   { method: 'GET', pattern: /^\/audit$/, kind: 'audit' },
+  { method: 'GET', pattern: /^\/engine$/, kind: 'engine' }, // which execution engine serves requests (no actor needed)
 ];

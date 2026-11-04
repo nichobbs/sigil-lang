@@ -19,6 +19,7 @@ export function handle(engine: DocsEngine, req: Req): Res {
   for (const r of ROUTES) {
     const m = r.pattern.exec(req.path);
     if (r.method !== req.method || !m) continue;
+    if (r.kind === 'engine') return { status: 200, body: { engine: engine.mode } };
     const actor = actorOf(req.headers);
     if (!actor) return { status: 401, body: { error: 'x-actor-id and x-actor-role headers are required' } };
     if (r.kind === 'audit') return { status: 200, body: engine.auditLog() };

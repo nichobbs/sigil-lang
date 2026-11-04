@@ -4,9 +4,11 @@
 // Pattern: "load, decide, store". The shell loads the document; Sigil decides and requests put/emit; the shell performs them.
 
 import { parseProgram } from '../../../src/parse.js';
-import { Host, Interp, RuntimeFault, UNIT, errVal, okVal, type Val } from '../../../src/interp.js';
+import { ContractViolation, Host, Interp, RuntimeFault, UNIT, errVal, okVal, type Val } from '../../../src/interp.js';
 import type { Program } from '../../../src/ast.js';
 import { decodeVal, encodeVal, type Json } from '../../../experiments/lib/json.js';
+import { callCompiled, instantiate, type Exports } from '../../../src/wasm/abi.js';
+import type { FnReport } from '../../../src/wasm/compile.js';
 import type { AuditLog, DocStore } from './adapters.js';
 
 export type Role = 'Viewer' | 'Editor' | 'Admin';
@@ -23,7 +25,7 @@ export type Outcome =
   | { kind: 'bad-input'; message: string };
 
 /** Host that performs the program's requested effects on adapters. Handles are fixed by the program's `bind`s. */
-class AdapterHost extends Host {
+export class AdapterHost extends Host {
   constructor(private store: DocStore, private audit: AuditLog) {
     super();
   }
@@ -42,16 +44,46 @@ class AdapterHost extends Host {
   }
 }
 
+/** A compiled module instance bound to this engine's adapter host, plus the reports needed to marshal calls. */
+interface WasmBackend {
+  exports: Exports;
+  host: AdapterHost;
+  fns: Map<string, FnReport>;
+}
+
 export class DocsEngine {
   private prog: Program;
-  constructor(source: string, private store: DocStore, private audit: AuditLog) {
-    this.prog = parseProgram(source);
+  /** 'wasm' when the program runs as compiled Wasm, 'interp' when it runs on the reference interpreter. */
+  readonly mode: 'interp' | 'wasm';
+  constructor(source: string, private store: DocStore, private audit: AuditLog, private wasm?: WasmBackend) {
+    this.prog = parseProgram(source); // types are needed to decode JSON into values in both modes
+    this.mode = wasm ? 'wasm' : 'interp';
+  }
+
+  /**
+   * An engine that executes the compiled module. Effects (put, emit) reach the same adapters through the Wasm host ABI.
+   * `bytes` and `reports` come from apps/docs/build-wasm.ts; the source is still parsed here, only for its type declarations.
+   */
+  static async withWasm(source: string, store: DocStore, audit: AuditLog, bytes: Uint8Array, reports: Map<string, FnReport>): Promise<DocsEngine> {
+    const host = new AdapterHost(store, audit);
+    const exports = await instantiate(bytes, host);
+    return new DocsEngine(source, store, audit, { exports, host, fns: reports });
   }
 
   private run(fn: string, args: Json[]): Val {
     const f = this.prog.fns.get(fn);
     if (!f) throw new Error(`program has no function ${fn}`);
     const vals = f.params.map((p, i) => decodeVal(this.prog, p.type, args[i], p.name));
+    // Input boundary. Compiled code trusts the declared ranges of its arguments (the checker's proofs assume them), so the
+    // shell enforces them here, in both modes, with the interpreter's own contract check (same message either way).
+    const guard = new Interp(this.prog, new AdapterHost(this.store, this.audit));
+    f.params.forEach((p, i) => guard.checkType(vals[i], p.type, `${fn}(${p.name})`));
+    if (this.wasm) {
+      const rep = this.wasm.fns.get(fn);
+      if (!rep) throw new Error(`no compiled report for ${fn}`);
+      this.wasm.host.log.length = 0;
+      return callCompiled(rep, this.wasm.exports, vals);
+    }
     return new Interp(this.prog, new AdapterHost(this.store, this.audit)).callFn(fn, vals);
   }
 
@@ -71,7 +103,7 @@ export class DocsEngine {
       out = encodeVal(this.run('handle-request', [actor, doc, req]));
     } catch (e) {
       // Argument decoding (e.g. a size outside 0..1000000) is the shell's input check, not a program decision.
-      if (e instanceof Error && !(e instanceof RuntimeFault) && /expected|outside|missing/.test(e.message)) return { kind: 'bad-input', message: e.message };
+      if (e instanceof ContractViolation || (e instanceof Error && !(e instanceof RuntimeFault) && /expected|outside|missing/.test(e.message))) return { kind: 'bad-input', message: e.message };
       throw e;
     }
     const r = out as { ok?: { doc: number; status: string; size: number }; err?: DocError };
