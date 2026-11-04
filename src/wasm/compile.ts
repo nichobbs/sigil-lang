@@ -16,6 +16,7 @@ import { Expr, FnDef, Program, Type, resolveType } from '../ast.js';
 import { CAP_OPS } from '../caps.js';
 import { CheckResult, FnEvidence } from '../check.js';
 import { Repr, reprFor } from '../interval.js';
+import { uleb } from './encode.js';
 import { I32, I64, IntOps, OP, ValType, WasmFunc, blockType, buildModule, localGet, localSet } from './encode.js';
 
 export type Kind = { t: 'int' } | { t: 'bool' } | { t: 'enum'; cases: string[] };
@@ -52,6 +53,15 @@ export interface CompileResult {
   bytes: Uint8Array;
   fns: FnReport[];
 }
+
+/** What a caller needs to know about a compiled callee. */
+export interface Callee {
+  index: number;
+  vt: ValType; // int representation of the callee
+  params: Kind[];
+  result: Kind;
+}
+export type CalleeResolver = (name: string) => Callee | string; // string = reason it cannot be called
 
 class NotCompilable extends Error {}
 const no = (reason: string): never => {
@@ -145,6 +155,7 @@ class FnGen {
     private prog: Program,
     private R: IntOps,
     private opts: CompileOptions,
+    private callee: CalleeResolver,
   ) {}
 
   alloc(vt: ValType): number {
@@ -275,12 +286,31 @@ class FnGen {
     return { c: [...s.c, ...localSet(tmp), ...chain(0)], kind };
   }
 
+  /** Direct call to another compiled Sigil function. Ints are converted between the two functions' widths. */
+  private genUserCall(e: Extract<Expr, { k: 'call' }>): G {
+    const info = this.callee(e.fn);
+    if (typeof info === 'string') return no(`calls ${e.fn}, which is not compilable: ${info}`);
+    if (e.kw.length) return no(`keyword arguments to ${e.fn}`);
+    if (e.args.length !== info.params.length) return no(`${e.fn} expects ${info.params.length} argument(s)`);
+    // The checker has proved each argument lies in the callee's parameter range, so narrowing is lossless.
+    const conv = (from: ValType, to: ValType): number[] => (from === to ? [] : from === 'i64' ? [OP.i32WrapI64] : [OP.i64ExtendI32S]);
+    const c: number[] = [];
+    e.args.forEach((a, i) => {
+      const g = this.gen(a);
+      if (!sameKind(g.kind, info.params[i])) no(`argument ${i + 1} of ${e.fn} is ${showKind(g.kind)}, expected ${showKind(info.params[i])}`);
+      c.push(...g.c, ...(g.kind.t === 'int' ? conv(this.R.vt, info.vt) : []));
+    });
+    c.push(OP.call, ...uleb(info.index));
+    if (info.result.t === 'int') c.push(...conv(info.vt, this.R.vt));
+    return { c, kind: info.result };
+  }
+
   private genCall(e: Extract<Expr, { k: 'call' }>): G {
     const R = this.R;
     const name = e.fn;
     if (name in CAP_OPS) return no(`capability operation ${name}`);
     if (this.prog.types.has(name)) return no(`record construction ${name}`);
-    if (this.prog.fns.has(name)) return no(`call to user function ${name} (inter-function calls are not supported by this backend)`);
+    if (this.prog.fns.has(name)) return this.genUserCall(e);
     if (e.kw.length) return no(`keyword arguments to ${name}`);
     const need = (n: number) => {
       if (e.args.length !== n) no(`${name} expects ${n} argument(s)`);
@@ -366,7 +396,7 @@ class FnGen {
 // Per-function and per-program drivers
 // ---------------------------------------------------------------------------
 
-function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, opts: CompileOptions): { report: FnReport; func?: WasmFunc } {
+function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, opts: CompileOptions, callee: CalleeResolver): { report: FnReport; func?: WasmFunc } {
   const report: FnReport = { name: f.name, compilable: false, checkerRepr: ev.repr };
   try {
     if (f.needs.length) no(`uses capabilities/effects (needs ${f.needs.join(', ')})`);
@@ -391,12 +421,19 @@ function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, op
     for (const v of lits) mags.push(v < 0n ? -v : v);
     const mine = reprFor(mags.reduce((a, b) => (a > b ? a : b), 0n));
     if (ev.repr === 'bigint' || mine === 'bigint') no('needs bigint representation (exceeds i64)');
-    const used: 'i32' | 'i64' = ev.repr === 'i64' || mine === 'i64' ? 'i64' : 'i32';
+    // A caller is at least as wide as its callees, so a callee's result always fits the caller.
+    let calleeWide = false;
+    for (const name of calledFns(prog, f.body)) {
+      const info = callee(name);
+      if (typeof info === 'string') no(`calls ${name}, which is not compilable: ${info}`);
+      else if (info.vt === 'i64') calleeWide = true;
+    }
+    const used: 'i32' | 'i64' = ev.repr === 'i64' || mine === 'i64' || calleeWide ? 'i64' : 'i32';
     if (used !== ev.repr) report.widenedFromChecker = `checker derived ${ev.repr}, but parameter ranges or literals need ${used}`;
     report.repr = used;
     const R = used === 'i64' ? I64 : I32;
 
-    const g = new FnGen(prog, R, opts);
+    const g = new FnGen(prog, R, opts, callee);
     const top = new Map<string, Binding>();
     const ptypes: ValType[] = [];
     for (const p of params) {
@@ -426,18 +463,86 @@ function compileFn(prog: Program, f: FnDef, ev: FnEvidence, res: CheckResult, op
   }
 }
 
+function calledFns(prog: Program, e: Expr, out = new Set<string>()): Set<string> {
+  switch (e.k) {
+    case 'call':
+      if (prog.fns.has(e.fn)) out.add(e.fn);
+      e.args.forEach((a) => calledFns(prog, a, out));
+      e.kw.forEach((a) => calledFns(prog, a.value, out));
+      break;
+    case 'let':
+      e.binds.forEach((b) => calledFns(prog, b.value, out));
+      e.body.forEach((b) => calledFns(prog, b, out));
+      break;
+    case 'match':
+      calledFns(prog, e.scrut, out);
+      e.arms.forEach((a) => calledFns(prog, a.body, out));
+      break;
+    case 'if':
+      calledFns(prog, e.cond, out);
+      calledFns(prog, e.then, out);
+      calledFns(prog, e.else, out);
+      break;
+    case 'lam':
+      calledFns(prog, e.body, out);
+      break;
+    case 'do':
+      e.body.forEach((b) => calledFns(prog, b, out));
+      break;
+    case 'try':
+      calledFns(prog, e.expr, out);
+      break;
+  }
+  return out;
+}
+
 export function compileProgram(prog: Program, res: CheckResult, opts: CompileOptions = {}): CompileResult {
   const funcs: WasmFunc[] = [];
-  const fns: FnReport[] = [];
-  for (const f of prog.fns.values()) {
-    const ev = res.evidence.get(f.name);
-    if (!ev) {
-      fns.push({ name: f.name, compilable: false, reason: 'no checker evidence', checkerRepr: 'bigint' });
-      continue;
+  const done = new Map<string, { report: FnReport; index?: number }>();
+  const active = new Set<string>();
+
+  // Callees are compiled before their callers, so a callee's function index is known at the call site.
+  const ensure = (name: string): { report: FnReport; index?: number } => {
+    const hit = done.get(name);
+    if (hit) return hit;
+    const f = prog.fns.get(name)!;
+    const ev = res.evidence.get(name);
+    let out: { report: FnReport; index?: number };
+    if (active.has(name)) {
+      // recursion: report on the caller side, do not memoize a half-built entry
+      return { report: { name, compilable: false, reason: 'recursive call', checkerRepr: 'bigint' } };
     }
-    const { report, func } = compileFn(prog, f, ev, res, opts);
-    fns.push(report);
-    if (func) funcs.push(func);
-  }
-  return { bytes: buildModule(funcs), fns };
+    if (!ev) {
+      out = { report: { name, compilable: false, reason: 'no checker evidence', checkerRepr: 'bigint' } };
+    } else {
+      active.add(name);
+      try {
+        const { report, func } = compileFn(prog, f, ev, res, opts, callee);
+        out = { report };
+        if (func) {
+          out.index = funcs.length;
+          funcs.push(func);
+        }
+      } finally {
+        active.delete(name);
+      }
+    }
+    done.set(name, out);
+    return out;
+  };
+
+  const callee: CalleeResolver = (name) => {
+    const r = ensure(name);
+    const rep = r.report;
+    if (!rep.compilable || r.index === undefined) return rep.reason ?? 'not compilable';
+    const params: Kind[] = [];
+    for (const p of rep.params!) {
+      if (p.leaves.length !== 1 || p.leaves[0].path !== '') return `parameter ${p.name} is a record (record arguments are not supported across calls)`;
+      params.push(p.leaves[0].kind);
+    }
+    return { index: r.index, vt: rep.repr!, params, result: rep.result! };
+  };
+
+  for (const f of prog.fns.values()) ensure(f.name);
+  return { bytes: buildModule(funcs), fns: [...prog.fns.keys()].map((n) => done.get(n)!.report) };
 }
