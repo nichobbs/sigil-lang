@@ -1,0 +1,10 @@
+; Human-owned policy for B3: what a program may request, and what each sink may receive.
+; The card's last four digits are personal data: the payment store may hold them, the audit log may not.
+; Sinks are deny-by-default. Everything else a refund touches is public or internal.
+
+(policy
+  (allow store (ns "payments/*"))
+  (allow audit)
+
+  (sink store:payments (accepts pii))
+  (sink audit          (accepts internal)))

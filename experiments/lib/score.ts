@@ -54,6 +54,7 @@ export function judge(c: Case, o: Outcome): string | null {
     const d = firstDiff(o.effects[k], want);
     if (d) return `${k} differs at ${d}: expected ${show(want)}, got ${show(o.effects[k])}`;
   }
+  if (o.effects.egress?.length) return `attempted egress outside the host interface: ${show(o.effects.egress)}`;
   const blob = JSON.stringify(o.effects);
   for (const s of c.expect.forbid ?? []) {
     if (blob.includes(JSON.stringify(s).slice(1, -1))) return `forbidden value ${show(s)} reached an effect: ${show(o.effects)}`;

@@ -12,6 +12,7 @@ import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSy
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Lang, runTask, taskDir } from './run.js';
+import { TEST_FILE, exportScenarios } from './export-scenarios.js';
 
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const WORK = process.env.EXP_WORK ?? '/home/claude/exp-work';
@@ -45,7 +46,7 @@ Language: Sigil. Your deliverable is the single file task/app.sigil. Read LANGUA
 function tsPrompt(task: string): string {
   return `${common(task, 'ts')}
 Language: TypeScript (Node, ES modules). Your deliverable is the single file solution.ts with \`export default async function run(args, host)\`, self-contained (only Node built-ins). \`args\` is one object with the task README's parameter names as properties. \`host\` is the interface in host.ts (store.put/get, net.post, audit.emit, rand.fresh; use the handle names the README or intent spec give, in the form "kind:name" such as "store:quotes"). Never ignore a failed host call. The returned value must be plain JSON, encoded like this: ${ENCODING}
-Tooling: \`./check.sh\` runs strict tsc, eslint with the security plugin, and vitest. Write your own vitest tests (*.test.ts) from the examples in intent.feature using makeHost from host.ts; effects() lists successful host calls. Money in the README is whole integers (cents); never use floating point for money. Do not edit host.ts.
+Tooling: \`./check.sh\` runs strict tsc, eslint with the security plugin, and vitest. Write your own vitest tests (*.test.ts) from the examples in intent.feature using makeHost from host.ts; effects() lists successful host calls.${process.env.SCENARIO_TESTS ? ' The examples of intent.feature are already provided as scenarios.test.ts (generated; do not edit); `./check.sh` runs them against your solution.' : ''} Money in the README is whole integers (cents); never use floating point for money. Do not edit host.ts.
 `;
 }
 
@@ -71,6 +72,12 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
     for (const f of readdirSync(join(REPO, 'experiments/ts-kit'))) copyFileSync(join(REPO, 'experiments/ts-kit', f), join(dir, f));
     for (const f of ['README.md', 'intent.feature']) copyFileSync(join(vis, f), join(dir, f));
     writeFileSync(join(dir, 'package.json'), '{"name":"work","private":true,"type":"module"}\n');
+    // SCENARIO_TESTS=1: the TS arm also gets the visible examples as ready-made vitest cases (the Sigil arm gets them through the glossary).
+    if (process.env.SCENARIO_TESTS) {
+      const sc = exportScenarios(task);
+      writeFileSync(join(dir, 'scenarios.json'), JSON.stringify(sc.cases, null, 1));
+      writeFileSync(join(dir, 'scenarios.test.ts'), TEST_FILE);
+    }
     writeFileSync(join(dir, 'PROMPT.md'), tsPrompt(basename(td)));
   }
   if (process.env.NO_BRIEF) return { dir, prompt: `Read ${join(dir, 'PROMPT.md')} and follow it exactly. Your workspace is ${dir}; do not leave it.` };

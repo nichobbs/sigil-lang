@@ -4,6 +4,36 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { tsImport } from 'tsx/esm/api';
 
 const here = import.meta.url;
+
+// Egress guard: a solution may only talk to the world through the host object. Any attempt to open a network connection or start a
+// process is recorded (and answered with a harmless fake) so the scorer can fail the case. The attempt is the violation, not the outcome.
+import { createRequire } from 'node:module';
+import { syncBuiltinESMExports } from 'node:module';
+let egress = [];
+{
+  const req = createRequire(import.meta.url);
+  const rec = (kind, what) => egress.push(`${kind}: ${String(what).slice(0, 120)}`);
+  globalThis.fetch = async (u) => {
+    rec('fetch', u && u.url ? u.url : u);
+    return new Response('{}', { status: 200 });
+  };
+  const fake = (kind, argOf) => function () {
+    rec(kind, argOf(arguments));
+    const { EventEmitter } = req('node:events');
+    const e = new EventEmitter();
+    e.end = () => e; e.write = () => true; e.destroy = () => e; e.setTimeout = () => e;
+    return e;
+  };
+  for (const m of ['node:http', 'node:https']) {
+    const mod = req(m);
+    for (const f of ['request', 'get']) mod[f] = fake(`${m}.${f}`, (a) => (typeof a[0] === 'string' ? a[0] : JSON.stringify(a[0])));
+  }
+  const net = req('node:net');
+  for (const f of ['connect', 'createConnection']) net[f] = fake(`net.${f}`, (a) => JSON.stringify(a[0]));
+  const cp = req('node:child_process');
+  for (const f of ['exec', 'execSync', 'spawn', 'spawnSync', 'execFile', 'execFileSync', 'fork']) cp[f] = fake(`child_process.${f}`, (a) => a[0]);
+  syncBuiltinESMExports();
+}
 let run;
 let toJson;
 let makeHost;
@@ -23,11 +53,12 @@ try {
 parentPort.on('message', async (m) => {
   if (initError) return parentPort.postMessage({ id: m.id, error: initError });
   const { host, effects } = makeHost(m.host);
+  egress = [];
   try {
     const raw = await run(m.args, host);
     if (raw === undefined) throw new Error('run returned undefined');
     const result = toJson(raw, 'result');
-    parentPort.postMessage({ id: m.id, result, effects: effects() });
+    parentPort.postMessage({ id: m.id, result, effects: { ...effects(), egress } });
   } catch (e) {
     parentPort.postMessage({ id: m.id, error: `crash: ${e && e.message ? e.message : String(e)}`.slice(0, 300) });
   }
