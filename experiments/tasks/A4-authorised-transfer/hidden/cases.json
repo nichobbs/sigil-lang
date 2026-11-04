@@ -1,0 +1,2045 @@
+{
+  "entry": "transfer",
+  "cases": [
+    {
+      "name": "customer moves money out of own account",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 50000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 12000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 12000,
+            "srcBalance": 38000,
+            "dstBalance": 14000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 5,
+              "balance": 38000
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 14000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 12000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer moves the whole balance",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 12345
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 12345,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 12345,
+            "srcBalance": 0,
+            "dstBalance": 14345
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 5,
+              "balance": 0
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 14345
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 12345
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer one cent over the balance is Insufficient",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 12345
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 12346,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 12346,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "teller moves money out of any account",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 50000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 7550,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 7550,
+            "srcBalance": 42450,
+            "dstBalance": 9550
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 9,
+              "balance": 42450
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 9550
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 202,
+              "amount": 7550
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "admin moves money out of any account",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 50000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 100,
+            "srcBalance": 49900,
+            "dstBalance": 2100
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 9,
+              "balance": 49900
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 2100
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 202,
+              "amount": 100
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer cannot debit an account owned by someone else",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 50000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 5,
+          "balance": 0
+        },
+        "amount": 1000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000,
+              "reason": "NotAllowed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "TRAP customer not owner, insufficient funds: NotAllowed not Insufficient",
+      "trap": true,
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 500
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 90000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 90000,
+              "reason": "NotAllowed"
+            }
+          ]
+        },
+        "forbid": [
+          "7777123",
+          "8888456"
+        ]
+      }
+    },
+    {
+      "name": "customer not owner, over limit, unapproved: NotAllowed",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 50000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 2000000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 2000000,
+              "reason": "NotAllowed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer not owner, same account: NotAllowed",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 500
+        },
+        "dst": {
+          "id": 101,
+          "owner": 9,
+          "balance": 500
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 101,
+              "amount": 100,
+              "reason": "NotAllowed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer not owner, zero amount: NotAllowed",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 500
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 0,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 0,
+              "reason": "NotAllowed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer owns only the destination: NotAllowed",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 500
+        },
+        "dst": {
+          "id": 202,
+          "owner": 5,
+          "balance": 0
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 100,
+              "reason": "NotAllowed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer with approved flag still cannot debit others",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 2000000,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 2000000,
+              "reason": "NotAllowed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer debits own account into another customers account",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 1000
+        },
+        "dst": {
+          "id": 303,
+          "owner": 77,
+          "balance": 0
+        },
+        "amount": 1000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 303,
+            "amount": 1000,
+            "srcBalance": 0,
+            "dstBalance": 1000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 5,
+              "balance": 0
+            },
+            {
+              "id": 303,
+              "owner": 77,
+              "balance": 1000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 303,
+              "amount": 1000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "teller same account: SameAccount",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 500
+        },
+        "dst": {
+          "id": 101,
+          "owner": 5,
+          "balance": 500
+        },
+        "amount": 10,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "SameAccount"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 101,
+              "amount": 10,
+              "reason": "SameAccount"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "teller same account and zero amount: SameAccount first",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 500
+        },
+        "dst": {
+          "id": 101,
+          "owner": 5,
+          "balance": 500
+        },
+        "amount": 0,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "SameAccount"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 101,
+              "amount": 0,
+              "reason": "SameAccount"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "admin same account over limit unapproved: SameAccount before NeedsApproval",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 99999999
+        },
+        "dst": {
+          "id": 101,
+          "owner": 5,
+          "balance": 99999999
+        },
+        "amount": 2000000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "SameAccount"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 101,
+              "amount": 2000000,
+              "reason": "SameAccount"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "teller zero amount: BadAmount",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 500
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 0,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "BadAmount"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 202,
+              "amount": 0,
+              "reason": "BadAmount"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer zero amount from own empty account: BadAmount",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 0
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 0,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "BadAmount"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 0,
+              "reason": "BadAmount"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "one cent is the smallest transfer",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 1
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 0
+        },
+        "amount": 1,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 1,
+            "srcBalance": 0,
+            "dstBalance": 1
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 5,
+              "balance": 0
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 1
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "TRAP exactly 10000.00 needs no approval",
+      "trap": true,
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 1000000,
+            "srcBalance": 4000000,
+            "dstBalance": 1002000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 5,
+              "balance": 4000000
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 1002000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "10000.01 by customer unapproved: NeedsApproval",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000001,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NeedsApproval"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001,
+              "reason": "NeedsApproval"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "10000.01 by admin with approval succeeds",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000001,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 1000001,
+            "srcBalance": 3999999,
+            "dstBalance": 1002001
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 9,
+              "balance": 3999999
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 1002001
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "10000.00 by admin unapproved succeeds",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 1000000,
+            "srcBalance": 4000000,
+            "dstBalance": 1002000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 9,
+              "balance": 4000000
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 1002000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "10000.01 by admin without approval: NeedsApproval",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000001,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NeedsApproval"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001,
+              "reason": "NeedsApproval"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "TRAP approved flag from a teller is ignored",
+      "trap": true,
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000001,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NeedsApproval"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001,
+              "reason": "NeedsApproval"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "approved flag from a customer is ignored",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 5000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000001,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NeedsApproval"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001,
+              "reason": "NeedsApproval"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "approved flag on a small teller transfer is harmless",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 5000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 100,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 100,
+            "srcBalance": 4900,
+            "dstBalance": 2100
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 9,
+              "balance": 4900
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 2100
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 202,
+              "amount": 100
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "over limit unapproved and insufficient: NeedsApproval first",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 500
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000001,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NeedsApproval"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001,
+              "reason": "NeedsApproval"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "over limit approved by admin and insufficient: Insufficient",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 500
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 1000001,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "admin approved transfer of exactly the whole large balance",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 2000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 2000000,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 2000000,
+            "srcBalance": 0,
+            "dstBalance": 2002000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 9,
+              "balance": 0
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 2002000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 202,
+              "amount": 2000000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "TRAP insufficient refusal is audited without balances",
+      "trap": true,
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 7777123
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 8888456
+        },
+        "amount": 7777124,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NeedsApproval"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 202,
+              "amount": 7777124,
+              "reason": "NeedsApproval"
+            }
+          ]
+        },
+        "forbid": [
+          "7777123",
+          "8888456"
+        ]
+      }
+    },
+    {
+      "name": "NotAllowed refusal is audited without balances",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 7777123
+        },
+        "dst": {
+          "id": 202,
+          "owner": 5,
+          "balance": 8888456
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 100,
+              "reason": "NotAllowed"
+            }
+          ]
+        },
+        "forbid": [
+          "7777123",
+          "8888456"
+        ]
+      }
+    },
+    {
+      "name": "SameAccount refusal is audited without balances",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 7777123
+        },
+        "dst": {
+          "id": 101,
+          "owner": 5,
+          "balance": 7777123
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "SameAccount"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 101,
+              "amount": 100,
+              "reason": "SameAccount"
+            }
+          ]
+        },
+        "forbid": [
+          "7777123",
+          "8888456"
+        ]
+      }
+    },
+    {
+      "name": "BadAmount refusal is audited without balances",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 7777123
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 8888456
+        },
+        "amount": 0,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "BadAmount"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 101,
+              "dst": 202,
+              "amount": 0,
+              "reason": "BadAmount"
+            }
+          ]
+        },
+        "forbid": [
+          "7777123",
+          "8888456"
+        ]
+      }
+    },
+    {
+      "name": "NeedsApproval refusal is audited without balances",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 7777123
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 8888456
+        },
+        "amount": 1000001,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NeedsApproval"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000001,
+              "reason": "NeedsApproval"
+            }
+          ]
+        },
+        "forbid": [
+          "7777123",
+          "8888456"
+        ]
+      }
+    },
+    {
+      "name": "success audit has no balances",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 7777123
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 8888456
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 100,
+            "srcBalance": 7777023,
+            "dstBalance": 8888556
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 5,
+              "balance": 7777023
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 8888556
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 100
+            }
+          ]
+        },
+        "forbid": [
+          "7777123",
+          "8888456"
+        ]
+      }
+    },
+    {
+      "name": "store failure is reported and nothing is audited",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 5000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "store:accounts",
+            "op": "put"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "StoreFailed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "refusal outranks a store failure",
+      "args": {
+        "actor": {
+          "id": 5,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 50
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 2000
+        },
+        "amount": 100,
+        "approved": false
+      },
+      "host": {
+        "fail": [
+          {
+            "handle": "store:accounts",
+            "op": "put"
+          }
+        ],
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 5,
+              "src": 101,
+              "dst": 202,
+              "amount": 100,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "large balances: destination grows past 1e12",
+      "args": {
+        "actor": {
+          "id": 1,
+          "role": "Admin"
+        },
+        "src": {
+          "id": 101,
+          "owner": 5,
+          "balance": 1000000000000
+        },
+        "dst": {
+          "id": 202,
+          "owner": 9,
+          "balance": 1000000000000
+        },
+        "amount": 1000000000000,
+        "approved": true
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 101,
+            "dst": 202,
+            "amount": 1000000000000,
+            "srcBalance": 0,
+            "dstBalance": 2000000000000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 101,
+              "owner": 5,
+              "balance": 0
+            },
+            {
+              "id": 202,
+              "owner": 9,
+              "balance": 2000000000000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 1,
+              "src": 101,
+              "dst": 202,
+              "amount": 1000000000000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "large ids are carried through",
+      "args": {
+        "actor": {
+          "id": 6,
+          "role": "Teller"
+        },
+        "src": {
+          "id": 9007199254740990,
+          "owner": 9007199254740989,
+          "balance": 1000
+        },
+        "dst": {
+          "id": 9007199254740991,
+          "owner": 0,
+          "balance": 5
+        },
+        "amount": 1000,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 9007199254740990,
+            "dst": 9007199254740991,
+            "amount": 1000,
+            "srcBalance": 0,
+            "dstBalance": 1005
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 9007199254740990,
+              "owner": 9007199254740989,
+              "balance": 0
+            },
+            {
+              "id": 9007199254740991,
+              "owner": 0,
+              "balance": 1005
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 6,
+              "src": 9007199254740990,
+              "dst": 9007199254740991,
+              "amount": 1000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "actor id 0 owns account owner 0",
+      "args": {
+        "actor": {
+          "id": 0,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 1,
+          "owner": 0,
+          "balance": 10
+        },
+        "dst": {
+          "id": 2,
+          "owner": 3,
+          "balance": 0
+        },
+        "amount": 10,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "src": 1,
+            "dst": 2,
+            "amount": 10,
+            "srcBalance": 0,
+            "dstBalance": 10
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1,
+              "owner": 0,
+              "balance": 0
+            },
+            {
+              "id": 2,
+              "owner": 3,
+              "balance": 10
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 0,
+              "src": 1,
+              "dst": 2,
+              "amount": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "customer id equal to dst id but not owner: NotAllowed",
+      "args": {
+        "actor": {
+          "id": 202,
+          "role": "Customer"
+        },
+        "src": {
+          "id": 101,
+          "owner": 9,
+          "balance": 500
+        },
+        "dst": {
+          "id": 202,
+          "owner": 202,
+          "balance": 0
+        },
+        "amount": 10,
+        "approved": false
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "NotAllowed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "actor": 202,
+              "src": 101,
+              "dst": 202,
+              "amount": 10,
+              "reason": "NotAllowed"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

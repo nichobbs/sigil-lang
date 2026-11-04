@@ -1,0 +1,9 @@
+; Human-owned policy for A4: what a program may request, and what each sink may receive.
+; Sinks are deny-by-default. Balances are internal, so both sinks accept internal and nothing above it.
+
+(policy
+  (allow store (ns "accounts/*"))
+  (allow audit)
+
+  (sink store:accounts (accepts internal))
+  (sink audit          (accepts internal)))
