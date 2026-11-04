@@ -1,0 +1,7136 @@
+{
+  "entry": "search",
+  "cases": [
+    {
+      "name": "empty catalogue",
+      "args": {
+        "items": [],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 0,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "PriceAsc orders cheapest first from unsorted input",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1200,
+            "rating": 40,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Toys",
+            "price": 850,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Games",
+            "price": 3000,
+            "rating": 45,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Garden",
+            "price": 1200,
+            "rating": 40,
+            "stock": 7,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            5,
+            2,
+            1,
+            4,
+            3
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "PriceDesc orders dearest first",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1200,
+            "rating": 40,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Toys",
+            "price": 850,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Games",
+            "price": 3000,
+            "rating": 45,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Garden",
+            "price": 1200,
+            "rating": 40,
+            "stock": 7,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceDesc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            3,
+            1,
+            4,
+            2,
+            5
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "RatingDesc orders highest rating first",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1200,
+            "rating": 40,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Toys",
+            "price": 850,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Games",
+            "price": 3000,
+            "rating": 45,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Garden",
+            "price": 1200,
+            "rating": 40,
+            "stock": 7,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "RatingDesc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            3,
+            1,
+            4,
+            2,
+            5
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "PriceAsc ties go to the smaller id",
+      "args": {
+        "items": [
+          {
+            "id": 30,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 30"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          },
+          {
+            "id": 20,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 20"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            5,
+            10,
+            20,
+            30
+          ],
+          "total": 4,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "PriceDesc ties go to the smaller id",
+      "trap": true,
+      "args": {
+        "items": [
+          {
+            "id": 30,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 30"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          },
+          {
+            "id": 20,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 20"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 40,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 40"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceDesc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            40,
+            10,
+            20,
+            30,
+            5
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "RatingDesc ties go to the smaller id",
+      "args": {
+        "items": [
+          {
+            "id": 30,
+            "category": "Books",
+            "price": 1000,
+            "rating": 44,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 30"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 1000,
+            "rating": 44,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          },
+          {
+            "id": 20,
+            "category": "Books",
+            "price": 1000,
+            "rating": 44,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 20"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 1000,
+            "rating": 12,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 50,
+            "category": "Books",
+            "price": 1000,
+            "rating": 50,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 50"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "RatingDesc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            50,
+            10,
+            20,
+            30,
+            5
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "RatingDesc equal ratings with different prices are still ordered by id",
+      "args": {
+        "items": [
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 100,
+            "rating": 20,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 900,
+            "rating": 20,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 500,
+            "rating": 20,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "RatingDesc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            3,
+            6,
+            9
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "PriceDesc ties mixed with distinct prices across a page boundary",
+      "args": {
+        "items": [
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceDesc",
+          "pageSize": 2,
+          "page": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            4,
+            6
+          ],
+          "total": 5,
+          "hasMore": true
+        }
+      }
+    },
+    {
+      "name": "category filter keeps only that category",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1200,
+            "rating": 40,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Toys",
+            "price": 850,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Games",
+            "price": 3000,
+            "rating": 45,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Garden",
+            "price": 1200,
+            "rating": 40,
+            "stock": 7,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Toys",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Toys",
+            "price": 9000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 7"
+          }
+        ],
+        "query": {
+          "anyCategory": false,
+          "category": "Toys",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            6,
+            2,
+            7
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "anyCategory true ignores the category field",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1200,
+            "rating": 40,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Toys",
+            "price": 850,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Games",
+            "price": 3000,
+            "rating": 45,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Garden",
+            "price": 1200,
+            "rating": 40,
+            "stock": 7,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Games",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            5,
+            2,
+            1,
+            4,
+            3
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "minimum price is inclusive",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 2000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 2001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 1000,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "minimum price one above an item excludes it",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 2000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 2001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 1001,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            3,
+            4,
+            5,
+            6
+          ],
+          "total": 4,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "maximum price is inclusive",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 2000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 2001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 2000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "total": 5,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "maximum price one below an item excludes it",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 2000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 2001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 1999,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "total": 4,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "minimum above maximum matches nothing",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1999,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 2000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 2001,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 2000,
+          "maxPrice": 1000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 0,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "price zero and the largest price are both inside the default limits",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 0,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 100000000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 50,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            1,
+            3,
+            2
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "minimum rating is inclusive",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1000,
+            "rating": 34,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 35,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1000,
+            "rating": 36,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1000,
+            "rating": 0,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 1000,
+            "rating": 50,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 35,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            2,
+            3,
+            5
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "minimum rating 50 keeps only the top rating",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1000,
+            "rating": 34,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 35,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1000,
+            "rating": 36,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1000,
+            "rating": 0,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 1000,
+            "rating": 50,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 50,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            5
+          ],
+          "total": 1,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "in stock only keeps stock of 1 and drops 0",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 100000,
+            "hidden": false,
+            "title": "Item 4"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": true,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            2,
+            3,
+            4
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "hidden items never appear and are not counted",
+      "trap": true,
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            2,
+            4,
+            5
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "hidden items do not take up positions on later pages",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 2,
+          "page": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            5
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "hidden item that would be first under every sort order",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1,
+            "rating": 50,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 2,
+            "rating": 10,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 3,
+            "rating": 20,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "RatingDesc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            3,
+            2
+          ],
+          "total": 2,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "every item hidden",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": true,
+            "title": "Item 5"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 0,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "titles are not searched",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "hidden"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 0,
+            "hidden": false,
+            "title": "out of stock"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": ""
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Books Toys Games 1 2 3"
+          }
+        ],
+        "query": {
+          "anyCategory": false,
+          "category": "Toys",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 0,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "all filters combined",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1500,
+            "rating": 40,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 1500,
+            "rating": 39,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 900,
+            "rating": 45,
+            "stock": 9,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Games",
+            "price": 1500,
+            "rating": 50,
+            "stock": 9,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 2500,
+            "rating": 48,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 1700,
+            "rating": 41,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 2000,
+            "rating": 41,
+            "stock": 4,
+            "hidden": true,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 2000,
+            "rating": 41,
+            "stock": 4,
+            "hidden": false,
+            "title": "Item 8"
+          }
+        ],
+        "query": {
+          "anyCategory": false,
+          "category": "Books",
+          "minPrice": 1000,
+          "maxPrice": 2500,
+          "minRating": 40,
+          "inStockOnly": true,
+          "order": "RatingDesc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            5,
+            8,
+            1
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "first page is full and more follow",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 600,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 800,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 5,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "total": 10,
+          "hasMore": true
+        }
+      }
+    },
+    {
+      "name": "last page exactly full: no more pages",
+      "trap": true,
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 600,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 800,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 5,
+          "page": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "total": 10,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "page past the end is empty with the total",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 600,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 800,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 5,
+          "page": 2
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 10,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "page far past the end is empty",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 600,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 800,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 5,
+          "page": 100000
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 10,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "last page partial",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 600,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 800,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 4,
+          "page": 2
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            9,
+            10
+          ],
+          "total": 10,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "page size 1 walks one item at a time",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 100,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 200,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 300,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 400,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 500,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 600,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 700,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 800,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 900,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 10"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 1,
+          "page": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            4
+          ],
+          "total": 10,
+          "hasMore": true
+        }
+      }
+    },
+    {
+      "name": "empty result on page 0 has no more pages",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 1000,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1"
+          }
+        ],
+        "query": {
+          "anyCategory": false,
+          "category": "Toys",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 0,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "page size 20 on 25 matches, first page",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 400,
+            "rating": 7,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 800,
+            "rating": 14,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 100,
+            "rating": 21,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 500,
+            "rating": 28,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 900,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 200,
+            "rating": 42,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 600,
+            "rating": 49,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 1000,
+            "rating": 5,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 300,
+            "rating": 12,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 700,
+            "rating": 19,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 10"
+          },
+          {
+            "id": 11,
+            "category": "Books",
+            "price": 0,
+            "rating": 26,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 11"
+          },
+          {
+            "id": 12,
+            "category": "Books",
+            "price": 400,
+            "rating": 33,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 12"
+          },
+          {
+            "id": 13,
+            "category": "Books",
+            "price": 800,
+            "rating": 40,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 13"
+          },
+          {
+            "id": 14,
+            "category": "Books",
+            "price": 100,
+            "rating": 47,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 14"
+          },
+          {
+            "id": 15,
+            "category": "Books",
+            "price": 500,
+            "rating": 3,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 15"
+          },
+          {
+            "id": 16,
+            "category": "Books",
+            "price": 900,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 16"
+          },
+          {
+            "id": 17,
+            "category": "Books",
+            "price": 200,
+            "rating": 17,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 17"
+          },
+          {
+            "id": 18,
+            "category": "Books",
+            "price": 600,
+            "rating": 24,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 18"
+          },
+          {
+            "id": 19,
+            "category": "Books",
+            "price": 1000,
+            "rating": 31,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 19"
+          },
+          {
+            "id": 20,
+            "category": "Books",
+            "price": 300,
+            "rating": 38,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 20"
+          },
+          {
+            "id": 21,
+            "category": "Books",
+            "price": 700,
+            "rating": 45,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 21"
+          },
+          {
+            "id": 22,
+            "category": "Books",
+            "price": 0,
+            "rating": 1,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 22"
+          },
+          {
+            "id": 23,
+            "category": "Books",
+            "price": 400,
+            "rating": 8,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 23"
+          },
+          {
+            "id": 24,
+            "category": "Books",
+            "price": 800,
+            "rating": 15,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 24"
+          },
+          {
+            "id": 25,
+            "category": "Books",
+            "price": 100,
+            "rating": 22,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 25"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceDesc",
+          "pageSize": 20,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            8,
+            19,
+            5,
+            16,
+            2,
+            13,
+            24,
+            10,
+            21,
+            7,
+            18,
+            4,
+            15,
+            1,
+            12,
+            23,
+            9,
+            20,
+            6,
+            17
+          ],
+          "total": 25,
+          "hasMore": true
+        }
+      }
+    },
+    {
+      "name": "page size 20 on 25 matches, second page",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 400,
+            "rating": 7,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 800,
+            "rating": 14,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 100,
+            "rating": 21,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 500,
+            "rating": 28,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 900,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 200,
+            "rating": 42,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 600,
+            "rating": 49,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 1000,
+            "rating": 5,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 300,
+            "rating": 12,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 700,
+            "rating": 19,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 10"
+          },
+          {
+            "id": 11,
+            "category": "Books",
+            "price": 0,
+            "rating": 26,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 11"
+          },
+          {
+            "id": 12,
+            "category": "Books",
+            "price": 400,
+            "rating": 33,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 12"
+          },
+          {
+            "id": 13,
+            "category": "Books",
+            "price": 800,
+            "rating": 40,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 13"
+          },
+          {
+            "id": 14,
+            "category": "Books",
+            "price": 100,
+            "rating": 47,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 14"
+          },
+          {
+            "id": 15,
+            "category": "Books",
+            "price": 500,
+            "rating": 3,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 15"
+          },
+          {
+            "id": 16,
+            "category": "Books",
+            "price": 900,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 16"
+          },
+          {
+            "id": 17,
+            "category": "Books",
+            "price": 200,
+            "rating": 17,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 17"
+          },
+          {
+            "id": 18,
+            "category": "Books",
+            "price": 600,
+            "rating": 24,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 18"
+          },
+          {
+            "id": 19,
+            "category": "Books",
+            "price": 1000,
+            "rating": 31,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 19"
+          },
+          {
+            "id": 20,
+            "category": "Books",
+            "price": 300,
+            "rating": 38,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 20"
+          },
+          {
+            "id": 21,
+            "category": "Books",
+            "price": 700,
+            "rating": 45,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 21"
+          },
+          {
+            "id": 22,
+            "category": "Books",
+            "price": 0,
+            "rating": 1,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 22"
+          },
+          {
+            "id": 23,
+            "category": "Books",
+            "price": 400,
+            "rating": 8,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 23"
+          },
+          {
+            "id": 24,
+            "category": "Books",
+            "price": 800,
+            "rating": 15,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 24"
+          },
+          {
+            "id": 25,
+            "category": "Books",
+            "price": 100,
+            "rating": 22,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 25"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceDesc",
+          "pageSize": 20,
+          "page": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            3,
+            14,
+            25,
+            11,
+            22
+          ],
+          "total": 25,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "exactly 20 matches with page size 20",
+      "args": {
+        "items": [
+          {
+            "id": 1,
+            "category": "Books",
+            "price": 400,
+            "rating": 7,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1"
+          },
+          {
+            "id": 2,
+            "category": "Books",
+            "price": 800,
+            "rating": 14,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2"
+          },
+          {
+            "id": 3,
+            "category": "Books",
+            "price": 100,
+            "rating": 21,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3"
+          },
+          {
+            "id": 4,
+            "category": "Books",
+            "price": 500,
+            "rating": 28,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 4"
+          },
+          {
+            "id": 5,
+            "category": "Books",
+            "price": 900,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 5"
+          },
+          {
+            "id": 6,
+            "category": "Books",
+            "price": 200,
+            "rating": 42,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 6"
+          },
+          {
+            "id": 7,
+            "category": "Books",
+            "price": 600,
+            "rating": 49,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 7"
+          },
+          {
+            "id": 8,
+            "category": "Books",
+            "price": 1000,
+            "rating": 5,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 8"
+          },
+          {
+            "id": 9,
+            "category": "Books",
+            "price": 300,
+            "rating": 12,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 9"
+          },
+          {
+            "id": 10,
+            "category": "Books",
+            "price": 700,
+            "rating": 19,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 10"
+          },
+          {
+            "id": 11,
+            "category": "Books",
+            "price": 0,
+            "rating": 26,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 11"
+          },
+          {
+            "id": 12,
+            "category": "Books",
+            "price": 400,
+            "rating": 33,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 12"
+          },
+          {
+            "id": 13,
+            "category": "Books",
+            "price": 800,
+            "rating": 40,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 13"
+          },
+          {
+            "id": 14,
+            "category": "Books",
+            "price": 100,
+            "rating": 47,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 14"
+          },
+          {
+            "id": 15,
+            "category": "Books",
+            "price": 500,
+            "rating": 3,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 15"
+          },
+          {
+            "id": 16,
+            "category": "Books",
+            "price": 900,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 16"
+          },
+          {
+            "id": 17,
+            "category": "Books",
+            "price": 200,
+            "rating": 17,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 17"
+          },
+          {
+            "id": 18,
+            "category": "Books",
+            "price": 600,
+            "rating": 24,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 18"
+          },
+          {
+            "id": 19,
+            "category": "Books",
+            "price": 1000,
+            "rating": 31,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 19"
+          },
+          {
+            "id": 20,
+            "category": "Books",
+            "price": 300,
+            "rating": 38,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 20"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 20,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            11,
+            3,
+            14,
+            6,
+            17,
+            9,
+            20,
+            1,
+            12,
+            4,
+            15,
+            7,
+            18,
+            10,
+            2,
+            13,
+            5,
+            16,
+            8,
+            19
+          ],
+          "total": 20,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "ids 0 and 1000000000 are ordinary ids",
+      "args": {
+        "items": [
+          {
+            "id": 1000000000,
+            "category": "Books",
+            "price": 5,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 1000000000"
+          },
+          {
+            "id": 0,
+            "category": "Books",
+            "price": 5,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 0"
+          },
+          {
+            "id": 77,
+            "category": "Books",
+            "price": 5,
+            "rating": 30,
+            "stock": 5,
+            "hidden": false,
+            "title": "Item 77"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 10,
+          "page": 0
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            0,
+            77,
+            1000000000
+          ],
+          "total": 3,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "100 items sorted by price ascending, page 3 of 20",
+      "args": {
+        "items": [
+          {
+            "id": 1000,
+            "category": "Books",
+            "price": 0,
+            "rating": 0,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 1000"
+          },
+          {
+            "id": 993,
+            "category": "Games",
+            "price": 250,
+            "rating": 13,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 993"
+          },
+          {
+            "id": 986,
+            "category": "Garden",
+            "price": 500,
+            "rating": 26,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 986"
+          },
+          {
+            "id": 979,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 39,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 979"
+          },
+          {
+            "id": 972,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 1,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 972"
+          },
+          {
+            "id": 965,
+            "category": "Books",
+            "price": 1250,
+            "rating": 14,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 965"
+          },
+          {
+            "id": 958,
+            "category": "Games",
+            "price": 1500,
+            "rating": 27,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 958"
+          },
+          {
+            "id": 951,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 40,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 951"
+          },
+          {
+            "id": 944,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 2,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 944"
+          },
+          {
+            "id": 937,
+            "category": "Toys",
+            "price": 0,
+            "rating": 15,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 937"
+          },
+          {
+            "id": 930,
+            "category": "Books",
+            "price": 250,
+            "rating": 28,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 930"
+          },
+          {
+            "id": 923,
+            "category": "Games",
+            "price": 500,
+            "rating": 41,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 923"
+          },
+          {
+            "id": 916,
+            "category": "Garden",
+            "price": 750,
+            "rating": 3,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 916"
+          },
+          {
+            "id": 909,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 16,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 909"
+          },
+          {
+            "id": 902,
+            "category": "Toys",
+            "price": 1250,
+            "rating": 29,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 902"
+          },
+          {
+            "id": 895,
+            "category": "Books",
+            "price": 1500,
+            "rating": 42,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 895"
+          },
+          {
+            "id": 888,
+            "category": "Games",
+            "price": 1750,
+            "rating": 4,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 888"
+          },
+          {
+            "id": 881,
+            "category": "Garden",
+            "price": 2000,
+            "rating": 17,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 881"
+          },
+          {
+            "id": 874,
+            "category": "Kitchen",
+            "price": 0,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 874"
+          },
+          {
+            "id": 867,
+            "category": "Toys",
+            "price": 250,
+            "rating": 43,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 867"
+          },
+          {
+            "id": 860,
+            "category": "Books",
+            "price": 500,
+            "rating": 5,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 860"
+          },
+          {
+            "id": 853,
+            "category": "Games",
+            "price": 750,
+            "rating": 18,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 853"
+          },
+          {
+            "id": 846,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 31,
+            "stock": 2,
+            "hidden": true,
+            "title": "Item 846"
+          },
+          {
+            "id": 839,
+            "category": "Kitchen",
+            "price": 1250,
+            "rating": 44,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 839"
+          },
+          {
+            "id": 832,
+            "category": "Toys",
+            "price": 1500,
+            "rating": 6,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 832"
+          },
+          {
+            "id": 825,
+            "category": "Books",
+            "price": 1750,
+            "rating": 19,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 825"
+          },
+          {
+            "id": 818,
+            "category": "Games",
+            "price": 2000,
+            "rating": 32,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 818"
+          },
+          {
+            "id": 811,
+            "category": "Garden",
+            "price": 0,
+            "rating": 45,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 811"
+          },
+          {
+            "id": 804,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 7,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 804"
+          },
+          {
+            "id": 797,
+            "category": "Toys",
+            "price": 500,
+            "rating": 20,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 797"
+          },
+          {
+            "id": 790,
+            "category": "Books",
+            "price": 750,
+            "rating": 33,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 790"
+          },
+          {
+            "id": 783,
+            "category": "Games",
+            "price": 1000,
+            "rating": 46,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 783"
+          },
+          {
+            "id": 776,
+            "category": "Garden",
+            "price": 1250,
+            "rating": 8,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 776"
+          },
+          {
+            "id": 769,
+            "category": "Kitchen",
+            "price": 1500,
+            "rating": 21,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 769"
+          },
+          {
+            "id": 762,
+            "category": "Toys",
+            "price": 1750,
+            "rating": 34,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 762"
+          },
+          {
+            "id": 755,
+            "category": "Books",
+            "price": 2000,
+            "rating": 47,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 755"
+          },
+          {
+            "id": 748,
+            "category": "Games",
+            "price": 0,
+            "rating": 9,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 748"
+          },
+          {
+            "id": 741,
+            "category": "Garden",
+            "price": 250,
+            "rating": 22,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 741"
+          },
+          {
+            "id": 734,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 734"
+          },
+          {
+            "id": 727,
+            "category": "Toys",
+            "price": 750,
+            "rating": 48,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 727"
+          },
+          {
+            "id": 720,
+            "category": "Books",
+            "price": 1000,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 720"
+          },
+          {
+            "id": 713,
+            "category": "Games",
+            "price": 1250,
+            "rating": 23,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 713"
+          },
+          {
+            "id": 706,
+            "category": "Garden",
+            "price": 1500,
+            "rating": 36,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 706"
+          },
+          {
+            "id": 699,
+            "category": "Kitchen",
+            "price": 1750,
+            "rating": 49,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 699"
+          },
+          {
+            "id": 692,
+            "category": "Toys",
+            "price": 2000,
+            "rating": 11,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 692"
+          },
+          {
+            "id": 685,
+            "category": "Books",
+            "price": 0,
+            "rating": 24,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 685"
+          },
+          {
+            "id": 678,
+            "category": "Games",
+            "price": 250,
+            "rating": 37,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 678"
+          },
+          {
+            "id": 671,
+            "category": "Garden",
+            "price": 500,
+            "rating": 50,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 671"
+          },
+          {
+            "id": 664,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 12,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 664"
+          },
+          {
+            "id": 657,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 25,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 657"
+          },
+          {
+            "id": 650,
+            "category": "Books",
+            "price": 1250,
+            "rating": 38,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 650"
+          },
+          {
+            "id": 643,
+            "category": "Games",
+            "price": 1500,
+            "rating": 0,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 643"
+          },
+          {
+            "id": 636,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 13,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 636"
+          },
+          {
+            "id": 629,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 26,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 629"
+          },
+          {
+            "id": 622,
+            "category": "Toys",
+            "price": 0,
+            "rating": 39,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 622"
+          },
+          {
+            "id": 615,
+            "category": "Books",
+            "price": 250,
+            "rating": 1,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 615"
+          },
+          {
+            "id": 608,
+            "category": "Games",
+            "price": 500,
+            "rating": 14,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 608"
+          },
+          {
+            "id": 601,
+            "category": "Garden",
+            "price": 750,
+            "rating": 27,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 601"
+          },
+          {
+            "id": 594,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 40,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 594"
+          },
+          {
+            "id": 587,
+            "category": "Toys",
+            "price": 1250,
+            "rating": 2,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 587"
+          },
+          {
+            "id": 580,
+            "category": "Books",
+            "price": 1500,
+            "rating": 15,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 580"
+          },
+          {
+            "id": 573,
+            "category": "Games",
+            "price": 1750,
+            "rating": 28,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 573"
+          },
+          {
+            "id": 566,
+            "category": "Garden",
+            "price": 2000,
+            "rating": 41,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 566"
+          },
+          {
+            "id": 559,
+            "category": "Kitchen",
+            "price": 0,
+            "rating": 3,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 559"
+          },
+          {
+            "id": 552,
+            "category": "Toys",
+            "price": 250,
+            "rating": 16,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 552"
+          },
+          {
+            "id": 545,
+            "category": "Books",
+            "price": 500,
+            "rating": 29,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 545"
+          },
+          {
+            "id": 538,
+            "category": "Games",
+            "price": 750,
+            "rating": 42,
+            "stock": 2,
+            "hidden": true,
+            "title": "Item 538"
+          },
+          {
+            "id": 531,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 4,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 531"
+          },
+          {
+            "id": 524,
+            "category": "Kitchen",
+            "price": 1250,
+            "rating": 17,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 524"
+          },
+          {
+            "id": 517,
+            "category": "Toys",
+            "price": 1500,
+            "rating": 30,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 517"
+          },
+          {
+            "id": 510,
+            "category": "Books",
+            "price": 1750,
+            "rating": 43,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 510"
+          },
+          {
+            "id": 503,
+            "category": "Games",
+            "price": 2000,
+            "rating": 5,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 503"
+          },
+          {
+            "id": 496,
+            "category": "Garden",
+            "price": 0,
+            "rating": 18,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 496"
+          },
+          {
+            "id": 489,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 31,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 489"
+          },
+          {
+            "id": 482,
+            "category": "Toys",
+            "price": 500,
+            "rating": 44,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 482"
+          },
+          {
+            "id": 475,
+            "category": "Books",
+            "price": 750,
+            "rating": 6,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 475"
+          },
+          {
+            "id": 468,
+            "category": "Games",
+            "price": 1000,
+            "rating": 19,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 468"
+          },
+          {
+            "id": 461,
+            "category": "Garden",
+            "price": 1250,
+            "rating": 32,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 461"
+          },
+          {
+            "id": 454,
+            "category": "Kitchen",
+            "price": 1500,
+            "rating": 45,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 454"
+          },
+          {
+            "id": 447,
+            "category": "Toys",
+            "price": 1750,
+            "rating": 7,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 447"
+          },
+          {
+            "id": 440,
+            "category": "Books",
+            "price": 2000,
+            "rating": 20,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 440"
+          },
+          {
+            "id": 433,
+            "category": "Games",
+            "price": 0,
+            "rating": 33,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 433"
+          },
+          {
+            "id": 426,
+            "category": "Garden",
+            "price": 250,
+            "rating": 46,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 426"
+          },
+          {
+            "id": 419,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 8,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 419"
+          },
+          {
+            "id": 412,
+            "category": "Toys",
+            "price": 750,
+            "rating": 21,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 412"
+          },
+          {
+            "id": 405,
+            "category": "Books",
+            "price": 1000,
+            "rating": 34,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 405"
+          },
+          {
+            "id": 398,
+            "category": "Games",
+            "price": 1250,
+            "rating": 47,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 398"
+          },
+          {
+            "id": 391,
+            "category": "Garden",
+            "price": 1500,
+            "rating": 9,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 391"
+          },
+          {
+            "id": 384,
+            "category": "Kitchen",
+            "price": 1750,
+            "rating": 22,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 384"
+          },
+          {
+            "id": 377,
+            "category": "Toys",
+            "price": 2000,
+            "rating": 35,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 377"
+          },
+          {
+            "id": 370,
+            "category": "Books",
+            "price": 0,
+            "rating": 48,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 370"
+          },
+          {
+            "id": 363,
+            "category": "Games",
+            "price": 250,
+            "rating": 10,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 363"
+          },
+          {
+            "id": 356,
+            "category": "Garden",
+            "price": 500,
+            "rating": 23,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 356"
+          },
+          {
+            "id": 349,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 36,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 349"
+          },
+          {
+            "id": 342,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 49,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 342"
+          },
+          {
+            "id": 335,
+            "category": "Books",
+            "price": 1250,
+            "rating": 11,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 335"
+          },
+          {
+            "id": 328,
+            "category": "Games",
+            "price": 1500,
+            "rating": 24,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 328"
+          },
+          {
+            "id": 321,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 37,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 321"
+          },
+          {
+            "id": 314,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 50,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 314"
+          },
+          {
+            "id": 307,
+            "category": "Toys",
+            "price": 0,
+            "rating": 12,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 307"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceAsc",
+          "pageSize": 20,
+          "page": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            328,
+            391,
+            454,
+            517,
+            580,
+            643,
+            706,
+            832,
+            895,
+            958,
+            321,
+            447,
+            510,
+            573,
+            636,
+            699,
+            762,
+            825,
+            888,
+            951
+          ],
+          "total": 90,
+          "hasMore": true
+        }
+      }
+    },
+    {
+      "name": "100 items sorted by price descending, last page of 7",
+      "args": {
+        "items": [
+          {
+            "id": 1000,
+            "category": "Books",
+            "price": 0,
+            "rating": 0,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 1000"
+          },
+          {
+            "id": 993,
+            "category": "Games",
+            "price": 250,
+            "rating": 13,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 993"
+          },
+          {
+            "id": 986,
+            "category": "Garden",
+            "price": 500,
+            "rating": 26,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 986"
+          },
+          {
+            "id": 979,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 39,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 979"
+          },
+          {
+            "id": 972,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 1,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 972"
+          },
+          {
+            "id": 965,
+            "category": "Books",
+            "price": 1250,
+            "rating": 14,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 965"
+          },
+          {
+            "id": 958,
+            "category": "Games",
+            "price": 1500,
+            "rating": 27,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 958"
+          },
+          {
+            "id": 951,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 40,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 951"
+          },
+          {
+            "id": 944,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 2,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 944"
+          },
+          {
+            "id": 937,
+            "category": "Toys",
+            "price": 0,
+            "rating": 15,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 937"
+          },
+          {
+            "id": 930,
+            "category": "Books",
+            "price": 250,
+            "rating": 28,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 930"
+          },
+          {
+            "id": 923,
+            "category": "Games",
+            "price": 500,
+            "rating": 41,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 923"
+          },
+          {
+            "id": 916,
+            "category": "Garden",
+            "price": 750,
+            "rating": 3,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 916"
+          },
+          {
+            "id": 909,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 16,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 909"
+          },
+          {
+            "id": 902,
+            "category": "Toys",
+            "price": 1250,
+            "rating": 29,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 902"
+          },
+          {
+            "id": 895,
+            "category": "Books",
+            "price": 1500,
+            "rating": 42,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 895"
+          },
+          {
+            "id": 888,
+            "category": "Games",
+            "price": 1750,
+            "rating": 4,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 888"
+          },
+          {
+            "id": 881,
+            "category": "Garden",
+            "price": 2000,
+            "rating": 17,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 881"
+          },
+          {
+            "id": 874,
+            "category": "Kitchen",
+            "price": 0,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 874"
+          },
+          {
+            "id": 867,
+            "category": "Toys",
+            "price": 250,
+            "rating": 43,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 867"
+          },
+          {
+            "id": 860,
+            "category": "Books",
+            "price": 500,
+            "rating": 5,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 860"
+          },
+          {
+            "id": 853,
+            "category": "Games",
+            "price": 750,
+            "rating": 18,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 853"
+          },
+          {
+            "id": 846,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 31,
+            "stock": 2,
+            "hidden": true,
+            "title": "Item 846"
+          },
+          {
+            "id": 839,
+            "category": "Kitchen",
+            "price": 1250,
+            "rating": 44,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 839"
+          },
+          {
+            "id": 832,
+            "category": "Toys",
+            "price": 1500,
+            "rating": 6,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 832"
+          },
+          {
+            "id": 825,
+            "category": "Books",
+            "price": 1750,
+            "rating": 19,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 825"
+          },
+          {
+            "id": 818,
+            "category": "Games",
+            "price": 2000,
+            "rating": 32,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 818"
+          },
+          {
+            "id": 811,
+            "category": "Garden",
+            "price": 0,
+            "rating": 45,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 811"
+          },
+          {
+            "id": 804,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 7,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 804"
+          },
+          {
+            "id": 797,
+            "category": "Toys",
+            "price": 500,
+            "rating": 20,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 797"
+          },
+          {
+            "id": 790,
+            "category": "Books",
+            "price": 750,
+            "rating": 33,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 790"
+          },
+          {
+            "id": 783,
+            "category": "Games",
+            "price": 1000,
+            "rating": 46,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 783"
+          },
+          {
+            "id": 776,
+            "category": "Garden",
+            "price": 1250,
+            "rating": 8,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 776"
+          },
+          {
+            "id": 769,
+            "category": "Kitchen",
+            "price": 1500,
+            "rating": 21,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 769"
+          },
+          {
+            "id": 762,
+            "category": "Toys",
+            "price": 1750,
+            "rating": 34,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 762"
+          },
+          {
+            "id": 755,
+            "category": "Books",
+            "price": 2000,
+            "rating": 47,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 755"
+          },
+          {
+            "id": 748,
+            "category": "Games",
+            "price": 0,
+            "rating": 9,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 748"
+          },
+          {
+            "id": 741,
+            "category": "Garden",
+            "price": 250,
+            "rating": 22,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 741"
+          },
+          {
+            "id": 734,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 734"
+          },
+          {
+            "id": 727,
+            "category": "Toys",
+            "price": 750,
+            "rating": 48,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 727"
+          },
+          {
+            "id": 720,
+            "category": "Books",
+            "price": 1000,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 720"
+          },
+          {
+            "id": 713,
+            "category": "Games",
+            "price": 1250,
+            "rating": 23,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 713"
+          },
+          {
+            "id": 706,
+            "category": "Garden",
+            "price": 1500,
+            "rating": 36,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 706"
+          },
+          {
+            "id": 699,
+            "category": "Kitchen",
+            "price": 1750,
+            "rating": 49,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 699"
+          },
+          {
+            "id": 692,
+            "category": "Toys",
+            "price": 2000,
+            "rating": 11,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 692"
+          },
+          {
+            "id": 685,
+            "category": "Books",
+            "price": 0,
+            "rating": 24,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 685"
+          },
+          {
+            "id": 678,
+            "category": "Games",
+            "price": 250,
+            "rating": 37,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 678"
+          },
+          {
+            "id": 671,
+            "category": "Garden",
+            "price": 500,
+            "rating": 50,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 671"
+          },
+          {
+            "id": 664,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 12,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 664"
+          },
+          {
+            "id": 657,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 25,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 657"
+          },
+          {
+            "id": 650,
+            "category": "Books",
+            "price": 1250,
+            "rating": 38,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 650"
+          },
+          {
+            "id": 643,
+            "category": "Games",
+            "price": 1500,
+            "rating": 0,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 643"
+          },
+          {
+            "id": 636,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 13,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 636"
+          },
+          {
+            "id": 629,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 26,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 629"
+          },
+          {
+            "id": 622,
+            "category": "Toys",
+            "price": 0,
+            "rating": 39,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 622"
+          },
+          {
+            "id": 615,
+            "category": "Books",
+            "price": 250,
+            "rating": 1,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 615"
+          },
+          {
+            "id": 608,
+            "category": "Games",
+            "price": 500,
+            "rating": 14,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 608"
+          },
+          {
+            "id": 601,
+            "category": "Garden",
+            "price": 750,
+            "rating": 27,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 601"
+          },
+          {
+            "id": 594,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 40,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 594"
+          },
+          {
+            "id": 587,
+            "category": "Toys",
+            "price": 1250,
+            "rating": 2,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 587"
+          },
+          {
+            "id": 580,
+            "category": "Books",
+            "price": 1500,
+            "rating": 15,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 580"
+          },
+          {
+            "id": 573,
+            "category": "Games",
+            "price": 1750,
+            "rating": 28,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 573"
+          },
+          {
+            "id": 566,
+            "category": "Garden",
+            "price": 2000,
+            "rating": 41,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 566"
+          },
+          {
+            "id": 559,
+            "category": "Kitchen",
+            "price": 0,
+            "rating": 3,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 559"
+          },
+          {
+            "id": 552,
+            "category": "Toys",
+            "price": 250,
+            "rating": 16,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 552"
+          },
+          {
+            "id": 545,
+            "category": "Books",
+            "price": 500,
+            "rating": 29,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 545"
+          },
+          {
+            "id": 538,
+            "category": "Games",
+            "price": 750,
+            "rating": 42,
+            "stock": 2,
+            "hidden": true,
+            "title": "Item 538"
+          },
+          {
+            "id": 531,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 4,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 531"
+          },
+          {
+            "id": 524,
+            "category": "Kitchen",
+            "price": 1250,
+            "rating": 17,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 524"
+          },
+          {
+            "id": 517,
+            "category": "Toys",
+            "price": 1500,
+            "rating": 30,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 517"
+          },
+          {
+            "id": 510,
+            "category": "Books",
+            "price": 1750,
+            "rating": 43,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 510"
+          },
+          {
+            "id": 503,
+            "category": "Games",
+            "price": 2000,
+            "rating": 5,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 503"
+          },
+          {
+            "id": 496,
+            "category": "Garden",
+            "price": 0,
+            "rating": 18,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 496"
+          },
+          {
+            "id": 489,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 31,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 489"
+          },
+          {
+            "id": 482,
+            "category": "Toys",
+            "price": 500,
+            "rating": 44,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 482"
+          },
+          {
+            "id": 475,
+            "category": "Books",
+            "price": 750,
+            "rating": 6,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 475"
+          },
+          {
+            "id": 468,
+            "category": "Games",
+            "price": 1000,
+            "rating": 19,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 468"
+          },
+          {
+            "id": 461,
+            "category": "Garden",
+            "price": 1250,
+            "rating": 32,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 461"
+          },
+          {
+            "id": 454,
+            "category": "Kitchen",
+            "price": 1500,
+            "rating": 45,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 454"
+          },
+          {
+            "id": 447,
+            "category": "Toys",
+            "price": 1750,
+            "rating": 7,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 447"
+          },
+          {
+            "id": 440,
+            "category": "Books",
+            "price": 2000,
+            "rating": 20,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 440"
+          },
+          {
+            "id": 433,
+            "category": "Games",
+            "price": 0,
+            "rating": 33,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 433"
+          },
+          {
+            "id": 426,
+            "category": "Garden",
+            "price": 250,
+            "rating": 46,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 426"
+          },
+          {
+            "id": 419,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 8,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 419"
+          },
+          {
+            "id": 412,
+            "category": "Toys",
+            "price": 750,
+            "rating": 21,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 412"
+          },
+          {
+            "id": 405,
+            "category": "Books",
+            "price": 1000,
+            "rating": 34,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 405"
+          },
+          {
+            "id": 398,
+            "category": "Games",
+            "price": 1250,
+            "rating": 47,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 398"
+          },
+          {
+            "id": 391,
+            "category": "Garden",
+            "price": 1500,
+            "rating": 9,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 391"
+          },
+          {
+            "id": 384,
+            "category": "Kitchen",
+            "price": 1750,
+            "rating": 22,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 384"
+          },
+          {
+            "id": 377,
+            "category": "Toys",
+            "price": 2000,
+            "rating": 35,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 377"
+          },
+          {
+            "id": 370,
+            "category": "Books",
+            "price": 0,
+            "rating": 48,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 370"
+          },
+          {
+            "id": 363,
+            "category": "Games",
+            "price": 250,
+            "rating": 10,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 363"
+          },
+          {
+            "id": 356,
+            "category": "Garden",
+            "price": 500,
+            "rating": 23,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 356"
+          },
+          {
+            "id": 349,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 36,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 349"
+          },
+          {
+            "id": 342,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 49,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 342"
+          },
+          {
+            "id": 335,
+            "category": "Books",
+            "price": 1250,
+            "rating": 11,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 335"
+          },
+          {
+            "id": 328,
+            "category": "Games",
+            "price": 1500,
+            "rating": 24,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 328"
+          },
+          {
+            "id": 321,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 37,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 321"
+          },
+          {
+            "id": 314,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 50,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 314"
+          },
+          {
+            "id": 307,
+            "category": "Toys",
+            "price": 0,
+            "rating": 12,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 307"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": false,
+          "order": "PriceDesc",
+          "pageSize": 7,
+          "page": 12
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            622,
+            685,
+            748,
+            811,
+            874,
+            937
+          ],
+          "total": 90,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "100 items by rating, category filter, in stock",
+      "args": {
+        "items": [
+          {
+            "id": 1000,
+            "category": "Books",
+            "price": 0,
+            "rating": 0,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 1000"
+          },
+          {
+            "id": 993,
+            "category": "Games",
+            "price": 250,
+            "rating": 13,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 993"
+          },
+          {
+            "id": 986,
+            "category": "Garden",
+            "price": 500,
+            "rating": 26,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 986"
+          },
+          {
+            "id": 979,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 39,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 979"
+          },
+          {
+            "id": 972,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 1,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 972"
+          },
+          {
+            "id": 965,
+            "category": "Books",
+            "price": 1250,
+            "rating": 14,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 965"
+          },
+          {
+            "id": 958,
+            "category": "Games",
+            "price": 1500,
+            "rating": 27,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 958"
+          },
+          {
+            "id": 951,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 40,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 951"
+          },
+          {
+            "id": 944,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 2,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 944"
+          },
+          {
+            "id": 937,
+            "category": "Toys",
+            "price": 0,
+            "rating": 15,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 937"
+          },
+          {
+            "id": 930,
+            "category": "Books",
+            "price": 250,
+            "rating": 28,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 930"
+          },
+          {
+            "id": 923,
+            "category": "Games",
+            "price": 500,
+            "rating": 41,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 923"
+          },
+          {
+            "id": 916,
+            "category": "Garden",
+            "price": 750,
+            "rating": 3,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 916"
+          },
+          {
+            "id": 909,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 16,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 909"
+          },
+          {
+            "id": 902,
+            "category": "Toys",
+            "price": 1250,
+            "rating": 29,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 902"
+          },
+          {
+            "id": 895,
+            "category": "Books",
+            "price": 1500,
+            "rating": 42,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 895"
+          },
+          {
+            "id": 888,
+            "category": "Games",
+            "price": 1750,
+            "rating": 4,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 888"
+          },
+          {
+            "id": 881,
+            "category": "Garden",
+            "price": 2000,
+            "rating": 17,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 881"
+          },
+          {
+            "id": 874,
+            "category": "Kitchen",
+            "price": 0,
+            "rating": 30,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 874"
+          },
+          {
+            "id": 867,
+            "category": "Toys",
+            "price": 250,
+            "rating": 43,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 867"
+          },
+          {
+            "id": 860,
+            "category": "Books",
+            "price": 500,
+            "rating": 5,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 860"
+          },
+          {
+            "id": 853,
+            "category": "Games",
+            "price": 750,
+            "rating": 18,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 853"
+          },
+          {
+            "id": 846,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 31,
+            "stock": 2,
+            "hidden": true,
+            "title": "Item 846"
+          },
+          {
+            "id": 839,
+            "category": "Kitchen",
+            "price": 1250,
+            "rating": 44,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 839"
+          },
+          {
+            "id": 832,
+            "category": "Toys",
+            "price": 1500,
+            "rating": 6,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 832"
+          },
+          {
+            "id": 825,
+            "category": "Books",
+            "price": 1750,
+            "rating": 19,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 825"
+          },
+          {
+            "id": 818,
+            "category": "Games",
+            "price": 2000,
+            "rating": 32,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 818"
+          },
+          {
+            "id": 811,
+            "category": "Garden",
+            "price": 0,
+            "rating": 45,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 811"
+          },
+          {
+            "id": 804,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 7,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 804"
+          },
+          {
+            "id": 797,
+            "category": "Toys",
+            "price": 500,
+            "rating": 20,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 797"
+          },
+          {
+            "id": 790,
+            "category": "Books",
+            "price": 750,
+            "rating": 33,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 790"
+          },
+          {
+            "id": 783,
+            "category": "Games",
+            "price": 1000,
+            "rating": 46,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 783"
+          },
+          {
+            "id": 776,
+            "category": "Garden",
+            "price": 1250,
+            "rating": 8,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 776"
+          },
+          {
+            "id": 769,
+            "category": "Kitchen",
+            "price": 1500,
+            "rating": 21,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 769"
+          },
+          {
+            "id": 762,
+            "category": "Toys",
+            "price": 1750,
+            "rating": 34,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 762"
+          },
+          {
+            "id": 755,
+            "category": "Books",
+            "price": 2000,
+            "rating": 47,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 755"
+          },
+          {
+            "id": 748,
+            "category": "Games",
+            "price": 0,
+            "rating": 9,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 748"
+          },
+          {
+            "id": 741,
+            "category": "Garden",
+            "price": 250,
+            "rating": 22,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 741"
+          },
+          {
+            "id": 734,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 734"
+          },
+          {
+            "id": 727,
+            "category": "Toys",
+            "price": 750,
+            "rating": 48,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 727"
+          },
+          {
+            "id": 720,
+            "category": "Books",
+            "price": 1000,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 720"
+          },
+          {
+            "id": 713,
+            "category": "Games",
+            "price": 1250,
+            "rating": 23,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 713"
+          },
+          {
+            "id": 706,
+            "category": "Garden",
+            "price": 1500,
+            "rating": 36,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 706"
+          },
+          {
+            "id": 699,
+            "category": "Kitchen",
+            "price": 1750,
+            "rating": 49,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 699"
+          },
+          {
+            "id": 692,
+            "category": "Toys",
+            "price": 2000,
+            "rating": 11,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 692"
+          },
+          {
+            "id": 685,
+            "category": "Books",
+            "price": 0,
+            "rating": 24,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 685"
+          },
+          {
+            "id": 678,
+            "category": "Games",
+            "price": 250,
+            "rating": 37,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 678"
+          },
+          {
+            "id": 671,
+            "category": "Garden",
+            "price": 500,
+            "rating": 50,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 671"
+          },
+          {
+            "id": 664,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 12,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 664"
+          },
+          {
+            "id": 657,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 25,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 657"
+          },
+          {
+            "id": 650,
+            "category": "Books",
+            "price": 1250,
+            "rating": 38,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 650"
+          },
+          {
+            "id": 643,
+            "category": "Games",
+            "price": 1500,
+            "rating": 0,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 643"
+          },
+          {
+            "id": 636,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 13,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 636"
+          },
+          {
+            "id": 629,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 26,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 629"
+          },
+          {
+            "id": 622,
+            "category": "Toys",
+            "price": 0,
+            "rating": 39,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 622"
+          },
+          {
+            "id": 615,
+            "category": "Books",
+            "price": 250,
+            "rating": 1,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 615"
+          },
+          {
+            "id": 608,
+            "category": "Games",
+            "price": 500,
+            "rating": 14,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 608"
+          },
+          {
+            "id": 601,
+            "category": "Garden",
+            "price": 750,
+            "rating": 27,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 601"
+          },
+          {
+            "id": 594,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 40,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 594"
+          },
+          {
+            "id": 587,
+            "category": "Toys",
+            "price": 1250,
+            "rating": 2,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 587"
+          },
+          {
+            "id": 580,
+            "category": "Books",
+            "price": 1500,
+            "rating": 15,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 580"
+          },
+          {
+            "id": 573,
+            "category": "Games",
+            "price": 1750,
+            "rating": 28,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 573"
+          },
+          {
+            "id": 566,
+            "category": "Garden",
+            "price": 2000,
+            "rating": 41,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 566"
+          },
+          {
+            "id": 559,
+            "category": "Kitchen",
+            "price": 0,
+            "rating": 3,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 559"
+          },
+          {
+            "id": 552,
+            "category": "Toys",
+            "price": 250,
+            "rating": 16,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 552"
+          },
+          {
+            "id": 545,
+            "category": "Books",
+            "price": 500,
+            "rating": 29,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 545"
+          },
+          {
+            "id": 538,
+            "category": "Games",
+            "price": 750,
+            "rating": 42,
+            "stock": 2,
+            "hidden": true,
+            "title": "Item 538"
+          },
+          {
+            "id": 531,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 4,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 531"
+          },
+          {
+            "id": 524,
+            "category": "Kitchen",
+            "price": 1250,
+            "rating": 17,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 524"
+          },
+          {
+            "id": 517,
+            "category": "Toys",
+            "price": 1500,
+            "rating": 30,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 517"
+          },
+          {
+            "id": 510,
+            "category": "Books",
+            "price": 1750,
+            "rating": 43,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 510"
+          },
+          {
+            "id": 503,
+            "category": "Games",
+            "price": 2000,
+            "rating": 5,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 503"
+          },
+          {
+            "id": 496,
+            "category": "Garden",
+            "price": 0,
+            "rating": 18,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 496"
+          },
+          {
+            "id": 489,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 31,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 489"
+          },
+          {
+            "id": 482,
+            "category": "Toys",
+            "price": 500,
+            "rating": 44,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 482"
+          },
+          {
+            "id": 475,
+            "category": "Books",
+            "price": 750,
+            "rating": 6,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 475"
+          },
+          {
+            "id": 468,
+            "category": "Games",
+            "price": 1000,
+            "rating": 19,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 468"
+          },
+          {
+            "id": 461,
+            "category": "Garden",
+            "price": 1250,
+            "rating": 32,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 461"
+          },
+          {
+            "id": 454,
+            "category": "Kitchen",
+            "price": 1500,
+            "rating": 45,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 454"
+          },
+          {
+            "id": 447,
+            "category": "Toys",
+            "price": 1750,
+            "rating": 7,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 447"
+          },
+          {
+            "id": 440,
+            "category": "Books",
+            "price": 2000,
+            "rating": 20,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 440"
+          },
+          {
+            "id": 433,
+            "category": "Games",
+            "price": 0,
+            "rating": 33,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 433"
+          },
+          {
+            "id": 426,
+            "category": "Garden",
+            "price": 250,
+            "rating": 46,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 426"
+          },
+          {
+            "id": 419,
+            "category": "Kitchen",
+            "price": 500,
+            "rating": 8,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 419"
+          },
+          {
+            "id": 412,
+            "category": "Toys",
+            "price": 750,
+            "rating": 21,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 412"
+          },
+          {
+            "id": 405,
+            "category": "Books",
+            "price": 1000,
+            "rating": 34,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 405"
+          },
+          {
+            "id": 398,
+            "category": "Games",
+            "price": 1250,
+            "rating": 47,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 398"
+          },
+          {
+            "id": 391,
+            "category": "Garden",
+            "price": 1500,
+            "rating": 9,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 391"
+          },
+          {
+            "id": 384,
+            "category": "Kitchen",
+            "price": 1750,
+            "rating": 22,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 384"
+          },
+          {
+            "id": 377,
+            "category": "Toys",
+            "price": 2000,
+            "rating": 35,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 377"
+          },
+          {
+            "id": 370,
+            "category": "Books",
+            "price": 0,
+            "rating": 48,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 370"
+          },
+          {
+            "id": 363,
+            "category": "Games",
+            "price": 250,
+            "rating": 10,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 363"
+          },
+          {
+            "id": 356,
+            "category": "Garden",
+            "price": 500,
+            "rating": 23,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 356"
+          },
+          {
+            "id": 349,
+            "category": "Kitchen",
+            "price": 750,
+            "rating": 36,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 349"
+          },
+          {
+            "id": 342,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 49,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 342"
+          },
+          {
+            "id": 335,
+            "category": "Books",
+            "price": 1250,
+            "rating": 11,
+            "stock": 3,
+            "hidden": false,
+            "title": "Item 335"
+          },
+          {
+            "id": 328,
+            "category": "Games",
+            "price": 1500,
+            "rating": 24,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 328"
+          },
+          {
+            "id": 321,
+            "category": "Garden",
+            "price": 1750,
+            "rating": 37,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 321"
+          },
+          {
+            "id": 314,
+            "category": "Kitchen",
+            "price": 2000,
+            "rating": 50,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 314"
+          },
+          {
+            "id": 307,
+            "category": "Toys",
+            "price": 0,
+            "rating": 12,
+            "stock": 3,
+            "hidden": true,
+            "title": "Item 307"
+          }
+        ],
+        "query": {
+          "anyCategory": false,
+          "category": "Garden",
+          "minPrice": 0,
+          "maxPrice": 100000000,
+          "minRating": 0,
+          "inStockOnly": true,
+          "order": "RatingDesc",
+          "pageSize": 3,
+          "page": 1
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            566,
+            951,
+            321
+          ],
+          "total": 13,
+          "hasMore": true
+        }
+      }
+    },
+    {
+      "name": "random mix 1",
+      "args": {
+        "items": [
+          {
+            "id": 1078,
+            "category": "Games",
+            "price": 1000,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1078"
+          },
+          {
+            "id": 1758,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1758"
+          },
+          {
+            "id": 3172,
+            "category": "Garden",
+            "price": 400,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3172"
+          },
+          {
+            "id": 1207,
+            "category": "Garden",
+            "price": 250,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1207"
+          },
+          {
+            "id": 3713,
+            "category": "Books",
+            "price": 99999,
+            "rating": 25,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 3713"
+          },
+          {
+            "id": 4092,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 50,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 4092"
+          },
+          {
+            "id": 935,
+            "category": "Books",
+            "price": 400,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 935"
+          },
+          {
+            "id": 2103,
+            "category": "Toys",
+            "price": 400,
+            "rating": 35,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 2103"
+          },
+          {
+            "id": 2923,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 2923"
+          },
+          {
+            "id": 1113,
+            "category": "Toys",
+            "price": 0,
+            "rating": 0,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1113"
+          },
+          {
+            "id": 3478,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 35,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 3478"
+          },
+          {
+            "id": 1855,
+            "category": "Garden",
+            "price": 250,
+            "rating": 10,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 1855"
+          },
+          {
+            "id": 2252,
+            "category": "Books",
+            "price": 250,
+            "rating": 50,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 2252"
+          },
+          {
+            "id": 2394,
+            "category": "Games",
+            "price": 400,
+            "rating": 35,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 2394"
+          },
+          {
+            "id": 3727,
+            "category": "Books",
+            "price": 0,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3727"
+          },
+          {
+            "id": 3617,
+            "category": "Games",
+            "price": 99999,
+            "rating": 25,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 3617"
+          },
+          {
+            "id": 2692,
+            "category": "Games",
+            "price": 99999,
+            "rating": 10,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 2692"
+          },
+          {
+            "id": 2320,
+            "category": "Toys",
+            "price": 250,
+            "rating": 25,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 2320"
+          },
+          {
+            "id": 2225,
+            "category": "Kitchen",
+            "price": 400,
+            "rating": 35,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 2225"
+          },
+          {
+            "id": 3806,
+            "category": "Games",
+            "price": 0,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 3806"
+          },
+          {
+            "id": 731,
+            "category": "Garden",
+            "price": 100,
+            "rating": 50,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 731"
+          },
+          {
+            "id": 3067,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 35,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 3067"
+          },
+          {
+            "id": 4022,
+            "category": "Books",
+            "price": 1000,
+            "rating": 35,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 4022"
+          },
+          {
+            "id": 2713,
+            "category": "Garden",
+            "price": 250,
+            "rating": 0,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2713"
+          },
+          {
+            "id": 2860,
+            "category": "Games",
+            "price": 250,
+            "rating": 0,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 2860"
+          },
+          {
+            "id": 1734,
+            "category": "Games",
+            "price": 250,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1734"
+          },
+          {
+            "id": 1483,
+            "category": "Books",
+            "price": 100,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1483"
+          },
+          {
+            "id": 3579,
+            "category": "Kitchen",
+            "price": 100,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 3579"
+          },
+          {
+            "id": 4391,
+            "category": "Garden",
+            "price": 100,
+            "rating": 25,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 4391"
+          },
+          {
+            "id": 4590,
+            "category": "Kitchen",
+            "price": 400,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 4590"
+          },
+          {
+            "id": 135,
+            "category": "Games",
+            "price": 1000,
+            "rating": 0,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 135"
+          },
+          {
+            "id": 3708,
+            "category": "Books",
+            "price": 0,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 3708"
+          },
+          {
+            "id": 328,
+            "category": "Games",
+            "price": 400,
+            "rating": 50,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 328"
+          },
+          {
+            "id": 2928,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 25,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 2928"
+          },
+          {
+            "id": 2489,
+            "category": "Books",
+            "price": 0,
+            "rating": 10,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 2489"
+          },
+          {
+            "id": 846,
+            "category": "Games",
+            "price": 100,
+            "rating": 35,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 846"
+          },
+          {
+            "id": 1292,
+            "category": "Books",
+            "price": 100,
+            "rating": 25,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1292"
+          },
+          {
+            "id": 4399,
+            "category": "Toys",
+            "price": 400,
+            "rating": 50,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 4399"
+          },
+          {
+            "id": 3039,
+            "category": "Books",
+            "price": 100,
+            "rating": 10,
+            "stock": 50,
+            "hidden": true,
+            "title": "Item 3039"
+          },
+          {
+            "id": 4173,
+            "category": "Toys",
+            "price": 0,
+            "rating": 35,
+            "stock": 50,
+            "hidden": true,
+            "title": "Item 4173"
+          },
+          {
+            "id": 2335,
+            "category": "Garden",
+            "price": 99999,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 2335"
+          },
+          {
+            "id": 454,
+            "category": "Books",
+            "price": 100,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 454"
+          },
+          {
+            "id": 894,
+            "category": "Games",
+            "price": 0,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 894"
+          },
+          {
+            "id": 4287,
+            "category": "Garden",
+            "price": 99999,
+            "rating": 50,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 4287"
+          },
+          {
+            "id": 182,
+            "category": "Garden",
+            "price": 100,
+            "rating": 25,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 182"
+          },
+          {
+            "id": 1237,
+            "category": "Kitchen",
+            "price": 100,
+            "rating": 0,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1237"
+          },
+          {
+            "id": 3061,
+            "category": "Garden",
+            "price": 0,
+            "rating": 35,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 3061"
+          },
+          {
+            "id": 4587,
+            "category": "Books",
+            "price": 1000,
+            "rating": 25,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 4587"
+          },
+          {
+            "id": 4369,
+            "category": "Toys",
+            "price": 0,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 4369"
+          },
+          {
+            "id": 859,
+            "category": "Garden",
+            "price": 250,
+            "rating": 25,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 859"
+          },
+          {
+            "id": 628,
+            "category": "Games",
+            "price": 250,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 628"
+          },
+          {
+            "id": 111,
+            "category": "Garden",
+            "price": 250,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 111"
+          },
+          {
+            "id": 1535,
+            "category": "Games",
+            "price": 99999,
+            "rating": 0,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1535"
+          },
+          {
+            "id": 2777,
+            "category": "Garden",
+            "price": 400,
+            "rating": 50,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 2777"
+          },
+          {
+            "id": 3046,
+            "category": "Garden",
+            "price": 99999,
+            "rating": 35,
+            "stock": 1,
+            "hidden": true,
+            "title": "Item 3046"
+          },
+          {
+            "id": 4472,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 50,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 4472"
+          },
+          {
+            "id": 4759,
+            "category": "Games",
+            "price": 0,
+            "rating": 35,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 4759"
+          },
+          {
+            "id": 3086,
+            "category": "Garden",
+            "price": 99999,
+            "rating": 25,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3086"
+          },
+          {
+            "id": 496,
+            "category": "Garden",
+            "price": 250,
+            "rating": 10,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 496"
+          },
+          {
+            "id": 3927,
+            "category": "Games",
+            "price": 99999,
+            "rating": 35,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 3927"
+          }
+        ],
+        "query": {
+          "anyCategory": true,
+          "category": "Books",
+          "minPrice": 100,
+          "maxPrice": 100000000,
+          "minRating": 35,
+          "inStockOnly": false,
+          "order": "RatingDesc",
+          "pageSize": 1,
+          "page": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [
+            2777
+          ],
+          "total": 21,
+          "hasMore": true
+        }
+      }
+    },
+    {
+      "name": "random mix 2",
+      "args": {
+        "items": [
+          {
+            "id": 1371,
+            "category": "Games",
+            "price": 400,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1371"
+          },
+          {
+            "id": 1446,
+            "category": "Games",
+            "price": 0,
+            "rating": 0,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1446"
+          },
+          {
+            "id": 1594,
+            "category": "Books",
+            "price": 1000,
+            "rating": 50,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1594"
+          },
+          {
+            "id": 1176,
+            "category": "Toys",
+            "price": 400,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1176"
+          },
+          {
+            "id": 1783,
+            "category": "Kitchen",
+            "price": 250,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1783"
+          },
+          {
+            "id": 1475,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 1475"
+          },
+          {
+            "id": 4625,
+            "category": "Games",
+            "price": 100,
+            "rating": 10,
+            "stock": 0,
+            "hidden": true,
+            "title": "Item 4625"
+          },
+          {
+            "id": 3213,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 0,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 3213"
+          },
+          {
+            "id": 3760,
+            "category": "Books",
+            "price": 400,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3760"
+          },
+          {
+            "id": 4483,
+            "category": "Toys",
+            "price": 99999,
+            "rating": 50,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 4483"
+          },
+          {
+            "id": 72,
+            "category": "Garden",
+            "price": 99999,
+            "rating": 50,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 72"
+          },
+          {
+            "id": 1708,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 50,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 1708"
+          },
+          {
+            "id": 4466,
+            "category": "Books",
+            "price": 400,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 4466"
+          },
+          {
+            "id": 119,
+            "category": "Games",
+            "price": 1000,
+            "rating": 10,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 119"
+          },
+          {
+            "id": 2450,
+            "category": "Garden",
+            "price": 1000,
+            "rating": 50,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2450"
+          }
+        ],
+        "query": {
+          "anyCategory": false,
+          "category": "Books",
+          "minPrice": 100,
+          "maxPrice": 100000000,
+          "minRating": 35,
+          "inStockOnly": true,
+          "order": "PriceDesc",
+          "pageSize": 8,
+          "page": 2
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 0,
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "random mix 3",
+      "args": {
+        "items": [
+          {
+            "id": 4790,
+            "category": "Books",
+            "price": 100,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 4790"
+          },
+          {
+            "id": 3534,
+            "category": "Kitchen",
+            "price": 0,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3534"
+          },
+          {
+            "id": 2577,
+            "category": "Games",
+            "price": 0,
+            "rating": 25,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 2577"
+          },
+          {
+            "id": 3432,
+            "category": "Garden",
+            "price": 250,
+            "rating": 10,
+            "stock": 1,
+            "hidden": false,
+            "title": "Item 3432"
+          },
+          {
+            "id": 1764,
+            "category": "Kitchen",
+            "price": 100,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 1764"
+          },
+          {
+            "id": 1082,
+            "category": "Toys",
+            "price": 99999,
+            "rating": 0,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 1082"
+          },
+          {
+            "id": 732,
+            "category": "Kitchen",
+            "price": 99999,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 732"
+          },
+          {
+            "id": 1286,
+            "category": "Kitchen",
+            "price": 400,
+            "rating": 10,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 1286"
+          },
+          {
+            "id": 3989,
+            "category": "Kitchen",
+            "price": 1000,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3989"
+          },
+          {
+            "id": 2952,
+            "category": "Kitchen",
+            "price": 400,
+            "rating": 0,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 2952"
+          },
+          {
+            "id": 2157,
+            "category": "Toys",
+            "price": 1000,
+            "rating": 10,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 2157"
+          },
+          {
+            "id": 2633,
+            "category": "Toys",
+            "price": 400,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 2633"
+          },
+          {
+            "id": 1129,
+            "category": "Games",
+            "price": 99999,
+            "rating": 25,
+            "stock": 50,
+            "hidden": false,
+            "title": "Item 1129"
+          },
+          {
+            "id": 3071,
+            "category": "Books",
+            "price": 1000,
+            "rating": 35,
+            "stock": 0,
+            "hidden": false,
+            "title": "Item 3071"
+          },
+          {
+            "id": 1604,
+            "category": "Books",
+            "price": 1000,
+            "rating": 10,
+            "stock": 2,
+            "hidden": false,
+            "title": "Item 1604"
+          }
+        ],
+        "query": {
+          "anyCategory": false,
+          "category": "Toys",
+          "minPrice": 250,
+          "maxPrice": 400,
+          "minRating": 0,
+          "inStockOnly": true,
+          "order": "PriceDesc",
+          "pageSize": 20,
+          "page": 3
+        }
+      },
+      "expect": {
+        "result": {
+          "ids": [],
+          "total": 0,
+          "hasMore": false
+        }
+      }
+    }
+  ]
+}

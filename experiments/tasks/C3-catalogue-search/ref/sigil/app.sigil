@@ -1,0 +1,64 @@
+; C3 catalogue search: reference implementation (Sigil).
+;
+; Sigil has no sorting and no list indexing, so the page is built by ranking: the rank of a matching item is the
+; number of matching items that come before it in the sort order (ties broken by id, so ranks are distinct), and
+; position p of the sorted list is the single item whose rank is p. The page is the items at positions
+; start .. start+size-1, read one position at a time (at most 20), skipping positions past the end.
+
+(type Id       (Int 0 1000000000))
+(type Cents    (Int 0 100000000))
+(type Rating   (Int 0 50))
+(type Stock    (Int 0 100000))
+(type Category (var Books Games Garden Kitchen Toys))
+(type SortOrder (var PriceAsc PriceDesc RatingDesc))
+
+(type Item  (rec (id Id) (category Category) (price Cents) (rating Rating) (stock Stock) (hidden Bool) (title Str)))
+(type Query (rec (anyCategory Bool) (category Category) (minPrice Cents) (maxPrice Cents) (minRating Rating)
+                 (inStockOnly Bool) (order SortOrder) (pageSize (Int 1 20)) (page (Int 0 100000))))
+(type Page  (rec (ids (List Id 0 20)) (total (Int 0 100)) (hasMore Bool)))
+
+(type Ranked (rec (id Id) (rank (Int 0 100))))
+
+(fn matches
+  (in (q Query) (i Item))
+  (out Bool)
+  (and (not i.hidden)
+       (or q.anyCategory (= i.category q.category))
+       (<= q.minPrice i.price q.maxPrice)
+       (>= i.rating q.minRating)
+       (or (not q.inStockOnly) (> i.stock 0))))
+
+(fn before
+  (in (o SortOrder) (a Item) (b Item))
+  (out Bool)
+  (match o
+    (PriceAsc (or (< a.price b.price) (and (= a.price b.price) (< a.id b.id))))
+    (PriceDesc (or (> a.price b.price) (and (= a.price b.price) (< a.id b.id))))
+    (RatingDesc (or (> a.rating b.rating) (and (= a.rating b.rating) (< a.id b.id))))))
+
+(fn ranked
+  (in (found (List Item 0 100)) (o SortOrder))
+  (out (List Ranked 0 100))
+  (map found (fn (i) (Ranked i.id (len (filter found (fn (j) (before o j i))))))))
+
+; id + 1 of the item at this position of the sorted list, or 0 when there is none
+(fn at-position
+  (in (rs (List Ranked 0 100)) (pos (Int 0 2000019)))
+  (out (Int 0 200000000000))
+  (sum (map rs (fn (r) (if (= r.rank pos) (add r.id 1) 0)))))
+
+(fn search
+  (in (items (List Item 0 100)) (query Query))
+  (out Page)
+  (let [found (filter items (fn (i) (matches query i)))
+        rs (ranked found query.order)
+        start (mul query.page query.pageSize)
+        slots (map (list 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
+                   (fn (k) (if (< k query.pageSize) (at-position rs (add start k)) 0)))]
+    (Page (map (filter slots (fn (s) (> s 0))) (fn (s) (min 1000000000 (max 0 (sub s 1)))))
+          (len found)
+          (< (add start query.pageSize) (len found)))))
+
+(program catalogue
+  (targets server browser)
+  (entry search))

@@ -1,0 +1,105 @@
+; Glossary for C3: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (Category, SortOrder, Item, Query, Page, search),
+; so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "an item {id:Int} in {category:Category} priced {price:Money} rated {rating:Int} tenths of a star with {stock:Int} in stock"
+    (append items (Item id category price rating stock false "Item")))
+
+  (given "only {category:Category} items are wanted"
+    (set anyCat false)
+    (set cat category))
+
+  (given "a minimum price of {amount:Money}"
+    (set lo amount))
+
+  (given "a maximum price of {amount:Money}"
+    (set hi amount))
+
+  (given "a minimum rating of {r:Int} tenths of a star"
+    (set minr r))
+
+  (given "only items in stock are wanted"
+    (set instock true))
+
+  (given "the items are sorted by {o:SortOrder}"
+    (set ord o))
+
+  (given "the page size is {n:Int}"
+    (set size n))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "page {n:Int} is requested"
+    (default anyCat true)
+    (default cat Books)
+    (default lo 0)
+    (default hi 100000000)
+    (default minr 0)
+    (default instock false)
+    (default ord PriceAsc)
+    (default size 10)
+    (call result search items (Query anyCat cat lo hi minr instock ord size n)))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the page lists {a:Int}"
+    (expect (= result.ids (list a))))
+
+  (then "the page lists {a:Int} then {b:Int}"
+    (expect (= result.ids (list a b))))
+
+  (then "the page lists {a:Int} then {b:Int} then {c:Int}"
+    (expect (= result.ids (list a b c))))
+
+  (then "the page is empty"
+    (expect (= (len result.ids) 0)))
+
+  (then "there are {n:Int} matches in all"
+    (expect (= result.total n)))
+
+  (then "there are more pages"
+    (expect (= result.hasMore true)))
+
+  (then "there are no more pages"
+    (expect (= result.hasMore false)))
+
+  ; ---- Properties -------------------------------------------------------------
+  (always "An item that is flagged hidden never appears on a page and is never counted in the total, whatever else the query says."
+    (forall ((a Item) (b Item) (q Query))
+      (or (= a.id b.id)
+          (let [r (search (list a b) q)]
+            (and (or (not a.hidden) (= (len (filter r.ids (fn (x) (= x a.id)))) 0))
+                 (or (not b.hidden) (= (len (filter r.ids (fn (x) (= x b.id)))) 0))
+                 (<= r.total (len (filter (list a b) (fn (i) (not i.hidden))))))))))
+
+  (always "An item matches a query when it is not hidden, and its category is the queried category (or the query asks for any category), and its price is at least the minimum price and at most the maximum price (both limits are inclusive), and its rating is at least the minimum rating, and, when the query asks for items in stock only, its stock is at least 1. The title is never looked at."
+    (forall ((i Item) (q Query))
+      (let [r (search (list i) q)]
+        (= (= r.total 1)
+           (and (not i.hidden)
+                (or q.anyCategory (= i.category q.category))
+                (<= q.minPrice i.price q.maxPrice)
+                (>= i.rating q.minRating)
+                (or (not q.inStockOnly) (> i.stock 0)))))))
+
+  (always "The matching items are ordered by the query's sort order: PriceAsc puts the cheapest first, PriceDesc puts the dearest first and RatingDesc puts the highest rating first. Items that are equal under the sort order are put in order of id, smallest first, in all three sort orders."
+    (forall ((a Item) (b Item) (o SortOrder))
+      (or a.hidden b.hidden (= a.id b.id)
+          (= (let [r (search (list a b) (Query true Books 0 100000000 0 false o 2 0))] r.ids)
+             (if (match o
+                   (PriceAsc (or (< a.price b.price) (and (= a.price b.price) (< a.id b.id))))
+                   (PriceDesc (or (> a.price b.price) (and (= a.price b.price) (< a.id b.id))))
+                   (RatingDesc (or (> a.rating b.rating) (and (= a.rating b.rating) (< a.id b.id)))))
+               (list a.id b.id)
+               (list b.id a.id))))))
+
+  (always "The total is the number of matching items over all pages. Page p (counting from 0) with page size n holds the items at positions p*n up to p*n+n-1 of the ordered matches (the first position is 0). A page past the end is empty and still reports the total. The has-more flag is true exactly when (p+1)*n is less than the total."
+    (forall ((a Item) (b Item) (c Item) (q Query) (n (Int 1 3)) (p (Int 0 3)))
+      (or (= a.id b.id) (= a.id c.id) (= b.id c.id)
+          (let [r (search (list a b c) (Query q.anyCategory q.category q.minPrice q.maxPrice q.minRating q.inStockOnly q.order n p))
+                all (search (list a b c) (Query q.anyCategory q.category q.minPrice q.maxPrice q.minRating q.inStockOnly q.order 20 0))]
+            (and (= r.total all.total)
+                 (= r.hasMore (< (mul (add p 1) n) r.total))
+                 (= (len r.ids) (max 0 (min n (sub r.total (mul p n))))))))))
+)
