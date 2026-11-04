@@ -40,7 +40,7 @@ npx tsx src/cli.ts wasm examples/invoicing [out.wasm]   # which functions compil
 Covered:
 - Parameters of ranged `Int`, `Bool`, enums (as an `i32` index) and records of those (flattened to one scalar parameter per field). Results: `Int`, `Bool`, enum.
 - Expressions: literals, variables and field reads, `let`, `do`, `if`, `match` on enums (must be exhaustive, no payload binders), `add sub mul div-floor neg min max`, binary `= < <= > >=`, `and or not`.
-- Every `Int` in a function uses the checker's derived repr (`i32` or `i64`). The checker only tracks arithmetic results, not parameters or literals, so the backend widens to `i64` when a parameter range or literal needs it and records that in the report.
+- Every `Int` in a function uses the checker's derived repr (`i32` or `i64`). The checker counts parameter ranges and literals as well as arithmetic results (this was a gap the Wasm work found); the backend keeps a defensive check that widens to `i64` and reports it if the two ever disagree.
 - Direct calls between compiled functions (scalar arguments, any order of definition, no recursion). Callees are compiled first; a caller is at least as wide as its callees, and `i32`/`i64` are converted at the call boundary (narrowing is lossless because the checker has proved each argument is in the callee's parameter range). A call to a function that is not compilable makes the caller not compilable, with the callee's reason.
 - A function compiles only if it has no `needs`, no `requires`, no checker errors, and every non-`ensures` obligation is proved.
 

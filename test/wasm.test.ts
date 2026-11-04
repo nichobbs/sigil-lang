@@ -246,10 +246,10 @@ describe('wasm backend: numeric fixture', () => {
     expect(rep('mixed').repr).toBe('i32');
   });
 
-  it('widens when the checker repr ignores parameter ranges (a finding, not silently miscompiled)', () => {
-    expect(rep('wide').checkerRepr).toBe('i32');
+  it('the checker now counts parameter ranges, so no widening is needed (backend still guards against it)', () => {
+    expect(rep('wide').checkerRepr).toBe('i64');
     expect(rep('wide').repr).toBe('i64');
-    expect(rep('wide').widenedFromChecker).toBeTruthy();
+    expect(rep('wide').widenedFromChecker).toBeFalsy();
   });
 
   it('refuses what is outside the subset, with reasons', () => {
