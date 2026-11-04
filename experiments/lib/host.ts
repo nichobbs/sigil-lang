@@ -17,6 +17,8 @@ export interface Effects {
   stored: Json[];
   sent: Json[];
   emitted: Json[];
+  /** TypeScript arm only: attempts to reach the network or start a process outside the host object (see ts-worker.mjs). */
+  egress?: string[];
 }
 
 export interface Host {
