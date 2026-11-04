@@ -1,0 +1,9 @@
+; Human-owned policy for A2: what a program may request, and what each sink may receive.
+; Balances and spending are internal data; both sinks accept internal.
+
+(policy
+  (allow store (ns "ledger/*"))
+  (allow audit)
+
+  (sink store:ledger (accepts internal))
+  (sink audit        (accepts internal)))

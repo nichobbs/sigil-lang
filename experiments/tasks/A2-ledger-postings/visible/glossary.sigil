@@ -1,0 +1,89 @@
+; Glossary for A2: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and functions named in README.md (AcctKind, PostingKind, PostingError, Account, Posting,
+; overdraft-limit, apply-posting), so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "an open {kind:AcctKind} account with balance {bal:Money} and {spent:Money} spent today"
+    (set acct (Account 9 kind Open bal spent)))
+
+  (given "a frozen {kind:AcctKind} account with balance {bal:Money}"
+    (set acct (Account 9 kind Frozen bal 0)))
+
+  (given "the ledger store is unavailable"
+    (fail store:ledger put))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "a {pk:PostingKind} of {amount:Money} is posted"
+    (call result apply-posting acct (Posting pk amount)))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the posting succeeds with a new balance of {amount:Money}"
+    (expect (match result (ok r (= r.balance amount)) (err e false))))
+
+  (then "the posting succeeds with a new balance of -{amount:Money}"
+    (expect (match result (ok r (= r.balance (neg amount))) (err e false))))
+
+  (then "the stored account has {amount:Money} spent today"
+    (expect (= (map (stored store:ledger) (fn (a) a.spent)) (list amount))))
+
+  (then "the account is stored once"
+    (expect (= (len (stored store:ledger)) 1)))
+
+  (then "nothing is stored"
+    (expect (= (len (stored store:ledger)) 0)))
+
+  (then "an audit event records the posting as applied with a balance of {amount:Money}"
+    (expect (= (len (emitted audit)) 1))
+    (expect (= (map (emitted audit) (fn (e) e.balance)) (list amount))))
+
+  (then "the posting is refused with {why:PostingError}"
+    (expect (= result (err why))))
+
+  (then "an audit event records the posting as refused with {why:PostingError}"
+    (expect (= (len (emitted audit)) 1))
+    (expect (= (map (emitted audit) (fn (e) e.reason)) (list why))))
+
+  (then "no audit event is emitted"
+    (expect (= (len (emitted audit)) 0)))
+
+  ; ---- Properties ----------------------------------------------------------------
+  (always "Money is whole cents. A Credit adds its amount to the balance; a Debit or a Fee subtracts it."
+    (forall ((a Account) (p Posting))
+      (match (apply-posting a p)
+        (ok r (match p.kind
+                (Credit (= r.balance (min 1000000000000 (add a.balance p.amount))))
+                (Debit (= r.balance (sub a.balance p.amount)))
+                (Fee (= r.balance (sub a.balance p.amount)))))
+        (err e true))))
+
+  (always "A Debit or Fee posting that would take the balance below the account's overdraft allowance is refused with Insufficient. The allowance is $500.00 for a Checking account and $0.00 for a Savings account. A balance exactly at the allowance is allowed. A Credit is never refused because of the balance."
+    (forall ((a Account) (p Posting))
+      (match (apply-posting a p)
+        (ok r (or (= p.kind Credit) (>= r.balance (neg (overdraft-limit a.kind)))))
+        (err e (not (and (= e Insufficient) (= p.kind Credit)))))))
+
+  (always "A Debit posting is refused with OverLimit when the amount already spent today plus the amount of this posting is more than $2,000.00. Exactly $2,000.00 is allowed. Credit and Fee postings are not subject to the daily limit. Only an applied Debit adds to the amount spent today."
+    (forall ((a Account) (p Posting))
+      (match (apply-posting a p)
+        (ok r (or (not (= p.kind Debit)) (<= (add a.spent p.amount) 200000)))
+        (err e (or (not (= e OverLimit)) (= p.kind Debit))))))
+
+  (always "A Frozen account refuses a Debit or Fee posting with AcctFrozen. It still accepts a Credit posting."
+    (forall ((a Account) (p Posting))
+      (match (apply-posting a p)
+        (ok r (or (= p.kind Credit) (= a.status Open)))
+        (err e true))))
+
+  (always "A posting that breaks more than one rule is refused with the first of AcctFrozen, OverLimit and Insufficient that applies, in that order."
+    (forall ((a Account) (p Posting))
+      (match (apply-posting a p)
+        (ok r true)
+        (err e (or (not (= e Insufficient)) (= a.status Open))))))
+
+  (always "An applied posting stores the updated account once, then emits one audit event recording it as applied. A refused posting stores nothing and emits one audit event recording why it was refused. If the store fails, the result is StoreFailed and nothing is audited."
+    (forall ((a Account) (p Posting))
+      (match (apply-posting a p)
+        (ok r (= r.acct a.id))
+        (err e true)))))

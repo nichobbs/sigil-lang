@@ -1,0 +1,1721 @@
+{
+  "entry": "apply-posting",
+  "cases": [
+    {
+      "name": "Checking credit on a positive balance",
+      "args": {
+        "acct": {
+          "id": 1000,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 10000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 5000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1000,
+            "balance": 15000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1000,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 15000,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1000,
+              "kind": "Credit",
+              "amount": 5000,
+              "balance": 15000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking credit repays an overdraft",
+      "args": {
+        "acct": {
+          "id": 1001,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": -30000,
+          "spent": 2500
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 40000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1001,
+            "balance": 10000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1001,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 10000,
+              "spent": 2500
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1001,
+              "kind": "Credit",
+              "amount": 40000,
+              "balance": 10000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking debit within funds adds to spent",
+      "args": {
+        "acct": {
+          "id": 1002,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 100000,
+          "spent": 12345
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 2655
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1002,
+            "balance": 97345
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1002,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 97345,
+              "spent": 15000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1002,
+              "kind": "Debit",
+              "amount": 2655,
+              "balance": 97345
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking debit to exactly zero",
+      "args": {
+        "acct": {
+          "id": 1003,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 5000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 5000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1003,
+            "balance": 0
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1003,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 0,
+              "spent": 5000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1003,
+              "kind": "Debit",
+              "amount": 5000,
+              "balance": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking debit overdraws to exactly -500.00 is allowed",
+      "args": {
+        "acct": {
+          "id": 1004,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 10000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 60000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1004,
+            "balance": -50000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1004,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": -50000,
+              "spent": 60000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1004,
+              "kind": "Debit",
+              "amount": 60000,
+              "balance": -50000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking debit one cent past -500.00 is Insufficient",
+      "args": {
+        "acct": {
+          "id": 1005,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 10000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 60001
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1005,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking debit from overdrawn to exactly -500.00",
+      "args": {
+        "acct": {
+          "id": 1006,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": -20000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 30000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1006,
+            "balance": -50000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1006,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": -50000,
+              "spent": 30000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1006,
+              "kind": "Debit",
+              "amount": 30000,
+              "balance": -50000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking debit from exactly -500.00 by one cent",
+      "args": {
+        "acct": {
+          "id": 1007,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": -50000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 1
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1007,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking fee to exactly -500.00 is allowed",
+      "args": {
+        "acct": {
+          "id": 1008,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 51000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1008,
+            "balance": -50000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1008,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": -50000,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1008,
+              "kind": "Fee",
+              "amount": 51000,
+              "balance": -50000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking fee one cent past -500.00 is Insufficient",
+      "args": {
+        "acct": {
+          "id": 1009,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 51001
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1009,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking fee ignores a spent total already at the limit",
+      "args": {
+        "acct": {
+          "id": 1010,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 50000,
+          "spent": 200000
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 100
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1010,
+            "balance": 49900
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1010,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 49900,
+              "spent": 200000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1010,
+              "kind": "Fee",
+              "amount": 100,
+              "balance": 49900
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Checking fee larger than the daily limit is allowed",
+      "args": {
+        "acct": {
+          "id": 1011,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 300000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1011,
+            "balance": 700000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1011,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 700000,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1011,
+              "kind": "Fee",
+              "amount": 300000,
+              "balance": 700000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Fee does not add to spent",
+      "args": {
+        "acct": {
+          "id": 1012,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 50000,
+          "spent": 1500
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 250
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1012,
+            "balance": 49750
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1012,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 49750,
+              "spent": 1500
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1012,
+              "kind": "Fee",
+              "amount": 250,
+              "balance": 49750
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Debit of exactly the daily limit from zero spent",
+      "args": {
+        "acct": {
+          "id": 1013,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 200000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1013,
+            "balance": 800000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1013,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 800000,
+              "spent": 200000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1013,
+              "kind": "Debit",
+              "amount": 200000,
+              "balance": 800000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Debit one cent over the daily limit from zero spent",
+      "args": {
+        "acct": {
+          "id": 1014,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 200001
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "OverLimit"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1014,
+              "reason": "OverLimit"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Debit reaching exactly the limit on top of spent",
+      "args": {
+        "acct": {
+          "id": 1015,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000000,
+          "spent": 150000
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 50000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1015,
+            "balance": 950000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1015,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 950000,
+              "spent": 200000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1015,
+              "kind": "Debit",
+              "amount": 50000,
+              "balance": 950000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Debit one cent past the limit on top of spent",
+      "args": {
+        "acct": {
+          "id": 1016,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000000,
+          "spent": 150000
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 50001
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "OverLimit"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1016,
+              "reason": "OverLimit"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Debit of one cent when spent is already at the limit",
+      "args": {
+        "acct": {
+          "id": 1017,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 1000000,
+          "spent": 200000
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 1
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "OverLimit"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1017,
+              "reason": "OverLimit"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Debit hits both inclusive boundaries exactly",
+      "trap": true,
+      "args": {
+        "acct": {
+          "id": 1018,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 150000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 200000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1018,
+            "balance": -50000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1018,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": -50000,
+              "spent": 200000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1018,
+              "kind": "Debit",
+              "amount": 200000,
+              "balance": -50000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Savings debit to exactly zero is allowed",
+      "args": {
+        "acct": {
+          "id": 1019,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 30000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 30000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1019,
+            "balance": 0
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1019,
+              "kind": "Savings",
+              "status": "Open",
+              "balance": 0,
+              "spent": 30000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1019,
+              "kind": "Debit",
+              "amount": 30000,
+              "balance": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Savings debit one cent below zero is Insufficient",
+      "args": {
+        "acct": {
+          "id": 1020,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 30000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 30001
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1020,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Savings fee to exactly zero is allowed",
+      "args": {
+        "acct": {
+          "id": 1021,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 500,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 500
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1021,
+            "balance": 0
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1021,
+              "kind": "Savings",
+              "status": "Open",
+              "balance": 0,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1021,
+              "kind": "Fee",
+              "amount": 500,
+              "balance": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Savings fee one cent below zero is Insufficient",
+      "args": {
+        "acct": {
+          "id": 1022,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 500,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 501
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1022,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Savings credit",
+      "args": {
+        "acct": {
+          "id": 1023,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 0,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 1
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1023,
+            "balance": 1
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1023,
+              "kind": "Savings",
+              "status": "Open",
+              "balance": 1,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1023,
+              "kind": "Credit",
+              "amount": 1,
+              "balance": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Savings debit reaching the daily limit exactly",
+      "args": {
+        "acct": {
+          "id": 1024,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 900000,
+          "spent": 175000
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 25000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1024,
+            "balance": 875000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1024,
+              "kind": "Savings",
+              "status": "Open",
+              "balance": 875000,
+              "spent": 200000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1024,
+              "kind": "Debit",
+              "amount": 25000,
+              "balance": 875000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Credit is not subject to the daily limit",
+      "args": {
+        "acct": {
+          "id": 1025,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 0,
+          "spent": 200000
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 300000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1025,
+            "balance": 300000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1025,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 300000,
+              "spent": 200000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1025,
+              "kind": "Credit",
+              "amount": 300000,
+              "balance": 300000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Credit does not change spent",
+      "args": {
+        "acct": {
+          "id": 1026,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 7000,
+          "spent": 4200
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 100
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1026,
+            "balance": 7100
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1026,
+              "kind": "Savings",
+              "status": "Open",
+              "balance": 7100,
+              "spent": 4200
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1026,
+              "kind": "Credit",
+              "amount": 100,
+              "balance": 7100
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Frozen Checking accepts a Credit",
+      "trap": true,
+      "args": {
+        "acct": {
+          "id": 1027,
+          "kind": "Checking",
+          "status": "Frozen",
+          "balance": 5000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 2500
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1027,
+            "balance": 7500
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1027,
+              "kind": "Checking",
+              "status": "Frozen",
+              "balance": 7500,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1027,
+              "kind": "Credit",
+              "amount": 2500,
+              "balance": 7500
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Frozen Savings accepts a Credit and keeps spent",
+      "args": {
+        "acct": {
+          "id": 1028,
+          "kind": "Savings",
+          "status": "Frozen",
+          "balance": 5000,
+          "spent": 900
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 100000000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1028,
+            "balance": 100005000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1028,
+              "kind": "Savings",
+              "status": "Frozen",
+              "balance": 100005000,
+              "spent": 900
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1028,
+              "kind": "Credit",
+              "amount": 100000000,
+              "balance": 100005000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Frozen overdrawn Checking accepts a Credit",
+      "args": {
+        "acct": {
+          "id": 1029,
+          "kind": "Checking",
+          "status": "Frozen",
+          "balance": -50000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 1
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 1029,
+            "balance": -49999
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 1029,
+              "kind": "Checking",
+              "status": "Frozen",
+              "balance": -49999,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1029,
+              "kind": "Credit",
+              "amount": 1,
+              "balance": -49999
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Frozen account refuses a Debit",
+      "args": {
+        "acct": {
+          "id": 1030,
+          "kind": "Savings",
+          "status": "Frozen",
+          "balance": 50000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 100
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "AcctFrozen"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1030,
+              "reason": "AcctFrozen"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Frozen account refuses a Fee",
+      "args": {
+        "acct": {
+          "id": 1031,
+          "kind": "Checking",
+          "status": "Frozen",
+          "balance": 50000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 100
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "AcctFrozen"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1031,
+              "reason": "AcctFrozen"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Frozen wins over OverLimit and Insufficient on a Debit",
+      "args": {
+        "acct": {
+          "id": 1032,
+          "kind": "Checking",
+          "status": "Frozen",
+          "balance": 100,
+          "spent": 199000
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 90000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "AcctFrozen"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1032,
+              "reason": "AcctFrozen"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Frozen wins over Insufficient on a Fee",
+      "args": {
+        "acct": {
+          "id": 1033,
+          "kind": "Savings",
+          "status": "Frozen",
+          "balance": 100,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 5000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "AcctFrozen"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1033,
+              "reason": "AcctFrozen"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "OverLimit wins over Insufficient on a Debit",
+      "trap": true,
+      "args": {
+        "acct": {
+          "id": 1034,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 10000,
+          "spent": 190000
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 90000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "OverLimit"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1034,
+              "reason": "OverLimit"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Insufficient is reported when only the balance fails on a Debit",
+      "args": {
+        "acct": {
+          "id": 1035,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 1000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 5000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1035,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "A Fee past the balance is Insufficient even when spent is high",
+      "args": {
+        "acct": {
+          "id": 1036,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 0,
+          "spent": 250000
+        },
+        "posting": {
+          "kind": "Fee",
+          "amount": 60000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 1036,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Large ids and amounts",
+      "args": {
+        "acct": {
+          "id": 9007199254740991,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 999999999999,
+          "spent": 199999
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 1
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 9007199254740991,
+            "balance": 999999999998
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 9007199254740991,
+              "kind": "Savings",
+              "status": "Open",
+              "balance": 999999999998,
+              "spent": 200000
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 9007199254740991,
+              "kind": "Debit",
+              "amount": 1,
+              "balance": 999999999998
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Largest posting amount",
+      "args": {
+        "acct": {
+          "id": 9007199254740991,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 500000000000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Credit",
+          "amount": 100000000
+        }
+      },
+      "host": {
+        "seed": 1
+      },
+      "expect": {
+        "result": {
+          "ok": {
+            "acct": 9007199254740991,
+            "balance": 500100000000
+          }
+        },
+        "effects": {
+          "stored": [
+            {
+              "id": 9007199254740991,
+              "kind": "Checking",
+              "status": "Open",
+              "balance": 500100000000,
+              "spent": 0
+            }
+          ],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 9007199254740991,
+              "kind": "Credit",
+              "amount": 100000000,
+              "balance": 500100000000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Store failure on an applied posting stores and audits nothing",
+      "args": {
+        "acct": {
+          "id": 77,
+          "kind": "Checking",
+          "status": "Open",
+          "balance": 10000,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 2500
+        }
+      },
+      "host": {
+        "seed": 1,
+        "fail": [
+          {
+            "handle": "store:ledger",
+            "op": "put"
+          }
+        ]
+      },
+      "expect": {
+        "result": {
+          "err": "StoreFailed"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": []
+        }
+      }
+    },
+    {
+      "name": "A refused posting is still audited when the store is down",
+      "args": {
+        "acct": {
+          "id": 78,
+          "kind": "Savings",
+          "status": "Open",
+          "balance": 100,
+          "spent": 0
+        },
+        "posting": {
+          "kind": "Debit",
+          "amount": 5000
+        }
+      },
+      "host": {
+        "seed": 1,
+        "fail": [
+          {
+            "handle": "store:ledger",
+            "op": "put"
+          }
+        ]
+      },
+      "expect": {
+        "result": {
+          "err": "Insufficient"
+        },
+        "effects": {
+          "stored": [],
+          "sent": [],
+          "emitted": [
+            {
+              "acct": 78,
+              "reason": "Insufficient"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
