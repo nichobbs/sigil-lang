@@ -1,0 +1,12 @@
+; Human-owned. A declassifier exists only if it is declared here; code can only name it.
+; (from X) is the highest confidentiality it may be applied to, (to Y) is what the result becomes.
+
+(policy
+  (allow audit)
+  (sink audit (accepts internal))
+
+  (declassify salary-band
+    (from pii) (to internal)
+    (reason "The audit log may record a salary only as a 10,000-wide band, never the exact figure.")
+    (fields Applicant.salary)
+    (fns screen)))

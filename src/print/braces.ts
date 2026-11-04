@@ -102,6 +102,7 @@ function block(a: Arity, e: Expr): string {
 function fn(a: Arity, f: FnDef): string {
   const ann = [
     f.needs.length ? `@needs(${f.needs.join(', ')})` : '',
+    f.declassifies.length ? `@declassifies(${f.declassifies.join(', ')})` : '',
     ...f.requires.map((r) => `@requires(${expr(a, r)})`),
     ...f.ensures.map((r) => `@ensures(${expr(a, r)})`),
   ].filter(Boolean);

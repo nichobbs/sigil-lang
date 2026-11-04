@@ -20,6 +20,7 @@ export function arityTable(prog: Program): Arity {
     of(name) {
       if (name in BUILTIN_ARITY) return BUILTIN_ARITY[name];
       if (name in CAP_OPS) return CAP_OPS[name].arity;
+      if (name === 'declassify') return 2;
       const f = prog.fns.get(name);
       if (f) return f.params.length;
       const fl = fields(name);

@@ -168,6 +168,8 @@ export interface PrivacyBinding {
   text: string;
   source: string;
   allow: string[];
+  /** Declassifiers the human accepts for this rule: flows via exactly these are exempt from the two-run check. */
+  declassified: string[];
   run: string;
 }
 
@@ -298,12 +300,13 @@ export function parseGlossary(src: string, prog: Program): Glossary {
         break;
       }
       case 'privacy': {
-        const b: Partial<PrivacyBinding> = { text: key, allow: [] };
+        const b: Partial<PrivacyBinding> = { text: key, allow: [], declassified: [] };
         for (const c of e.items.slice(2)) {
           if (!isList(c) || !isSym(c.items[0])) throw new SigilError('privacy clause', c.pos);
           const tag = (c.items[0] as { v: string }).v;
           if (tag === 'source') b.source = sexpToString(c.items[1]);
           else if (tag === 'allow') b.allow = c.items.slice(1).map(sexpToString);
+          else if (tag === 'declassified') b.declassified = c.items.slice(1).map(sexpToString);
           else if (tag === 'run') b.run = sexpToString(c.items[1]);
           else throw new SigilError(`unknown privacy clause ${tag}`, c.pos);
         }
@@ -388,6 +391,8 @@ export interface TestResult {
   message?: string;
   cases?: number;
   note?: string;
+  /** Privacy only: declassifiers involved in the source's flows. Non-empty means NOT strict noninterference. */
+  declassifiers?: string[];
 }
 
 export interface SuiteOptions {
@@ -575,13 +580,24 @@ function runPrivacy(prog: Program, g: Glossary, p: Para, n: number, o: SuiteOpti
   if (!ft) return { ...base, status: 'error', message: `unknown source ${b.source}` };
 
   // Static half: the flow matrix must show the source reaching only allowed sinks.
+  // A flow that passed a declassifier is exempt only if the privacy binding names EVERY declassifier on it
+  // (a human decision in the glossary); otherwise it is an ordinary violation, with a hint.
   const notes: string[] = [];
+  const exempt = new Set<string>(); // sinks excluded from the two-run comparison, solely because of accepted declassifiers
+  let involved: string[] = [];
   if (check) {
-    const reached = check.flows.filter((f) => f.src === b.source).map((f) => f.sink);
-    const bad = reached.filter((s) => !b.allow.includes(s));
-    if (bad.length) return { ...base, status: 'fail', message: `static: ${b.source} reaches ${bad.join(', ')} (allowed: ${b.allow.join(', ') || 'none'})` };
-    notes.push(`static: ${b.source} reaches {${[...new Set(reached)].join(', ')}}`);
+    const edges = check.flows.filter((f) => f.src === b.source);
+    const viaAccepted = (f: (typeof edges)[number]) => !!f.via && f.via.every((v) => b.declassified.includes(v.name));
+    const bad = edges.filter((f) => !b.allow.includes(f.sink) && !viaAccepted(f));
+    if (bad.length) {
+      const desc = (f: (typeof edges)[number]) => (f.via ? `${f.sink} via declassify ${f.via.map((v) => v.name).join(', ')} (not accepted by this rule; add (declassified ${f.via.map((v) => v.name).join(' ')}) to its glossary binding if a human agrees)` : f.sink);
+      return { ...base, status: 'fail', message: `static: ${b.source} reaches ${bad.map(desc).join('; ')} (allowed: ${b.allow.join(', ') || 'none'})` };
+    }
+    for (const f of edges) if (!b.allow.includes(f.sink) && viaAccepted(f)) exempt.add(f.sink);
+    involved = [...new Set(edges.flatMap((f) => (f.via ?? []).map((v) => v.name)))];
+    notes.push(`static: ${b.source} reaches {${[...new Set(edges.map((f) => f.sink))].join(', ')}}`);
   }
+  const open = new Set([...b.allow, ...exempt]);
 
   // Dynamic half: two runs differing only in the source field; all non-allowed sinks must agree.
   const rnd = mulberry32(hash(p.text));
@@ -605,8 +621,8 @@ function runPrivacy(prog: Program, g: Glossary, p: Para, n: number, o: SuiteOpti
       if (e instanceof ContractViolation || e instanceof RuntimeFault) return { ...base, status: 'error', cases: i, message: e.message };
       throw e;
     }
-    const strip = (l: typeof r1.log) => l.filter((o) => !b.allow.includes(o.handle));
-    const allowed = (l: typeof r1.log) => l.filter((o) => b.allow.includes(o.handle));
+    const strip = (l: typeof r1.log) => l.filter((o) => !open.has(o.handle));
+    const allowed = (l: typeof r1.log) => l.filter((o) => open.has(o.handle));
     const same = (x: typeof r1.log, y: typeof r1.log) => x.length === y.length && x.every((o, j) => o.handle === y[j].handle && o.op === y[j].op && o.ok === y[j].ok && o.args.length === y[j].args.length && o.args.every((a, k) => eqVal(a, y[j].args[k])));
     if (!eqVal(r1.out, r2.out) || !same(strip(r1.log), strip(r2.log))) {
       const diff = strip(r1.log).find((o, j) => !strip(r2.log)[j] || !same([o], [strip(r2.log)[j]]));
@@ -616,7 +632,17 @@ function runPrivacy(prog: Program, g: Glossary, p: Para, n: number, o: SuiteOpti
   }
   if (influenced === 0) notes.push('WARNING: vacuous (the field never influenced an allowed sink in these runs)');
   else notes.push(`field influenced the allowed sink in ${influenced}/${n} runs`);
-  return { ...base, note: notes.join('; ') };
+  if (involved.length) {
+    // Not strict noninterference: say so, and say exactly which part was exempted.
+    const ex = [...exempt];
+    notes.unshift(
+      `PASS MODULO DECLASSIFIER${involved.length > 1 ? 'S' : ''} ${involved.join(', ')}: ` +
+        (ex.length
+          ? `strict noninterference does NOT hold; sink(s) ${ex.join(', ')} were excluded from the two-run comparison because every flow from ${b.source} to them passes an accepted declassifier (sink granularity; the static matrix guarantees no direct flow reaches them)`
+          : `the declassified flow(s) reach only allowed sink(s), so non-allowed sinks are still checked strictly`),
+    );
+  }
+  return { ...base, note: notes.join('; '), ...(involved.length ? { declassifiers: involved } : {}) };
 }
 
 export function runSuite(prog: Program, feature: Feature, g: Glossary, check?: CheckResult, opts: SuiteOptions = DEFAULT_SUITE): SuiteOutput {

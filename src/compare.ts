@@ -206,7 +206,7 @@ export interface FragilityRow {
   examples: { before: string; after: string }[];
 }
 
-export function fragilityExperiment(prog: Program, pol: Policy = { allow: [], sinks: new Map() }): FragilityRow[] {
+export function fragilityExperiment(prog: Program, pol: Policy = { allow: [], sinks: new Map(), declassifiers: new Map() }): FragilityRow[] {
   const base = check(prog, pol);
   const baseErrors = errors(base).length;
   const out: FragilityRow[] = [];

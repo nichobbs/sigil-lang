@@ -337,6 +337,9 @@ export class Interp {
   private evalCall(e: Extract<Expr, { k: 'call' }>, env: Env): Val {
     const name = e.fn;
 
+    // declassify is the identity at runtime: labels are static, and the checker has already approved the release
+    if (name === 'declassify' && e.args.length === 2) return this.eval(e.args[1], env);
+
     // capability operations
     if (name in CAP_OPS) {
       const h = this.eval(e.args[0], env);
