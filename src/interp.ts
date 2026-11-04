@@ -356,6 +356,9 @@ export class Interp {
       if (r.k !== 'rec') throw new RuntimeFault(`${name} is not a record type`);
       const fields: Record<string, Val> = {};
       if (e.args.length) {
+        if (e.args.length !== r.fields.length) {
+          throw new RuntimeFault(`${name} has ${r.fields.length} field(s) (${r.fields.map((f) => f.name).join(', ')}) but is built with ${e.args.length} argument(s): ${printExpr(e)}. If this is in glossary.sigil, the program changed the shape of a type that the human-owned glossary or README fixes; restore the type instead of editing the glossary`);
+        }
         r.fields.forEach((f, i) => (fields[f.name] = this.eval(e.args[i], env)));
       } else {
         for (const f of r.fields) {
