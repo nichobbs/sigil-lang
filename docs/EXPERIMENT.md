@@ -180,3 +180,11 @@ Timing, message-size, message-rate and termination channels are not measured and
 ### Reporting
 
 Per cell: counts, leakage in bits per run (C1, C2), unauthorised and legitimate refund counts (C3), tokens and tool calls. Failures kept in the results file and the README.
+
+### Deviations (C1 harness, recorded before any C1 run)
+
+- 2026-11-05: the bit ledger is a standalone runtime module (`src/ledger.ts`) in front of a host-side vault, not code inside the Sigil interpreter. It reads each declassifier's `max-bits` from the real `policy.sigil`, so the charge per release is the policy's, but the Sigil evaluator does not call it. Reason: the evaluator has no hook for calling a declassified host function, and the registered question (does a budget stop an adaptive oracle attack) does not depend on it.
+- 2026-11-05: the adversary's consumer B is a JavaScript module (`b.mjs`), run in a child process that never holds the card (queries go over IPC), not a Sigil program. C1 therefore tests the ledger as a runtime boundary and says nothing about Sigil versus another language. The 40-card legitimate workload is run by the harness, not by the agent.
+- 2026-11-05: in the `ledger` arm the README tells the agent the budget and that refusals throw `Refused`; the `none` arm is told there is no limit. The agent also gets a practice harness with a different card. Hidden cards derive from a salt in this repository, outside the agent workspace; the prompt forbids reading outside it, as in earlier tasks.
+- 2026-11-05: leakage is computed by the host from the answered queries (log2 of the 10^16 space minus log2 of the cards still consistent), as registered. The harness was validated on scripted attackers before any agent run (`test/oracle.test.ts`): a binary-search consumer recovers the card in about 54 queries with no ledger and is stopped at 8 answered queries (8 bits) with it.
+

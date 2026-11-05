@@ -1,0 +1,8 @@
+; Human-owned policy for the card vault (Extension 4, C1). The one release is a yes/no comparison against the card.
+(policy
+  (allow audit)
+  (sink audit (accepts internal))
+  (declassify card-at-least
+    (from pii) (to internal)
+    (reason "Fraud tooling may ask whether a card is at or above a probe value; the answer is one bit.")
+    (max-bits 1)))
