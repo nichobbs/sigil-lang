@@ -167,6 +167,22 @@ describe('deploy gate', () => {
     expect(log[2].by).toBe('deployer');
   });
 
+  it('rejects a trust file that lists one key in any two roles, including approver and agent', () => {
+    const { reg } = setup();
+    const src = systemFor(files);
+    for (const t of [
+      { ...trust, agents: { deployer: K.agent.pub, x: K.approver.pub } },
+      { ...trust, approvers: { owner: K.approver.pub, y: K.attester.pub } },
+      { ...trust, agents: { deployer: K.agent.pub, z: K.attester.pub } },
+    ] as Trust[]) expect(codes(admit(src, reg, t, req(src)))).toContain('G-role-conflict');
+  });
+
+  it('rejects a system with no processes instead of admitting it vacuously', () => {
+    const reg = new Registry(tmp());
+    const src = '(system empty)';
+    expect(codes(admit(src, reg, trust, req(src)))).toEqual(['G-malformed']);
+  });
+
   it('refuses to attest a unit with pending declassifiers', () => {
     const d = tmp();
     cpSync(EX, d, { recursive: true });
