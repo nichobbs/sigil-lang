@@ -363,8 +363,10 @@ export function policyNotes(changes: Change[], policy: Map<string, string[]>, de
 // Review packet
 // ---------------------------------------------------------------------------
 
-export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Gate; hash: string; owners: Owners; policy?: Map<string, string[]>; declared?: Set<string> }): string {
-  const { changes, cov, gate: g, hash, owners, policy, declared } = opts;
+export interface MutationRegression { total: number; baseKilled: number; propKilled: number; lost: string[] }
+
+export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Gate; hash: string; owners: Owners; policy?: Map<string, string[]>; declared?: Set<string>; mutation?: MutationRegression }): string {
+  const { changes, cov, gate: g, hash, owners, policy, declared, mutation } = opts;
   const L: string[] = [];
   L.push(`# Glossary proposal ${hash.slice(0, 12)}`, '');
   if (!changes.length) {
@@ -385,6 +387,16 @@ export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Ga
   if (notes.length) {
     L.push('## Policy notes', '');
     for (const x of notes) L.push(`- ${x}`);
+    L.push('');
+  }
+  if (mutation) {
+    L.push('## Mutation regression', '');
+    L.push(`Mutants of the reference app caught: ${mutation.baseKilled}/${mutation.total} by the current glossary, ${mutation.propKilled}/${mutation.total} by the proposal.`);
+    if (mutation.lost.length) {
+      for (const x of mutation.lost) L.push(`- LOST: ${x} was caught by the current checks and is not caught by the proposal`);
+    } else {
+      L.push('No mutant lost. This catches weakenings that let a wrong implementation through; it does not see weakenings no mutant of the app exercises (extra emits, tautologies, narrower domains).');
+    }
     L.push('');
   }
   if (inner.length) {

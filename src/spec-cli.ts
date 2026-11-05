@@ -1,6 +1,7 @@
-// sigil spec <init|review|approve|promote|check> DIR [--as NAME] [--role ROLE]
+// sigil spec <init|review|approve|promote|check> DIR [--as NAME] [--role ROLE] [--mutation]
 //   init      adopt the current glossary.sigil: write spec.history so later edits are detectable
 //   review    render the review packet for proposed-glossary.sigil (exit 0; READY/NOT READY is in the text)
+//             --mutation also reruns mutation testing with both glossaries and lists mutants the proposal no longer catches
 //   approve   record an approval of the current proposal by a named owner or reviewer
 //   promote   if the sign-off rules in spec.owners are met, replace glossary.sigil with the proposal
 //   check     fail (exit 1) if glossary.sigil was changed by anything other than promote (use in CI)
@@ -8,6 +9,9 @@
 import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Approval, approvalLine, coverage, diffGlossary, gate, parseApprovals, parseEntries, parseOwners, proposalHash, renderReview, sha256, sinkPolicy, declaredDeclassifiers } from './spec.js';
+import { parsePolicy, parseProgram } from './parse.js';
+import { parseFeature, parseGlossary } from './scenario.js';
+import { runMutation } from './mutate.js';
 import { isList, isSym, readAll, SigilError } from './sexpr.js';
 
 const GLOSSARY = 'glossary.sigil';
@@ -61,7 +65,18 @@ export function specMain(args: string[]): number {
         const approvals = has('spec.approvals') ? parseApprovals(read('spec.approvals')) : [];
         const feat = readdirSync(dir).find((f) => f.endsWith('.feature'));
         const cov = feat ? coverage(read(feat), entries) : undefined;
-        console.log(renderReview({ changes, cov, gate: gate(changes, owners, approvals, hash), hash, owners, policy: has('policy.sigil') ? sinkPolicy(read('policy.sigil')) : undefined, declared: has('policy.sigil') ? declaredDeclassifiers(read('policy.sigil')) : undefined }));
+        let mutation;
+        if (args.includes('--mutation')) {
+          if (!has('app.sigil') || !has('policy.sigil') || !feat) throw new SigilError('spec review --mutation needs app.sigil, policy.sigil and a .feature file in DIR');
+          const prog = parseProgram(read('app.sigil'));
+          const pol = parsePolicy(read('policy.sigil'));
+          const ft = parseFeature(read(feat));
+          const run = (g: string) => runMutation(prog, pol, ft, (p) => parseGlossary(g, p), { propCases: 150, privacyCases: 40 });
+          const b = run(base);
+          const r = run(prop);
+          mutation = { total: b.total, baseKilled: b.killed.length, propKilled: r.killed.length, lost: b.killed.filter((k) => !r.killed.some((x) => x.id === k.id)).map((k) => `${k.fn}: ${k.desc}`) };
+        }
+        console.log(renderReview({ mutation, changes, cov, gate: gate(changes, owners, approvals, hash), hash, owners, policy: has('policy.sigil') ? sinkPolicy(read('policy.sigil')) : undefined, declared: has('policy.sigil') ? declaredDeclassifiers(read('policy.sigil')) : undefined }));
         return 0;
       }
       case 'approve': {
