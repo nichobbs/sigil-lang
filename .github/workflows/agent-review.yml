@@ -15,9 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ vars.AGENT_REVIEW == 'on' && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
-      - name: Record start time
-        id: start
-        run: echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: anthropics/claude-code-action@v1
@@ -29,32 +26,31 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: |
             --max-turns 20
-            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Read,Grep,Glob"
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Read,Grep,Glob,Write"
           prompt: |
             Repository: ${{ github.repository }}  PR number: ${{ github.event.pull_request.number }}
-            Use `gh pr diff` and `gh pr view` to read the change. Post your review as one PR comment with
-            `gh pr comment ${{ github.event.pull_request.number }} --body ...`.
+            Use `gh pr diff` and `gh pr view` to read the change. Write your review to the file review.md in the
+            current directory (do not post it yourself; the workflow posts it). review.md is your only output.
             Review this pull request as an independent reviewer. You did not write it.
             Check: soundness of checker/SMT changes (no assumed obligations, no unsound abstractions),
             that no scenario was weakened or deleted, that Intent-layer files (*.feature, glossary, policy)
             were not changed to make tests pass, and that new behaviour has tests.
-            The first line of your comment must be exactly `VERDICT: APPROVE` or `VERDICT: REQUEST CHANGES`.
+            The first line of review.md must be exactly `VERDICT: APPROVE` or `VERDICT: REQUEST CHANGES`.
             Use REQUEST CHANGES only for blocking findings: an unsound or assumed obligation, a weakened or
             deleted scenario, an Intent-layer file changed to make tests pass, new behaviour without tests, or
             a real defect. Style points and nits go under a separate "Non-blocking" heading and never block.
             Then list the findings.
-      - name: Fail on blocking findings
+      - name: Post the review and fail on blocking findings
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          STARTED: ${{ steps.start.outputs.at }}
         run: |
-          # Latest verdict comment by the Actions bot posted during this run; no verdict is a failure.
-          verdict=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" --paginate \
-            | jq -rs --arg started "$STARTED" 'add | [.[] | select(.user.login == "github-actions[bot]" and .created_at >= $started) | .body | select(test("^\\*{0,2}VERDICT: "))] | last // ""')
-          first=$(printf '%s' "$verdict" | head -n1)
+          # No review file, or no verdict on its first line, is a failure (the gate fails closed).
+          if [ ! -s review.md ]; then echo "::error::The reviewer wrote no review.md."; exit 1; fi
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file review.md
+          first=$(head -n1 review.md)
           echo "verdict line: $first"
           case "$first" in
             *"VERDICT: APPROVE"*) exit 0 ;;
             *"VERDICT: REQUEST CHANGES"*) echo "::error::The reviewer reported blocking findings."; exit 1 ;;
-            *) echo "::error::No verdict comment found."; exit 1 ;;
+            *) echo "::error::No verdict on the first line of review.md."; exit 1 ;;
           esac
