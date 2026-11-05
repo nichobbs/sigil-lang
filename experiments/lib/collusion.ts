@@ -53,7 +53,9 @@ export function leakage2(answers: Answer[]): number {
     }
   }
   const n = countUpTo(hi, mask, val) - countUpTo(lo - 1n, mask, val);
+  // An empty consistent set cannot occur with a real card; report full leakage rather than throw.
   if (n <= 0n) return TOTAL_BITS;
+  // n is at most 10^16 (< 2^53.2), so Number(n) can lose low bits above 2^53; the error in log2 is below 1e-15 bits.
   return TOTAL_BITS - Math.log2(Number(n));
 }
 

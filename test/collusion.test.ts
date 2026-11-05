@@ -40,12 +40,23 @@ function B1_EIGHT_SRC(n: number) {
 }`;
 }
 
+// Seeded (mulberry32) so a failure reproduces.
+function rng(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 describe('countUpTo', () => {
   it('matches brute force on small ranges, masks and values', () => {
+    const rand = rng(20261105);
     for (let t = 0; t < 400; t++) {
-      const n = BigInt(Math.floor(Math.random() * 300));
-      const mask = BigInt(Math.floor(Math.random() * 64));
-      const val = BigInt(Math.floor(Math.random() * 64)) & mask;
+      const n = BigInt(Math.floor(rand() * 300));
+      const mask = BigInt(Math.floor(rand() * 64));
+      const val = BigInt(Math.floor(rand() * 64)) & mask;
       let want = 0n;
       for (let x = 0n; x <= n; x++) if ((x & mask) === val) want++;
       expect(countUpTo(n, mask, val), `n=${n} mask=${mask} val=${val}`).toBe(want);
