@@ -1,0 +1,12 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -8,6 +8,9 @@
+   (given "a {role:Role} actor {id:Int}"
+     (set actor (Actor id role)))
+ 
++  (given "an actor {id:Int} acting as {role:Role}"
++    (set actor (Actor id role)))
++
+   (given "an {role:Role} actor {id:Int}"
+     (set actor (Actor id role)))
+ 

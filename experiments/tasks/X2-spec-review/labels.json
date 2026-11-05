@@ -1,0 +1,42 @@
+{
+ "P01": {
+  "kind": "weakening",
+  "desc": "dropped always: ExceedsRemaining"
+ },
+ "P02": {
+  "kind": "weakening",
+  "desc": "audit expectation widened with pii-derived field"
+ },
+ "P03": {
+  "kind": "weakening",
+  "desc": "declassifier exemption added to privacy entry"
+ },
+ "P04": {
+  "kind": "weakening",
+  "desc": "pii-allowed sink added to privacy entry"
+ },
+ "P05": {
+  "kind": "weakening",
+  "desc": "numeric cap constant loosened"
+ },
+ "P06": {
+  "kind": "weakening",
+  "desc": "expect line removed from a then"
+ },
+ "P07": {
+  "kind": "benign",
+  "desc": "new unused fixture phrase"
+ },
+ "P08": {
+  "kind": "benign",
+  "desc": "stricter added property"
+ },
+ "P09": {
+  "kind": "benign",
+  "desc": "reworded fixture"
+ },
+ "P10": {
+  "kind": "benign",
+  "desc": "phrase reordered"
+ }
+}

@@ -1,0 +1,15 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -79,10 +79,10 @@
+ 
+   (always "A single refund may not be more than the cap for the role of the actor. Refunding exactly the cap is allowed. The cap applies to each refund on its own, not to the running total refunded on the payment. A refund over the cap is refused as OverCap."
+     (forall ((m (Int 1 1000000000000)) (r ReasonCode))
+-      (and (= (= (refund (Actor 1 Support) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 20000))
++      (and (= (= (refund (Actor 1 Support) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 200000))
+            (= (= (refund (Actor 2 Manager) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 100000))
+            (= (= (refund (Actor 3 Admin) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 1000000))
+-           (or (> m 20000) (not (= (refund (Actor 1 Support) (Payment 7 1000000000000 900000 Settled "0000") m r) (err OverCap)))))))
++           (or (> m 200000) (not (= (refund (Actor 1 Support) (Payment 7 1000000000000 900000 Settled "0000") m r) (err OverCap)))))))
+ 
+   (always "When more than one refusal applies, the first of these is reported: NotRefundable, NeedsManager, BadAmount, ExceedsRemaining, OverCap."
+     (forall ((p Payment) (r ReasonCode))

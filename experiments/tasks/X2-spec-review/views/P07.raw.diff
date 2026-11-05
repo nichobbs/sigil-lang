@@ -1,0 +1,12 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -14,6 +14,9 @@
+   (given "a {status:PayStatus} payment {id:Int} of {amount:Money} with {refunded:Money} already refunded on the card ending {card:Str}"
+     (set payment (Payment id amount refunded status card)))
+ 
++  (given "a Disputed payment {id:Int} of {amount:Money} with nothing refunded on the card ending {card:Str}"
++    (set payment (Payment id amount 0 Disputed card)))
++
+   (given "the payment store is unavailable"
+     (fail store:payments put))
+ 

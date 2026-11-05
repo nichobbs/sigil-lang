@@ -1,0 +1,18 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -31,12 +31,12 @@
+   (then "the refund fails because the payment could not be stored"
+     (expect (= result (err StoreFailed))))
+ 
+-  (then "the stored payment holds {refunded:Money} refunded"
+-    (expect (= (map (stored store:payments) (fn (x) x.refunded)) (list refunded))))
+-
+   (then "the stored payment keeps the card ending {card:Str}"
+     (expect (= (map (stored store:payments) (fn (x) x.card)) (list card))))
+ 
++  (then "the stored payment holds {refunded:Money} refunded"
++    (expect (= (map (stored store:payments) (fn (x) x.refunded)) (list refunded))))
++
+   (then "the remaining amount to refund is {remaining:Money}"
+     (expect (match result (ok r (= r.remaining remaining)) (err e false))))
+ 

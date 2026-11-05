@@ -1,0 +1,15 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -71,12 +71,6 @@
+     (forall ((p Payment) (r ReasonCode))
+       (= (refund (Actor 1 Admin) (Payment p.id p.amount p.refunded Settled p.card) 0 r) (err BadAmount))))
+ 
+-  (always "A payment can be refunded in several parts, but never for more than it was paid. A refund is refused as ExceedsRemaining when it is more than what is left to refund, which is the amount of the payment minus everything already refunded. Refunding exactly what is left is allowed."
+-    (forall ((p Payment) (m (Int 1 1000000000000)) (r ReasonCode))
+-      (or (> p.refunded p.amount)
+-          (= (= (refund (Actor 1 Admin) (Payment p.id p.amount p.refunded Settled p.card) m r) (err ExceedsRemaining))
+-             (> m (sub p.amount p.refunded))))))
+-
+   (always "A single refund may not be more than the cap for the role of the actor. Refunding exactly the cap is allowed. The cap applies to each refund on its own, not to the running total refunded on the payment. A refund over the cap is refused as OverCap."
+     (forall ((m (Int 1 1000000000000)) (r ReasonCode))
+       (and (= (= (refund (Actor 1 Support) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 20000))
