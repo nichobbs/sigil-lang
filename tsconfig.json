@@ -12,5 +12,5 @@
     "types": ["node"]
   },
   "include": ["src", "test", "experiments", "apps"],
-  "exclude": ["experiments/min-tests", "experiments/tasks/*/ts-guard"]
+  "exclude": ["experiments/min-tests", "experiments/tasks/*/ts-guard", "experiments/tasks/*/ts-guard-brand"]
 }
