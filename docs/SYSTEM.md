@@ -29,6 +29,8 @@ Checks, all static:
 | `E-ceiling` | a channel carrying more than the receiver's `in` ceiling |
 | `E-sink` | a process holding more than one of its sinks is cleared for |
 
+A declassifier may be applied to a sender that holds less than its `from` (it can only release what the sender holds); a declassifier that raises a label (`to` above `from`) is rejected. Names are unique: duplicate processes, declassifiers, `approved` entries and sink names within a process are parse errors.
+
 A process holds the join of its `reads` and everything its inbound channels carry. There is no per-output tracking, so the check is conservative: a process that has seen pii cannot emit an `internal` channel without a declassifier, even if the output does not depend on the pii. The fix is to split the process, which is the intended idiom.
 
 Run: `sigil system check FILE` (exit 0 accepted, 1 rejected, 2 malformed).
