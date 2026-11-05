@@ -151,7 +151,7 @@ Design defaults fixed here (chosen by the author, not derived): information budg
 
 ### C0: composition check on seeded graphs (no agents)
 
-Twelve hand-written system files, six safe and six each with one violation (a pii-to-public edge, a sink below a reachable label, a declassifier on a path that bypasses the check, a stale spec hash, an input ceiling exceeded after an upgrade, a channel to an undeclared process). Pass bar: all six violations rejected, no safe graph rejected. Deterministic, so one run.
+Twelve hand-written system files, six safe and six each with one violation (a pii-to-public edge, a sink below a reachable label, a declassifier on a path that bypasses the check, a stale spec hash, an input ceiling exceeded after an upgrade, a channel to an undeclared process). Pass bar: all six violations rejected, no safe graph rejected. Deterministic, so one run. Fixtures: `experiments/tasks/C0-composition/{safe,violating}`; checker: `sigil system check` (docs/SYSTEM.md).
 
 ### C1: oracle attack through one declassifier
 
@@ -180,3 +180,7 @@ Timing, message-size, message-rate and termination channels are not measured and
 ### Reporting
 
 Per cell: counts, leakage in bits per run (C1, C2), unauthorised and legitimate refund counts (C3), tokens and tool calls. Failures kept in the results file and the README.
+
+### Deviations (Extension 4)
+
+- 2026-11-05, while building C0, before it was scored: the checker tracks one label per process (the join of what it reads and receives), not per output. My first draft of safe graph s4 had a process that received pii and sent an `internal` channel back with no declassifier; the checker rejected it, correctly under that model. I corrected the fixture (the channel now carries pii) instead of weakening the checker. This is a stated limitation, not a pass: the check is conservative and graphs like the draft s4 must be split into separate processes.

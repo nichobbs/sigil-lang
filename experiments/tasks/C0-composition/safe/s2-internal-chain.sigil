@@ -1,0 +1,6 @@
+(system s2 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (process a (program "pa") (spec "sa") (reads internal))
+  (process b (program "pb") (spec "sb") (in internal) (sink audit internal))
+  (process c (program "pc") (spec "sc") (in internal) (sink audit internal))
+  (channel a b (carries internal))
+  (channel b c (carries internal)))

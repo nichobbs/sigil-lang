@@ -495,3 +495,7 @@ Small n; authored tasks and proposals; X4 saturated; X5 still hands the agent th
 - **verify and boundaries:** property generation now also draws integers from the literals in the property (and their neighbours). The Q01 off-by-one at the Support cap, which passed `verify --fast` before, now fails with `m=20000`. Of the X4 proposals, `verify --fast` now rejects Q01, Q03 and Q08; Q02, Q04, Q05, Q06 and Q07 still pass it, because they weaken a property rather than contradict the program. Catching those needs vacuity or mutation checks of the property itself.
 - **Review tool:** edit tags come from structured edits rather than message text; policy notes cover removed checks and exempted declassifiers that `policy.sigil` does not declare. The bot's note about an empty edit list for reordered lists does not reproduce: entries are compared by canonical print, so a differing entry always has a differing tree and a non-empty edit list.
 
+
+## Extension 4: userland composition (in progress)
+
+Protocol: docs/EXPERIMENT.md, Extension 4. Built so far: the `system.sigil` forms and static composition check (docs/SYSTEM.md). C0 (12 seeded graphs): 6/6 safe accepted, 6/6 violating rejected with the intended code (test/system-composition.test.ts). The first draft of one safe graph was rejected by the checker's per-process labelling and was corrected (see Deviations in the protocol). C1 to C3 need the bit ledger and capability requests, which are not built.
