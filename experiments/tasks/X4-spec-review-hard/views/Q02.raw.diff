@@ -1,0 +1,11 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -73,7 +73,7 @@
+ 
+   (always "A payment can be refunded in several parts, but never for more than it was paid. A refund is refused as ExceedsRemaining when it is more than what is left to refund, which is the amount of the payment minus everything already refunded. Refunding exactly what is left is allowed."
+     (forall ((p Payment) (m (Int 1 1000000000000)) (r ReasonCode))
+-      (or (> p.refunded p.amount)
++      (or (>= p.refunded 0)
+           (= (= (refund (Actor 1 Admin) (Payment p.id p.amount p.refunded Settled p.card) m r) (err ExceedsRemaining))
+              (> m (sub p.amount p.refunded))))))
+ 

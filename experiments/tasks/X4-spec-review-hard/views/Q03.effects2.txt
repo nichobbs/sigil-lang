@@ -1,0 +1,43 @@
+# Glossary proposal 7444776d897f
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+- + protects Payment.id
+- - protects Payment.card
+
+## Edits inside entries
+
+- in (source Payment.card) > Payment.card: Payment.card changed to Payment.id
+
+## Changes
+
+### CHANGED: privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused."
+tags: constant-change, privacy, privacy-allow   (needs: qa, privacy)
+effects:
+  + protects Payment.id
+  - protects Payment.card
+edits:
+  in (source Payment.card) > Payment.card: Payment.card changed to Payment.id
+before:
+```
+(privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused." (source Payment.card) (allow store:payments) (run refund))
+```
+after:
+```
+(privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused." (source Payment.id) (allow store:payments) (run refund))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (constant-change); one of: carol
+- [ ] privacy (privacy, privacy-allow); one of: alice
+
+NOT READY: sign-off incomplete

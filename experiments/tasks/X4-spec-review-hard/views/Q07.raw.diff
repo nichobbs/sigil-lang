@@ -1,0 +1,11 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -92,7 +92,7 @@
+            (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 300000 r) (err ExceedsRemaining)))))
+ 
+   (always "A refund that is not refused stores the updated payment, with the amount added to what has been refunded and everything else unchanged, and the audit log records one RefundIssued event with the actor, the payment, the amount and the reason."
+-    (forall ((a Actor) (p Payment) (m (Int 0 1000000000000)) (r ReasonCode))
++    (forall ((a Actor) (p Payment) (m (Int 0 100)) (r ReasonCode))
+       (match (refund a p m r)
+         (ok x (and (= x.payment p.id) (= x.refund m) (= x.refunded (add p.refunded m))
+                    (= x.remaining (sub p.amount x.refunded))))

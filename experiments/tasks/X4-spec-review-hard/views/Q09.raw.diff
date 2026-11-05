@@ -1,0 +1,10 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -87,6 +87,7 @@
+   (always "When more than one refusal applies, the first of these is reported: NotRefundable, NeedsManager, BadAmount, ExceedsRemaining, OverCap."
+     (forall ((p Payment) (r ReasonCode))
+       (and (= (refund (Actor 1 Admin) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable))
++           (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable))
+            (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Disputed p.card) 0 r) (err NeedsManager))
+            (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 0 r) (err BadAmount))
+            (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 300000 r) (err ExceedsRemaining)))))

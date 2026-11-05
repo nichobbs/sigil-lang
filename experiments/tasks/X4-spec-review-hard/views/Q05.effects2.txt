@@ -1,0 +1,38 @@
+# Glossary proposal d0883883c9b4
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+No new or removed observations by structure. See the edits inside entries below: this tool does not judge whether they weaken a check.
+
+## Edits inside entries
+
+- in (and (= (refund (Actor 1 Admin) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable)) (= (refund (...: removed (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 300000 r) (err ExceedsRemaining))
+
+## Changes
+
+### CHANGED: always "When more than one refusal applies, the first of these is reported: NotRefundable, NeedsManager, BadAmount, ExceedsRemaining, OverCap."
+tags: check-removed, property   (needs: qa)
+edits:
+  in (and (= (refund (Actor 1 Admin) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable)) (= (refund (...: removed (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 300000 r) (err ExceedsRemaining))
+before:
+```
+(always "When more than one refusal applies, the first of these is reported: NotRefundable, NeedsManager, BadAmount, ExceedsRemaining, OverCap." (forall ((p Payment) (r ReasonCode)) (and (= (refund (Actor 1 Admin) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable)) (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Disputed p.card) 0 r) (err NeedsManager)) (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 0 r) (err BadAmount)) (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 300000 r) (err ExceedsRemaining)))))
+```
+after:
+```
+(always "When more than one refusal applies, the first of these is reported: NotRefundable, NeedsManager, BadAmount, ExceedsRemaining, OverCap." (forall ((p Payment) (r ReasonCode)) (and (= (refund (Actor 1 Admin) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable)) (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Disputed p.card) 0 r) (err NeedsManager)) (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 0 r) (err BadAmount)))))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (check-removed, property); one of: carol
+
+NOT READY: sign-off incomplete

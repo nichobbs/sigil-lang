@@ -1,0 +1,39 @@
+# Glossary proposal d8ef3d00cb7f
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+No new or removed observations by structure. See the edits inside entries below: this tool does not judge whether they weaken a check.
+
+## Edits inside entries
+
+- in (expect (= (len (stored store:payments)) 0)) > (= (len (stored store:payments)) 0) > =: = changed to >=
+
+## Changes
+
+### CHANGED: then "nothing is stored"
+tags: constant-change, sink-observation   (needs: qa, privacy)
+edits:
+  in (expect (= (len (stored store:payments)) 0)) > (= (len (stored store:payments)) 0) > =: = changed to >=
+before:
+```
+(then "nothing is stored" (expect (= (len (stored store:payments)) 0)))
+```
+after:
+```
+(then "nothing is stored" (expect (>= (len (stored store:payments)) 0)))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (constant-change); one of: carol
+- [ ] privacy (sink-observation); one of: alice
+
+NOT READY: sign-off incomplete

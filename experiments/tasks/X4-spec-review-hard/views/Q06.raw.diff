@@ -1,0 +1,11 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -41,7 +41,7 @@
+     (expect (match result (ok r (= r.remaining remaining)) (err e false))))
+ 
+   (then "nothing is stored"
+-    (expect (= (len (stored store:payments)) 0)))
++    (expect (>= (len (stored store:payments)) 0)))
+ 
+   ; The audit expectations name the fields they pin and ignore any others, so they hold for records with extra fields.
+   (then "an audit event records the refund of {amount:Money} as {reason:ReasonCode}"

@@ -1,0 +1,32 @@
+# Glossary proposal 65cb0516c2c0
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+No change to observable effects (fixtures only).
+
+## Changes
+
+### CHANGED: always "A refund that is not refused stores the updated payment, with the amount added to what has been refunded and everything else unchanged, and the audit log records one RefundIssued event with the actor, the payment, the amount and the reason."
+tags: property   (needs: qa)
+before:
+```
+(always "A refund that is not refused stores the updated payment, with the amount added to what has been refunded and everything else unchanged, and the audit log records one RefundIssued event with the actor, the payment, the amount and the reason." (forall ((a Actor) (p Payment) (m (Int 0 1000000000000)) (r ReasonCode)) (match (refund a p m r) (ok x (and (= x.payment p.id) (= x.refund m) (= x.refunded (add p.refunded m)) (= x.remaining (sub p.amount x.refunded)))) (err e true))))
+```
+after:
+```
+(always "A refund that is not refused stores the updated payment, with the amount added to what has been refunded and everything else unchanged, and the audit log records one RefundIssued event with the actor, the payment, the amount and the reason." (forall ((a Actor) (p Payment) (m (Int 0 100)) (r ReasonCode)) (match (refund a p m r) (ok x (and (= x.payment p.id) (= x.refund m) (= x.refunded (add p.refunded m)) (= x.remaining (sub p.amount x.refunded)))) (err e true))))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (property); one of: carol
+
+NOT READY: sign-off incomplete

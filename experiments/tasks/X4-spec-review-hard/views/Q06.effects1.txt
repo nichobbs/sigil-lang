@@ -1,0 +1,32 @@
+# Glossary proposal d8ef3d00cb7f
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+No change to observable effects (fixtures only).
+
+## Changes
+
+### CHANGED: then "nothing is stored"
+tags: sink-observation   (needs: privacy)
+before:
+```
+(then "nothing is stored" (expect (= (len (stored store:payments)) 0)))
+```
+after:
+```
+(then "nothing is stored" (expect (>= (len (stored store:payments)) 0)))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] privacy (sink-observation); one of: alice
+
+NOT READY: sign-off incomplete

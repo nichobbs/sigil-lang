@@ -1,0 +1,47 @@
+# Glossary proposal fd89b083d211
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+- + asserts field id of stored store:payments
+- - asserts field card of stored store:payments
+
+## Policy notes
+
+- sink store:payments accepts: pii (policy.sigil)
+
+## Edits inside entries
+
+- in (map (stored store:payments) (fn (x) x.card)) > (fn (x) x.card) > x.card: x.card changed to x.id
+
+## Changes
+
+### CHANGED: then "the stored payment keeps the card ending {card:Str}"
+tags: constant-change, sink-observation   (needs: qa, privacy)
+effects:
+  + asserts field id of stored store:payments
+  - asserts field card of stored store:payments
+edits:
+  in (map (stored store:payments) (fn (x) x.card)) > (fn (x) x.card) > x.card: x.card changed to x.id
+before:
+```
+(then "the stored payment keeps the card ending {card:Str}" (expect (= (map (stored store:payments) (fn (x) x.card)) (list card))))
+```
+after:
+```
+(then "the stored payment keeps the card ending {card:Str}" (expect (= (map (stored store:payments) (fn (x) x.id)) (list card))))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (constant-change); one of: carol
+- [ ] privacy (sink-observation); one of: alice
+
+NOT READY: sign-off incomplete

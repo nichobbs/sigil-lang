@@ -1,0 +1,42 @@
+{
+ "Q01": {
+  "kind": "weakening",
+  "desc": "cap boundary: exactly the cap now expected to be refused (> to >=) for Support"
+ },
+ "Q02": {
+  "kind": "weakening",
+  "desc": "ExceedsRemaining property made vacuous (precondition always true)"
+ },
+ "Q03": {
+  "kind": "weakening",
+  "desc": "privacy protects Payment.id instead of Payment.card"
+ },
+ "Q04": {
+  "kind": "weakening",
+  "desc": "audit count relaxed from exactly one to at least one (both audit steps)"
+ },
+ "Q05": {
+  "kind": "weakening",
+  "desc": "precedence property loses its OverCap-vs-ExceedsRemaining conjunct"
+ },
+ "Q06": {
+  "kind": "weakening",
+  "desc": "\"nothing is stored\" becomes a tautology (= 0 to >= 0)"
+ },
+ "Q07": {
+  "kind": "weakening",
+  "desc": "generated amount domain narrowed to 0..100 in the stores-updated property"
+ },
+ "Q08": {
+  "kind": "weakening",
+  "desc": "\"keeps the card\" now checks the id field"
+ },
+ "Q09": {
+  "kind": "benign",
+  "desc": "extra conjunct: Support on a Voided payment with 0 is NotRefundable"
+ },
+ "Q10": {
+  "kind": "benign",
+  "desc": "equality arguments swapped (1 = len)"
+ }
+}

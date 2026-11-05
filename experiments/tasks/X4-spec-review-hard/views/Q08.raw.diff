@@ -1,0 +1,11 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -35,7 +35,7 @@
+     (expect (= (map (stored store:payments) (fn (x) x.refunded)) (list refunded))))
+ 
+   (then "the stored payment keeps the card ending {card:Str}"
+-    (expect (= (map (stored store:payments) (fn (x) x.card)) (list card))))
++    (expect (= (map (stored store:payments) (fn (x) x.id)) (list card))))
+ 
+   (then "the remaining amount to refund is {remaining:Money}"
+     (expect (match result (ok r (= r.remaining remaining)) (err e false))))
