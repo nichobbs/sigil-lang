@@ -81,11 +81,17 @@ export function parseSystem(src: string): System {
         throw new SigilError(`unknown clause ${(head as { v: string }).v}`, f.pos);
     }
   }
-  const seen = new Set<string>();
-  for (const p of sys.processes) {
-    if (seen.has(p.name)) throw new SigilError(`duplicate process ${p.name}`);
-    seen.add(p.name);
-  }
+  const dup = (what: string, keys: string[], where = '') => {
+    const seen = new Set<string>();
+    for (const k of keys) {
+      if (seen.has(k)) throw new SigilError(`duplicate ${what} ${k}${where}`);
+      seen.add(k);
+    }
+  };
+  dup('process', sys.processes.map((p) => p.name));
+  dup('declassifier', sys.declassifiers.map((x) => x.name));
+  dup('approved entry', sys.approved.map(([a, b]) => `${a}/${b}`));
+  for (const p of sys.processes) dup('sink', p.sinks.map((x) => x.name), ` in process ${p.name}`);
   return sys;
 }
 
@@ -93,6 +99,8 @@ export function checkSystem(sys: System): SysDiag[] {
   const d: SysDiag[] = [];
   const procs = new Map(sys.processes.map((p) => [p.name, p]));
   const decl = new Map(sys.declassifiers.map((x) => [x.name, x]));
+  for (const x of sys.declassifiers)
+    if (rank(x.to) > rank(x.from)) d.push({ code: 'E-declass', msg: `declassifier ${x.name} raises a label (from ${x.from} to ${x.to}); a declassifier may only lower one` });
   const level = new Map<string, Conf>();
   for (const p of sys.processes) level.set(p.name, p.reads);
   const valid = sys.channels.filter((c) => {

@@ -184,7 +184,7 @@ Per cell: counts, leakage in bits per run (C1, C2), unauthorised and legitimate 
 ### Deviations (Extension 4)
 
 - 2026-11-05, while building C0, before it was scored: the checker tracks one label per process (the join of what it reads and receives), not per output. My first draft of safe graph s4 had a process that received pii and sent an `internal` channel back with no declassifier; the checker rejected it, correctly under that model. I corrected the fixture (the channel now carries pii) instead of weakening the checker. This is a stated limitation, not a pass: the check is conservative and graphs like the draft s4 must be split into separate processes.
-- 2026-11-05, after #64 merged and before any C1 to C3 run: clarified the C2 ceiling (16 bits under `per-declassifier`), pinned the C0 fixture names, and specified C3 token semantics (single-use, bound, not forwardable; replay and forwarding as attacks). Prompted by the review bot's notes on #64; no hypothesis or bar changed.
+- 2026-11-05, after #64 merged and before any C1 to C3 run: clarified the C2 ceiling (16 bits under `per-declassifier`), pinned the C0 fixture names, and specified C3 token semantics (single-use, bound, not forwardable; replay and forwarding as attacks). Prompted by the review bot's notes on #64. The hypotheses and thresholds are unchanged, but the C3 attack set grew (replay and forwarding), which makes the capability arm harder to pass.
 
 ### Deviations (C3 harness)
 
