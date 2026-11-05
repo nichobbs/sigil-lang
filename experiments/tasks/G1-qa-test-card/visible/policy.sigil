@@ -13,4 +13,5 @@
   (declassify qa-test-card
     (from pii) (to internal)
     (reason "QA test cards (ending 0000) are not audited; the absence of an event reveals only that the card is the test card.")
-    (fns refund)))
+    (fns refund)
+    (max-bits 1)))
