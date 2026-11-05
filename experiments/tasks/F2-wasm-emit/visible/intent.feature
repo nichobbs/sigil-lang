@@ -5,30 +5,34 @@ Feature: Expression to WebAssembly
   Example: A constant
     Given the node Const 5
     When the module is emitted
-    Then the module has 33 bytes
+    Then the module has 36 bytes
     And byte 0 is 0
     And byte 1 is 97
-    And byte 32 is 11
+    And byte 33 is 66
+    And byte 34 is 5
+    And byte 35 is 11
 
   Example: Two parameters added
     Given the node Param0 0
     And the node Param1 0
     And the node Add 0
     When the module is emitted
-    Then the module has 35 bytes
-    And byte 29 is 32
-    And byte 32 is 124
+    Then the module has 39 bytes
+    And byte 33 is 32
+    And byte 37 is 124
 
   Example: A negative constant needs a signed encoding
     Given the node Const -1
     When the module is emitted
-    Then the module has 33 bytes
-    And byte 31 is 127
+    Then the module has 36 bytes
+    And byte 34 is 127
 
   Example: A constant that needs two bytes
     Given the node Const 64
     When the module is emitted
-    Then the module has 34 bytes
+    Then the module has 37 bytes
+    And byte 34 is 192
+    And byte 35 is 0
 
   Example: An operator with too few operands
     Given the node Const 1

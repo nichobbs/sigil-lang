@@ -15,8 +15,8 @@ Feature: S-expression reader
     When the source is read
     Then the tree has 7 nodes
     And node 0 is an Atom from 1 to 4 with parent 6 and 0 children
-    And node 4 is an Atom from 12 to 13 with parent 5 and 0 children
-    And node 5 is a Form from 9 to 16 with parent 6 and 3 children
+    And node 4 is an Atom from 14 to 15 with parent 5 and 0 children
+    And node 5 is a Form from 7 to 16 with parent 6 and 3 children
     And node 6 is a Form from 0 to 17 with parent -1 and 3 children
 
   Example: Comments and texts
