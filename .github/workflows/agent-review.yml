@@ -1,6 +1,8 @@
 name: agent-review
-# A reviewing agent that is not the author. Needs the ANTHROPIC_API_KEY repository secret;
-# without it the job is skipped. Review is advisory unless made a required check.
+# A reviewing agent that is not the author. Needs the CLAUDE_CODE_OAUTH_TOKEN repository secret
+# (create it with `claude setup-token`); the job runs only when the repository variable AGENT_REVIEW
+# is "on" and the PR comes from this repository (secrets are not available to fork PRs).
+# Review is advisory unless made a required check.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -10,14 +12,24 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
-    if: ${{ vars.AGENT_REVIEW == 'on' }}
+    if: ${{ vars.AGENT_REVIEW == 'on' && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # A `claude setup-token` token is an OAuth token, not an API key: it goes in this input.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Use the workflow's own token, so the action does not need an OIDC exchange with the Claude GitHub App
+          # (that exchange is what fails with "Could not fetch an OIDC token" unless `id-token: write` is granted).
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: |
+            --max-turns 20
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Read,Grep,Glob"
           prompt: |
+            Repository: ${{ github.repository }}  PR number: ${{ github.event.pull_request.number }}
+            Use `gh pr diff` and `gh pr view` to read the change. Post your review as one PR comment with
+            `gh pr comment ${{ github.event.pull_request.number }} --body ...`.
             Review this pull request as an independent reviewer. You did not write it.
             Check: soundness of checker/SMT changes (no assumed obligations, no unsound abstractions),
             that no scenario was weakened or deleted, that Intent-layer files (*.feature, glossary, policy)
