@@ -1,0 +1,77 @@
+; B3 audited refund: reference implementation (Sigil).
+
+(type Cents       (Int 0 1000000000000))
+(type Id          (Int 0 9007199254740991))
+(type Role        (var Support Manager Admin))
+(type PayStatus   (var Settled Disputed Voided))
+(type ReasonCode  (var Duplicate Defective Goodwill Fraud))
+(type RefundError (var NotRefundable NeedsManager BadAmount ExceedsRemaining OverCap StoreFailed))
+
+(type Actor   (rec (id Id) (role Role)))
+(type Payment (rec (id Id) (amount Cents) (refunded Cents) (status PayStatus) (card Str :pii)))
+(type Receipt (rec (payment Id) (refund Cents) (refunded Cents) (remaining Cents)))
+(type RefundIssued  (rec (actor Id) (payment Id) (amount Cents) (reason ReasonCode) (cardCheck (Int 0 36) :internal)))
+(type RefundRefused (rec (actor Id) (payment Id) (amount Cents) (reason ReasonCode) (why RefundError) (cardCheck (Int 0 36) :internal)))
+
+(type Sum (Int 0 36))
+
+(fn digit-sum
+  (in (c (Str :max 64)))
+  (out (Int 0 36))
+  (min 36 (max 0 (fold (chars c) Sum 0 (fn (acc d) (min 36 (max 0 (add acc (max 0 (min 9 (sub d 48)))))))))))
+
+(fn refund-cap
+  (in (r Role))
+  (out Cents)
+  (match r
+    (Support 20000)
+    (Manager 100000)
+    (Admin 1000000)))
+
+(fn left-to-refund
+  (in (p Payment))
+  (out Cents)
+  (max 0 (sub p.amount p.refunded)))
+
+(fn check-amount
+  (in (a Actor) (p Payment) (amount Cents))
+  (out (Result Bool RefundError))
+  (if (< amount 1)
+    (err BadAmount)
+    (if (> amount (left-to-refund p))
+      (err ExceedsRemaining)
+      (if (> amount (refund-cap a.role))
+        (err OverCap)
+        (ok true)))))
+
+(fn check
+  (in (a Actor) (p Payment) (amount Cents))
+  (out (Result Bool RefundError))
+  (match p.status
+    (Voided (err NotRefundable))
+    (Disputed (if (= a.role Support) (err NeedsManager) (check-amount a p amount)))
+    (Settled (check-amount a p amount))))
+
+(fn refund
+  (in (actor Actor) (payment Payment) (amount Cents) (reason ReasonCode))
+  (out (Result Receipt RefundError))
+  (needs store:payments audit)
+  (declassifies qa-test-card)
+  (let [cc (declassify qa-test-card (digit-sum payment.card))
+        quiet (declassify qa-test-card (= payment.card "0000"))]
+  (match (check actor payment amount)
+    (err e (do (if quiet true (emit audit (RefundRefused actor.id payment.id amount reason e cc)))
+               (err e)))
+    (ok _ (let [nref (min 1000000000000 (add payment.refunded amount))
+                nrem (max 0 (sub payment.amount nref))]
+            (match (put store:payments payment.id (Payment payment.id payment.amount nref payment.status payment.card))
+              (ok _ (do (if quiet true (emit audit (RefundIssued actor.id payment.id amount reason cc)))
+                        (ok (Receipt payment.id amount nref nrem))))
+              (err _ (do (if quiet true (emit audit (RefundRefused actor.id payment.id amount reason StoreFailed cc)))
+                         (err StoreFailed)))))))))
+
+(program payments
+  (targets server browser)
+  (entry refund
+    (bind store:payments (store (ns "payments/payments") (mode append)))
+    (bind audit          (audit))))

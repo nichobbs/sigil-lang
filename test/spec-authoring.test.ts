@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { coverage, diffGlossary, effects, gate, parseApprovals, parseEntries, parseOwners, proposalHash, requiredRoles, tags } from '../src/spec.js';
+import { coverage, diffGlossary, effects, gate, parseApprovals, parseEntries, parseOwners, policyNotes, proposalHash, renderReview, requiredRoles, sinkPolicy, tags, treeDiff } from '../src/spec.js';
 
 const BASE = `(glossary
   (given "a {role:Role} actor {id:Int}" (set actor (Actor id role)))
@@ -209,5 +209,60 @@ describe('spec: promote edge cases', () => {
     const r = cli('check', d);
     expect(r.code).toBe(1);
     expect(r.out).toMatch(/differs from the last promoted version/);
+  });
+});
+
+describe('spec: edits inside entries and policy join', () => {
+  const G = (body: string) => `(glossary ${body})`;
+  const one = (src: string) => parseEntries(G(src))[0];
+  const owners = parseOwners(OWNERS);
+
+  it('lists a changed constant and tags it constant-change', () => {
+    const a = G('(always "cap" (forall ((m Int)) (= (refund m) (> m 20000))))');
+    const b = G('(always "cap" (forall ((m Int)) (= (refund m) (> m 200000))))');
+    const d = diffGlossary(parseEntries(a), parseEntries(b));
+    expect(d[0].kind === 'changed' && d[0].detail.join('\n')).toMatch(/20000 changed to 200000/);
+    expect(d[0].tags).toContain('constant-change');
+  });
+
+  it('lists a removed expect line and tags it check-removed, and the removed field assertion shows as an effect', () => {
+    const a = G('(then "x" (expect (= (len (emitted audit)) 1)) (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount))))');
+    const b = G('(then "x" (expect (= (len (emitted audit)) 1)))');
+    const d = diffGlossary(parseEntries(a), parseEntries(b))[0];
+    expect(d.kind === 'changed' && d.detail.some((x) => /removed \(expect/.test(x))).toBe(true);
+    expect(d.tags).toContain('check-removed');
+    expect(d.effectDelta).toEqual(['- asserts field amount of emitted audit']);
+  });
+
+  it('derives field and count assertions on observed sinks', () => {
+    expect(effects(one('(then "x" (expect (= (map (emitted audit) (fn (e) e.reason)) (list r))) (expect (= (len (emitted audit)) 1)))'))).toEqual(
+      expect.arrayContaining(['asserts field reason of emitted audit', 'asserts count of emitted audit', 'observes emitted audit']),
+    );
+  });
+
+  it('treeDiff is empty for equal forms and reports an added conjunct', () => {
+    const x = one('(always "p" (and a b))').sexp;
+    expect(treeDiff(x, x)).toEqual([]);
+    expect(treeDiff(x, one('(always "p" (and a b c))').sexp).join('')).toMatch(/added c/);
+  });
+
+  it('policy join warns when a privacy entry allows a sink the policy limits', () => {
+    const pol = sinkPolicy('(policy (sink store:payments (accepts pii)) (sink audit (accepts internal)))');
+    expect(pol.get('audit')).toEqual(['internal']);
+    const a = G('(privacy "p" (source Payment.card) (allow store:payments) (run refund))');
+    const b = G('(privacy "p" (source Payment.card) (allow store:payments) (allow audit) (run refund))');
+    const ch = diffGlossary(parseEntries(a), parseEntries(b));
+    expect(policyNotes(ch, pol).join('\n')).toMatch(/WARNING: policy.sigil limits sink audit to internal/);
+    const text = renderReview({ changes: ch, gate: gate(ch, owners, [], 'h'), hash: 'h', owners, policy: pol });
+    expect(text).toContain('## Policy notes');
+  });
+
+  it('review text no longer claims "no change" when entries were edited internally', () => {
+    const a = G('(always "cap" (forall ((m Int)) (> m 20000)))');
+    const b = G('(always "cap" (forall ((m Int)) (> m 200000)))');
+    const ch = diffGlossary(parseEntries(a), parseEntries(b));
+    const text = renderReview({ changes: ch, gate: gate(ch, owners, [], 'h'), hash: 'h', owners });
+    expect(text).not.toContain('No change to observable effects');
+    expect(text).toContain('## Edits inside entries');
   });
 });

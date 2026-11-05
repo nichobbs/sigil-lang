@@ -1,0 +1,19 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -45,14 +45,14 @@
+ 
+   ; The audit expectations name the fields they pin and ignore any others, so they hold for records with extra fields.
+   (then "an audit event records the refund of {amount:Money} as {reason:ReasonCode}"
+-    (expect (= (len (emitted audit)) 1))
++    (expect (>= (len (emitted audit)) 1))
+     (expect (= (map (emitted audit) (fn (e) e.actor)) (list actor.id)))
+     (expect (= (map (emitted audit) (fn (e) e.payment)) (list payment.id)))
+     (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount)))
+     (expect (= (map (emitted audit) (fn (e) e.reason)) (list reason))))
+ 
+   (then "an audit event records the refusal of {amount:Money} as {reason:ReasonCode} because {why:RefundError}"
+-    (expect (= (len (emitted audit)) 1))
++    (expect (>= (len (emitted audit)) 1))
+     (expect (= (map (emitted audit) (fn (e) e.actor)) (list actor.id)))
+     (expect (= (map (emitted audit) (fn (e) e.payment)) (list payment.id)))
+     (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount)))

@@ -56,6 +56,14 @@ export function effects(e: Entry): string[] {
     const ex = inExpect || (isSym(h) && h.v === 'expect');
     if (isSym(h)) {
       if ((h.v === 'emitted' || h.v === 'stored' || h.v === 'sent') && isSym(s.items[1])) out.add(`observes ${h.v} ${s.items[1].v}`);
+      // (map (emitted audit) (fn (e) e.amount)): the entry pins one field of the observed events.
+      if (h.v === 'map' && isList(s.items[1]) && isSym(s.items[1].items[0]) && ['emitted', 'stored', 'sent'].includes(s.items[1].items[0].v as string) && isSym(s.items[1].items[1])) {
+        const fn = s.items[2];
+        const body = isList(fn) ? fn.items[2] : undefined;
+        const f = body && isSym(body) ? /^[\w-]+\.([\w-]+)$/.exec(body.v) : null;
+        out.add(`asserts field ${f ? f[1] : sexpToString(body ?? s)} of ${s.items[1].items[0].v} ${s.items[1].items[1].v}`);
+      }
+      if (h.v === 'len' && isList(s.items[1]) && isSym(s.items[1].items[0]) && ['emitted', 'stored', 'sent'].includes(s.items[1].items[0].v as string) && isSym(s.items[1].items[1])) out.add(`asserts count of ${s.items[1].items[0].v} ${s.items[1].items[1].v}`);
       if (h.v === 'fail' && isSym(s.items[1]) && isSym(s.items[2])) out.add(`injects failure ${s.items[1].v} ${s.items[2].v}`);
       if (h.v === 'call' && isSym(s.items[2])) out.add(`calls ${s.items[2].v}`);
       // A constructor application such as (RefundIssued actor.id payment.id amount reason): its field list is part of the contract.
@@ -78,12 +86,63 @@ export function tags(e: Entry): string[] {
   if (e.head === 'privacy') t.add('privacy');
   if (fx.some((x) => x.startsWith('exempts'))) t.add('declassified');
   if (fx.some((x) => x.startsWith('allows sink'))) t.add('privacy-allow');
-  if (fx.some((x) => x.startsWith('observes') || x.startsWith('builds'))) t.add('sink-observation');
+  if (fx.some((x) => x.startsWith('observes') || x.startsWith('builds') || x.startsWith('asserts field') || x.startsWith('asserts count'))) t.add('sink-observation');
   if (fx.some((x) => x.startsWith('injects'))) t.add('fault-injection');
   if (e.head === 'always') t.add('property');
   if (e.head === 'rule') t.add('decision-table');
   if (!t.size) t.add('fixture');
   return [...t].sort();
+}
+
+// ---------------------------------------------------------------------------
+// Edits inside an entry: a structural diff of the two S-expressions, so a changed constant, a removed
+// (expect ...) line or a dropped conjunct is listed even when the observable effects are unchanged.
+// ---------------------------------------------------------------------------
+
+const clip = (x: string, n = 200) => (x.length > n ? x.slice(0, n - 3) + '...' : x);
+const show = (x: SExp) => clip(sexpToString(x));
+
+// Where an edit sits: the nearest enclosing form long enough to identify itself, plus the short forms below it.
+function where(chain: string[]): string {
+  if (!chain.length) return 'entry';
+  let i = chain.length - 1;
+  while (i > 0 && chain[i].length < 40) i--;
+  return chain.slice(i).map((x) => clip(x, 120)).join(' > ');
+}
+
+export function treeDiff(a: SExp, b: SExp, anc: string[] = [], top = true): string[] {
+  const chain = top ? [] : [...anc, sexpToString(a)];
+  const here = where(chain);
+  if (!isList(a) || !isList(b)) {
+    if (sexpToString(a) === sexpToString(b)) return [];
+    if (isList(a) || isList(b)) return [`in ${here}: replaced ${show(a)} with ${show(b)}`];
+    return [`in ${here}: ${show(a)} changed to ${show(b)}`];
+  }
+  if (a.items.length === b.items.length) {
+    const out: string[] = [];
+    a.items.forEach((x, i) => out.push(...treeDiff(x, b.items[i], chain, false)));
+    return out;
+  }
+  const ak = a.items.map(sexpToString);
+  const bk = b.items.map(sexpToString);
+  const out: string[] = [];
+  const bAvail = [...bk];
+  const removed: SExp[] = [];
+  a.items.forEach((x, i) => {
+    const j = bAvail.indexOf(ak[i]);
+    if (j >= 0) bAvail.splice(j, 1);
+    else removed.push(x);
+  });
+  const aAvail = [...ak];
+  const added: SExp[] = [];
+  b.items.forEach((x, i) => {
+    const j = aAvail.indexOf(bk[i]);
+    if (j >= 0) aAvail.splice(j, 1);
+    else added.push(x);
+  });
+  for (const x of removed) out.push(`in ${here}: removed ${show(x)}`);
+  for (const x of added) out.push(`in ${here}: added ${show(x)}`);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +152,7 @@ export function tags(e: Entry): string[] {
 export type Change =
   | { kind: 'added'; after: Entry; tags: string[]; effectDelta: string[] }
   | { kind: 'removed'; before: Entry; tags: string[]; effectDelta: string[] }
-  | { kind: 'changed'; before: Entry; after: Entry; tags: string[]; effectDelta: string[] };
+  | { kind: 'changed'; before: Entry; after: Entry; tags: string[]; effectDelta: string[]; detail: string[] };
 
 const delta = (b: string[], a: string[]) => [...a.filter((x) => !b.includes(x)).map((x) => `+ ${x}`), ...b.filter((x) => !a.includes(x)).map((x) => `- ${x}`)];
 
@@ -105,8 +164,11 @@ export function diffGlossary(base: Entry[], proposed: Entry[]): Change[] {
     const b = bm.get(p.key);
     if (!b) out.push({ kind: 'added', after: p, tags: tags(p), effectDelta: delta([], effects(p)) });
     else if (b.src !== p.src) {
-      const tg = [...new Set([...tags(b), ...tags(p)])].sort();
-      out.push({ kind: 'changed', before: b, after: p, tags: tg, effectDelta: delta(effects(b), effects(p)) });
+      const detail = treeDiff(b.sexp, p.sexp);
+      const tg = new Set([...tags(b), ...tags(p)]);
+      if (detail.some((d) => / changed to /.test(d))) tg.add('constant-change');
+      if (detail.some((d) => /: removed /.test(d))) tg.add('check-removed');
+      out.push({ kind: 'changed', before: b, after: p, tags: [...tg].sort(), effectDelta: delta(effects(b), effects(p)), detail });
     }
   }
   for (const b of base) {
@@ -244,11 +306,46 @@ export function gate(changes: Change[], o: Owners, approvals: Approval[], hash: 
 }
 
 // ---------------------------------------------------------------------------
+// Policy join: what policy.sigil says about the sinks a change touches (read at S-expression level).
+// ---------------------------------------------------------------------------
+
+export function sinkPolicy(policySrc: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const forms = readAll(policySrc);
+  const root = forms[0];
+  if (!root || !isList(root)) return out;
+  for (const f of root.items.slice(1)) {
+    if (!isList(f) || !isSym(f.items[0], 'sink') || !isSym(f.items[1])) continue;
+    const acc = f.items.slice(2).find((x) => isList(x) && isSym(x.items[0], 'accepts'));
+    out.set(f.items[1].v, acc && isList(acc) ? acc.items.slice(1).map(sexpToString) : []);
+  }
+  return out;
+}
+
+export function policyNotes(changes: Change[], policy: Map<string, string[]>): string[] {
+  const notes = new Set<string>();
+  for (const c of changes) {
+    for (const x of c.effectDelta) {
+      if (!x.startsWith('+')) continue;
+      const m = /(?:allows sink\(s\) |(?:emitted|stored|sent|count of emitted|field \S+ of emitted) )(\S+)/.exec(x) ?? /allows sink\(s\) (\S+)/.exec(x);
+      const sink = m?.[1];
+      if (!sink || !policy.has(sink)) continue;
+      const acc = policy.get(sink)!;
+      if (x.includes('allows sink')) {
+        if (!acc.includes('pii')) notes.add(`WARNING: policy.sigil limits sink ${sink} to ${acc.join(' ') || 'nothing'}; this proposal lets the protected source reach it.`);
+      } else notes.add(`sink ${sink} accepts: ${acc.join(' ') || 'nothing'} (policy.sigil)`);
+    }
+    if (c.effectDelta.some((x) => x.startsWith('+ exempts'))) notes.add('A declassifier exemption removes that flow from the privacy check. Confirm policy.sigil declares the declassifier and a privacy reviewer approves what it releases.');
+  }
+  return [...notes];
+}
+
+// ---------------------------------------------------------------------------
 // Review packet
 // ---------------------------------------------------------------------------
 
-export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Gate; hash: string; owners: Owners }): string {
-  const { changes, cov, gate: g, hash, owners } = opts;
+export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Gate; hash: string; owners: Owners; policy?: Map<string, string[]> }): string {
+  const { changes, cov, gate: g, hash, owners, policy } = opts;
   const L: string[] = [];
   L.push(`# Glossary proposal ${hash.slice(0, 12)}`, '');
   if (!changes.length) {
@@ -261,9 +358,21 @@ export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Ga
   const risky = changes.filter((c) => c.tags.some((t) => owners.require.has(t)));
   L.push('## What this proposal would allow', '');
   const fx = changes.flatMap((c) => c.effectDelta);
-  if (!fx.length) L.push('No change to observable effects (fixtures only).');
+  const inner = changes.flatMap((c) => (c.kind === 'changed' ? c.detail : []));
+  if (!fx.length) L.push(inner.length ? 'No new or removed observations by structure. See the edits inside entries below: this tool does not judge whether they weaken a check.' : 'No change to observable effects (fixtures only).');
   for (const x of [...new Set(fx)]) L.push(`- ${x}`);
   L.push('');
+  const notes = policy ? policyNotes(changes, policy) : [];
+  if (notes.length) {
+    L.push('## Policy notes', '');
+    for (const x of notes) L.push(`- ${x}`);
+    L.push('');
+  }
+  if (inner.length) {
+    L.push('## Edits inside entries', '');
+    for (const x of inner) L.push(`- ${x}`);
+    L.push('');
+  }
 
   L.push('## Changes', '');
   for (const c of changes) {
@@ -271,6 +380,7 @@ export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Ga
     L.push(`### ${c.kind.toUpperCase()}: ${e.head} "${e.text}"`);
     L.push(`tags: ${c.tags.join(', ')}${c.tags.some((t) => owners.require.has(t)) ? `   (needs: ${[...new Set(c.tags.map((t) => owners.require.get(t)).filter(Boolean))].join(', ')})` : ''}`);
     if (c.effectDelta.length) L.push('effects:', ...c.effectDelta.map((x) => `  ${x}`));
+    if (c.kind === 'changed' && c.detail.length) L.push('edits:', ...c.detail.map((x) => `  ${x}`));
     if (c.kind === 'changed') L.push('before:', '```', c.before.src, '```');
     L.push(c.kind === 'removed' ? 'removed:' : 'after:', '```', (c.kind === 'removed' ? c.before : c.after).src, '```', '');
   }

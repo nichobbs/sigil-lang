@@ -1,0 +1,16 @@
+; Human-owned policy for B3: what a program may request, and what each sink may receive.
+; The card's last four digits are personal data: the payment store may hold them, the audit log may not.
+; Sinks are deny-by-default. Everything else a refund touches is public or internal.
+
+(policy
+  (allow store (ns "payments/*"))
+  (allow audit)
+
+  (sink store:payments (accepts pii))
+  (sink audit          (accepts internal))
+
+  ; Approved for QA (REFUND-411): whether the audit log has an event may depend on the card being the QA test card.
+  (declassify qa-test-card
+    (from pii) (to internal)
+    (reason "QA test cards (ending 0000) are not audited; the absence of an event reveals only that the card is the test card.")
+    (fns refund)))

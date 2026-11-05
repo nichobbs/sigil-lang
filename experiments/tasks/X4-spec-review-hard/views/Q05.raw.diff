@@ -1,0 +1,12 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -88,8 +88,7 @@
+     (forall ((p Payment) (r ReasonCode))
+       (and (= (refund (Actor 1 Admin) (Payment p.id p.amount p.amount Voided p.card) 0 r) (err NotRefundable))
+            (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Disputed p.card) 0 r) (err NeedsManager))
+-           (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 0 r) (err BadAmount))
+-           (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 300000 r) (err ExceedsRemaining)))))
++           (= (refund (Actor 1 Support) (Payment p.id p.amount p.amount Settled p.card) 0 r) (err BadAmount)))))
+ 
+   (always "A refund that is not refused stores the updated payment, with the amount added to what has been refunded and everything else unchanged, and the audit log records one RefundIssued event with the actor, the payment, the amount and the reason."
+     (forall ((a Actor) (p Payment) (m (Int 0 1000000000000)) (r ReasonCode))

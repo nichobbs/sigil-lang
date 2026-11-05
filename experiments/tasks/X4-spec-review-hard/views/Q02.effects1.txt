@@ -1,0 +1,32 @@
+# Glossary proposal edd500a47319
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+No change to observable effects (fixtures only).
+
+## Changes
+
+### CHANGED: always "A payment can be refunded in several parts, but never for more than it was paid. A refund is refused as ExceedsRemaining when it is more than what is left to refund, which is the amount of the payment minus everything already refunded. Refunding exactly what is left is allowed."
+tags: property   (needs: qa)
+before:
+```
+(always "A payment can be refunded in several parts, but never for more than it was paid. A refund is refused as ExceedsRemaining when it is more than what is left to refund, which is the amount of the payment minus everything already refunded. Refunding exactly what is left is allowed." (forall ((p Payment) (m (Int 1 1000000000000)) (r ReasonCode)) (or (> p.refunded p.amount) (= (= (refund (Actor 1 Admin) (Payment p.id p.amount p.refunded Settled p.card) m r) (err ExceedsRemaining)) (> m (sub p.amount p.refunded))))))
+```
+after:
+```
+(always "A payment can be refunded in several parts, but never for more than it was paid. A refund is refused as ExceedsRemaining when it is more than what is left to refund, which is the amount of the payment minus everything already refunded. Refunding exactly what is left is allowed." (forall ((p Payment) (m (Int 1 1000000000000)) (r ReasonCode)) (or (>= p.refunded 0) (= (= (refund (Actor 1 Admin) (Payment p.id p.amount p.refunded Settled p.card) m r) (err ExceedsRemaining)) (> m (sub p.amount p.refunded))))))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (property); one of: carol
+
+NOT READY: sign-off incomplete

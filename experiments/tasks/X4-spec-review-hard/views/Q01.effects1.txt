@@ -1,0 +1,32 @@
+# Glossary proposal eb9765a6c14b
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+No change to observable effects (fixtures only).
+
+## Changes
+
+### CHANGED: always "A single refund may not be more than the cap for the role of the actor. Refunding exactly the cap is allowed. The cap applies to each refund on its own, not to the running total refunded on the payment. A refund over the cap is refused as OverCap."
+tags: property   (needs: qa)
+before:
+```
+(always "A single refund may not be more than the cap for the role of the actor. Refunding exactly the cap is allowed. The cap applies to each refund on its own, not to the running total refunded on the payment. A refund over the cap is refused as OverCap." (forall ((m (Int 1 1000000000000)) (r ReasonCode)) (and (= (= (refund (Actor 1 Support) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 20000)) (= (= (refund (Actor 2 Manager) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 100000)) (= (= (refund (Actor 3 Admin) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 1000000)) (or (> m 20000) (not (= (refund (Actor 1 Support) (Payment 7 1000000000000 900000 Settled "0000") m r) (err OverCap)))))))
+```
+after:
+```
+(always "A single refund may not be more than the cap for the role of the actor. Refunding exactly the cap is allowed. The cap applies to each refund on its own, not to the running total refunded on the payment. A refund over the cap is refused as OverCap." (forall ((m (Int 1 1000000000000)) (r ReasonCode)) (and (= (= (refund (Actor 1 Support) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (>= m 20000)) (= (= (refund (Actor 2 Manager) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 100000)) (= (= (refund (Actor 3 Admin) (Payment 7 1000000000000 0 Settled "0000") m r) (err OverCap)) (> m 1000000)) (or (>= m 20000) (not (= (refund (Actor 1 Support) (Payment 7 1000000000000 900000 Settled "0000") m r) (err OverCap)))))))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (property); one of: carol
+
+NOT READY: sign-off incomplete

@@ -1,0 +1,43 @@
+# Glossary proposal a3dba7fdbc84
+
+0 added, 2 changed, 0 removed.
+
+## What this proposal would allow
+
+No change to observable effects (fixtures only).
+
+## Changes
+
+### CHANGED: then "an audit event records the refund of {amount:Money} as {reason:ReasonCode}"
+tags: sink-observation   (needs: privacy)
+before:
+```
+(then "an audit event records the refund of {amount:Money} as {reason:ReasonCode}" (expect (= (len (emitted audit)) 1)) (expect (= (map (emitted audit) (fn (e) e.actor)) (list actor.id))) (expect (= (map (emitted audit) (fn (e) e.payment)) (list payment.id))) (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount))) (expect (= (map (emitted audit) (fn (e) e.reason)) (list reason))))
+```
+after:
+```
+(then "an audit event records the refund of {amount:Money} as {reason:ReasonCode}" (expect (>= (len (emitted audit)) 1)) (expect (= (map (emitted audit) (fn (e) e.actor)) (list actor.id))) (expect (= (map (emitted audit) (fn (e) e.payment)) (list payment.id))) (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount))) (expect (= (map (emitted audit) (fn (e) e.reason)) (list reason))))
+```
+
+### CHANGED: then "an audit event records the refusal of {amount:Money} as {reason:ReasonCode} because {why:RefundError}"
+tags: sink-observation   (needs: privacy)
+before:
+```
+(then "an audit event records the refusal of {amount:Money} as {reason:ReasonCode} because {why:RefundError}" (expect (= (len (emitted audit)) 1)) (expect (= (map (emitted audit) (fn (e) e.actor)) (list actor.id))) (expect (= (map (emitted audit) (fn (e) e.payment)) (list payment.id))) (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount))) (expect (= (map (emitted audit) (fn (e) e.reason)) (list reason))) (expect (= (map (emitted audit) (fn (e) e.why)) (list why))))
+```
+after:
+```
+(then "an audit event records the refusal of {amount:Money} as {reason:ReasonCode} because {why:RefundError}" (expect (>= (len (emitted audit)) 1)) (expect (= (map (emitted audit) (fn (e) e.actor)) (list actor.id))) (expect (= (map (emitted audit) (fn (e) e.payment)) (list payment.id))) (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount))) (expect (= (map (emitted audit) (fn (e) e.reason)) (list reason))) (expect (= (map (emitted audit) (fn (e) e.why)) (list why))))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 2.
+- [ ] owner (every promotion); one of: nic
+- [ ] privacy (sink-observation); one of: alice
+
+NOT READY: sign-off incomplete

@@ -1,0 +1,10 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -105,6 +105,6 @@
+         (err e (not (= e StoreFailed))))))
+ 
+   (privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused."
+-    (source Payment.card)
++    (source Payment.id)
+     (allow store:payments)
+     (run refund)))

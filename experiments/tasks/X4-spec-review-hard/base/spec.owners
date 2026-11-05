@@ -1,0 +1,5 @@
+(owners
+  (owner nic)
+  (reviewers (privacy alice) (qa carol))
+  (require (privacy privacy) (declassified privacy) (privacy-allow privacy) (sink-observation privacy)
+           (removal qa) (property qa) (constant-change qa) (check-removed qa)))
