@@ -14,8 +14,8 @@ Name: `read-sexp` in Sigil, `run` in TypeScript. Parameter: `src` (`Source`), th
 
 | Type | Definition |
 |---|---|
-| `Source` | text of at most 120 characters (characters are Unicode code points) |
-| `Offset` | integer 0 to 120 |
+| `Source` | text of at most 200 characters (characters are Unicode code points) |
+| `Offset` | integer 0 to 200 |
 | `Index` | integer -1 to 59 (a position in the node list, or -1 for none) |
 | `NodeKind` | one of `Atom`, `Text`, `Form` |
 | `ReadError` | one of `Empty`, `Trailing`, `Unclosed`, `Stray`, `UnterminatedText`, `TooBig` |
