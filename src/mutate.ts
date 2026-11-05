@@ -107,7 +107,7 @@ export interface MutationReport {
   killedByScenarios: number;
   killedByContractsOnly: number;
   survivors: { id: number; fn: string; desc: string }[];
-  killed: string[]; // `${fn}: ${desc}` of every mutant some check killed (stable across glossaries for the same program)
+  killed: { id: number; fn: string; desc: string }[]; // every mutant some check killed; ids are stable across glossaries for the same program
 }
 
 export function runMutation(
@@ -123,7 +123,7 @@ export function runMutation(
   for (const m of ms) {
     const kill = (k: 'killedByChecker' | 'killedByScenarios' | 'killedByContractsOnly') => {
       rep[k]++;
-      rep.killed.push(`${m.fn}: ${m.desc}`);
+      rep.killed.push({ id: m.id, fn: m.fn, desc: m.desc });
     };
     try {
       const chk = check(m.prog, pol);

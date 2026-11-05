@@ -74,7 +74,7 @@ export function specMain(args: string[]): number {
           const run = (g: string) => runMutation(prog, pol, ft, (p) => parseGlossary(g, p), { propCases: 150, privacyCases: 40 });
           const b = run(base);
           const r = run(prop);
-          mutation = { total: b.total, baseKilled: b.killed.length, propKilled: r.killed.length, lost: b.killed.filter((k) => !r.killed.includes(k)) };
+          mutation = { total: b.total, baseKilled: b.killed.length, propKilled: r.killed.length, lost: b.killed.filter((k) => !r.killed.some((x) => x.id === k.id)).map((k) => `${k.fn}: ${k.desc}`) };
         }
         console.log(renderReview({ mutation, changes, cov, gate: gate(changes, owners, approvals, hash), hash, owners, policy: has('policy.sigil') ? sinkPolicy(read('policy.sigil')) : undefined, declared: has('policy.sigil') ? declaredDeclassifiers(read('policy.sigil')) : undefined }));
         return 0;
