@@ -1,0 +1,27 @@
+# Glossary proposal b87d728bb27e
+
+1 added, 0 changed, 0 removed.
+
+## What this proposal would allow
+
+No change to observable effects (fixtures only).
+
+## Changes
+
+### ADDED: given "a Disputed payment {id:Int} of {amount:Money} with nothing refunded on the card ending {card:Str}"
+tags: fixture
+after:
+```
+(given "a Disputed payment {id:Int} of {amount:Money} with nothing refunded on the card ending {card:Str}" (set payment (Payment id amount 0 Disputed card)))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+- unused phrase: given a Disputed payment {id:Int} of {amount:Money} with nothing refunded on the card ending {card:Str}
+
+## Sign-off
+
+Highest-risk changes: none.
+- [ ] owner (every promotion); one of: nic
+
+NOT READY: sign-off incomplete

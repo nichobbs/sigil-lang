@@ -1,0 +1,30 @@
+# Glossary proposal 1891f8a0e123
+
+1 added, 0 changed, 0 removed.
+
+## What this proposal would allow
+
+- + asserts a property over generated inputs
+
+## Changes
+
+### ADDED: always "A Voided payment is refused as NotRefundable even when the amount is 0."
+tags: property   (needs: qa)
+effects:
+  + asserts a property over generated inputs
+after:
+```
+(always "A Voided payment is refused as NotRefundable even when the amount is 0." (forall ((a Actor) (p Payment) (r ReasonCode)) (= (refund a (Payment p.id p.amount p.refunded Voided p.card) 0 r) (err NotRefundable))))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+- NOT IN FEATURE: always A Voided payment is refused as NotRefundable even when the amount is 0.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] qa (property); one of: carol
+
+NOT READY: sign-off incomplete

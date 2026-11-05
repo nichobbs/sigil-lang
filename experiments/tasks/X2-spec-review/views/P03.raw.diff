@@ -1,0 +1,8 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -107,4 +107,5 @@
+   (privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused."
+     (source Payment.card)
+     (allow store:payments)
++    (declassified digit-checksum)
+     (run refund)))

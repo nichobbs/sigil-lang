@@ -1,0 +1,34 @@
+# Glossary proposal 9e795c55f598
+
+0 added, 1 changed, 0 removed.
+
+## What this proposal would allow
+
+- + exempts declassifier(s) digit-checksum from the privacy check
+
+## Changes
+
+### CHANGED: privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused."
+tags: declassified, privacy, privacy-allow   (needs: privacy)
+effects:
+  + exempts declassifier(s) digit-checksum from the privacy check
+before:
+```
+(privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused." (source Payment.card) (allow store:payments) (run refund))
+```
+after:
+```
+(privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused." (source Payment.card) (allow store:payments) (declassified digit-checksum) (run refund))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+Every step is bound, every phrase is used, every property paragraph is in the feature.
+
+## Sign-off
+
+Highest-risk changes: 1.
+- [ ] owner (every promotion); one of: nic
+- [ ] privacy (declassified, privacy, privacy-allow); one of: alice
+
+NOT READY: sign-off incomplete

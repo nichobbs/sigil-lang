@@ -1,0 +1,3 @@
+# Glossary proposal 4b08d65f8b85
+
+No differences from glossary.sigil.

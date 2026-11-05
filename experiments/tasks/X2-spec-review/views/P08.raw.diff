@@ -1,0 +1,13 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -104,6 +104,10 @@
+         (ok x true)
+         (err e (not (= e StoreFailed))))))
+ 
++  (always "A Voided payment is refused as NotRefundable even when the amount is 0."
++    (forall ((a Actor) (p Payment) (r ReasonCode))
++      (= (refund a (Payment p.id p.amount p.refunded Voided p.card) 0 r) (err NotRefundable))))
++
+   (privacy "The card's last four digits are stored with the payment but never appear in the audit log, whether the refund is made or refused."
+     (source Payment.card)
+     (allow store:payments)

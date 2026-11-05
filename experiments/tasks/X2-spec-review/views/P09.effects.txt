@@ -1,0 +1,27 @@
+# Glossary proposal 46d58a9fec5f
+
+1 added, 0 changed, 0 removed.
+
+## What this proposal would allow
+
+No change to observable effects (fixtures only).
+
+## Changes
+
+### ADDED: given "an actor {id:Int} acting as {role:Role}"
+tags: fixture
+after:
+```
+(given "an actor {id:Int} acting as {role:Role}" (set actor (Actor id role)))
+```
+
+## Coverage against the feature file (approximate; verify is exact)
+
+- unused phrase: given an actor {id:Int} acting as {role:Role}
+
+## Sign-off
+
+Highest-risk changes: none.
+- [ ] owner (every promotion); one of: nic
+
+NOT READY: sign-off incomplete

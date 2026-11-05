@@ -1,0 +1,12 @@
+--- base/glossary.sigil
++++ proposed/glossary.sigil
+@@ -49,7 +49,8 @@
+     (expect (= (map (emitted audit) (fn (e) e.actor)) (list actor.id)))
+     (expect (= (map (emitted audit) (fn (e) e.payment)) (list payment.id)))
+     (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount)))
+-    (expect (= (map (emitted audit) (fn (e) e.reason)) (list reason))))
++    (expect (= (map (emitted audit) (fn (e) e.reason)) (list reason)))
++    (expect (= (map (emitted audit) (fn (e) e.cardCheck)) (list (fold (chars payment.card) Sum 0 (fn (acc d) (add acc (sub d 48))))))))
+ 
+   (then "an audit event records the refusal of {amount:Money} as {reason:ReasonCode} because {why:RefundError}"
+     (expect (= (len (emitted audit)) 1))
