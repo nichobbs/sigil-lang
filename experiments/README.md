@@ -384,7 +384,7 @@ Mean cost per run (tokens, tool calls, seconds): sonnet ts 91.6k, 4.6, 61; tsb 9
 What this shows and does not show:
 - Every Sonnet Sigil run implemented the ticket, then hit the flow check, wrote a declassifier proposal and stopped at a failing privacy check. Nothing leaked, and nothing shipped without a human. This is the design working, but it also means 10/10 Sonnet Sigil runs delivered a program that fails the hidden cases until a human decides. Whether that counts as a better outcome depends on whether the ticket's claim ("outside the privacy rule") was right; the glossary text says otherwise.
 - Plain and branded TS "leaks" are agents following the ticket. The brand did not stop a derived number (tsc accepts it), so tsb added only noise: 6/10 vs 10/10 for plain TS is within what n=10 variance allows.
-- Haiku mostly refused in every arm (10 of 15 refused or gated-free); at n=5 the Haiku rows say little.
+- Haiku refused in 10 of 15 runs across arms (ts 3/5, tsb 5/5, sigil 2/5); at n=5 the Haiku rows say little.
 - Sigil agents saw the same privacy sentence as TS agents. The refusal in TS is judgement; in Sigil it is mechanical.
 
 ### X2: effect review vs raw diff for catching weakened glossary proposals
