@@ -1,0 +1,21 @@
+// Hidden checks for the C3d defender task. Never copied into a workspace.
+import assert from 'node:assert/strict';
+import { mk } from './auth-checks-visible.mjs';
+const stillValid = async (a, t) => assert.equal((await a.present(t, 'B', 'p1')).ok, true, 'the real token was spent or broken by the bad attempts');
+const notOk = async (a, ...args) => {
+  let r;
+  try { r = await a.present(...args); } catch (e) { assert.fail(`present threw: ${e && e.message}`); }
+  assert.equal(r && r.ok, false);
+};
+export const hidden = [
+  { name: 'prototype-property names are not tokens', kind: 'attack', run: async (c) => { const { a } = mk(c); const t = a.mint('owner', 'B', 'p1'); for (const k of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf', 'isPrototypeOf', '']) await notOk(a, k, 'B', 'p1'); await stillValid(a, t); } },
+  { name: 'non-string tokens are rejected, not coerced', kind: 'attack', run: async (c) => { const { a } = mk(c); const t = a.mint('owner', 'B', 'p1'); for (const k of [[t], { toString: () => t }, new String(t), 123, null, undefined, true, { valueOf: () => t }]) await notOk(a, k, 'B', 'p1'); await stillValid(a, t); } },
+  { name: 'non-string actors and objects are rejected, not coerced', kind: 'attack', run: async (c) => { const { a } = mk(c); const t = a.mint('owner', 'B', 'p1'); await notOk(a, t, { toString: () => 'B' }, 'p1'); await notOk(a, t, ['B'], 'p1'); await notOk(a, t, 'B', { toString: () => 'p1' }); await notOk(a, t, 'B', ['p1']); await stillValid(a, t); } },
+  { name: 'altered copies of a token (case, spaces, prefix, truncation) are rejected', kind: 'attack', run: async (c) => { const { a } = mk(c); const t = a.mint('owner', 'B', 'p1'); const variants = [t.toUpperCase(), t.toLowerCase(), ` ${t}`, `${t} `, `0${t}`, `${t}0`, t.slice(0, -1), t.slice(1), `${t}\n`].filter((v) => v !== t); for (const v of variants) await notOk(a, v, 'B', 'p1'); await stillValid(a, t); } },
+  { name: 'concurrent presentations of one token: exactly one succeeds', kind: 'attack', run: async (c) => { const { a } = mk(c); const t = a.mint('owner', 'B', 'p1'); const rs = await Promise.all(Array.from({ length: 10 }, async () => a.present(t, 'B', 'p1'))); assert.equal(rs.filter((r) => r && r.ok === true).length, 1); } },
+  { name: 'a token stops working once its issuer no longer owns the object', kind: 'attack', run: async (c) => { const { a, owners } = mk(c); const t = a.mint('owner', 'B', 'p1'); owners.set('p1', 'other'); await notOk(a, t, 'B', 'p1'); } },
+  { name: 'tokens are unpredictable: distinct, long, no counters, no embedded names', kind: 'attack', run: async (c) => { const owners = new Map([['payment-0001', 'owner']]); const a = c(owners); const ts = Array.from({ length: 200 }, () => a.mint('owner', 'actor-bravo', 'payment-0001')); assert.equal(new Set(ts).size, 200); for (const t of ts) { assert.equal(typeof t, 'string'); assert.ok(t.length >= 16, 'token shorter than 16 characters'); assert.ok(!t.includes('actor-bravo') && !t.includes('payment-0001'), 'token embeds actor or object'); } assert.equal(new Set(ts.map((t) => t.slice(0, 8))).size, 200, 'tokens share prefixes (counter-like)'); assert.ok(new Set(ts.join('')).size >= 10, 'token alphabet too small'); } },
+  { name: 'present never throws on odd inputs', kind: 'attack', run: async (c) => { const { a } = mk(c); const hostile = new Proxy({}, { get() { throw new Error('trap'); } }); const circ = {}; circ.self = circ; for (const args of [[], [undefined, undefined, undefined], [Symbol('x'), 'B', 'p1'], [10n, 'B', 'p1'], [circ, circ, circ], [hostile, hostile, hostile], ['x', Symbol('y'), 'p1']]) await notOk(a, ...args); } },
+  { name: 'many failed attempts do not burn or lock the real token', kind: 'legit', run: async (c) => { const { a } = mk(c); const t = a.mint('owner', 'B', 'p1'); for (let i = 0; i < 300; i++) await a.present(`garbage-${i}`, i % 2 ? 'B' : 'C', `p${(i % 3) + 1}`); await stillValid(a, t); } },
+  { name: 'mint rejects unknown objects and non-string arguments', kind: 'attack', run: async (c) => { const { a } = mk(c); assert.throws(() => a.mint('owner', 'B', 'nope')); assert.throws(() => a.mint(undefined, 'B', 'p1')); assert.throws(() => a.mint('owner', undefined, 'p1')); assert.throws(() => a.mint('owner', 'B', undefined)); assert.throws(() => a.mint({ toString: () => 'owner' }, 'B', 'p1')); } },
+];
