@@ -47,10 +47,10 @@ jobs:
           # No review file, or no verdict on its first line, is a failure (the gate fails closed).
           if [ ! -s review.md ]; then echo "::error::The reviewer wrote no review.md."; exit 1; fi
           gh pr comment "${{ github.event.pull_request.number }}" --body-file review.md
-          first=$(head -n1 review.md)
+          first=$(head -n1 review.md | tr -d '\r' | sed 's/[[:space:]]*$//')
           echo "verdict line: $first"
           case "$first" in
-            *"VERDICT: APPROVE"*) exit 0 ;;
-            *"VERDICT: REQUEST CHANGES"*) echo "::error::The reviewer reported blocking findings."; exit 1 ;;
+            "VERDICT: APPROVE") exit 0 ;;
+            "VERDICT: REQUEST CHANGES") echo "::error::The reviewer reported blocking findings."; exit 1 ;;
             *) echo "::error::No verdict on the first line of review.md."; exit 1 ;;
           esac
