@@ -54,6 +54,7 @@ For each added, changed or removed entry:
 - **Effects**, derived from the S-expression structure and diffed before and after. Examples: `observes emitted audit`, `builds RefundIssued(actor.id payment.id amount reason (digit-sum payment.card))`, `exempts declassifier(s) card-band from the privacy check`, `injects failure store:payments put`. A constructor counts only inside `expect`, where it is compared with something observed, not in fixtures or generated inputs.
 - **Before and after source** for anyone who wants to read it.
 - **Coverage** against the feature file: steps no phrase binds, phrases nothing uses, property paragraphs missing from the feature. This is an approximation (placeholders match anything); `verify` is the exact check.
+- **Mutation regression** (opt-in, `sigil spec review DIR --mutation`, needs `app.sigil`, `policy.sigil` and a `.feature` in DIR): mutants of the app that the current glossary kills and the proposal does not. It sees weakenings that let a wrong implementation through. It does not see weakenings no mutant exercises (extra emits, tautologies, narrower domains). Slow: two full mutation runs.
 - **Sign-off state**: who is required and why, who has signed, approvals that were ignored and the reason.
 
 ## Sign-off rules (`spec.owners`)

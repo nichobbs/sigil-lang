@@ -107,6 +107,7 @@ export interface MutationReport {
   killedByScenarios: number;
   killedByContractsOnly: number;
   survivors: { id: number; fn: string; desc: string }[];
+  killed: { id: number; fn: string; desc: string }[]; // every mutant some check killed; ids are stable across glossaries for the same program
 }
 
 export function runMutation(
@@ -117,29 +118,33 @@ export function runMutation(
   opts: Pick<SuiteOptions, 'propCases' | 'privacyCases'> = { propCases: 150, privacyCases: 40 },
 ): MutationReport {
   const ms = enumerateMutants(prog);
-  const rep: MutationReport = { total: ms.length, killedByChecker: 0, killedByScenarios: 0, killedByContractsOnly: 0, survivors: [] };
+  const rep: MutationReport = { total: ms.length, killedByChecker: 0, killedByScenarios: 0, killedByContractsOnly: 0, survivors: [], killed: [] };
   const failing = (rs: { status: string }[]) => rs.some((r) => r.status !== 'pass');
   for (const m of ms) {
+    const kill = (k: 'killedByChecker' | 'killedByScenarios' | 'killedByContractsOnly') => {
+      rep[k]++;
+      rep.killed.push({ id: m.id, fn: m.fn, desc: m.desc });
+    };
     try {
       const chk = check(m.prog, pol);
       if (errors(chk).length) {
-        rep.killedByChecker++;
+        kill('killedByChecker');
         continue;
       }
       const g = glossaryFor(m.prog);
       const noContracts = runSuite(m.prog, feature, g, chk, { ...opts, contracts: false });
       if (failing(noContracts.results)) {
-        rep.killedByScenarios++;
+        kill('killedByScenarios');
         continue;
       }
       const withContracts = runSuite(m.prog, feature, g, chk, { ...opts, contracts: true });
       if (failing(withContracts.results)) {
-        rep.killedByContractsOnly++;
+        kill('killedByContractsOnly');
         continue;
       }
       rep.survivors.push({ id: m.id, fn: m.fn, desc: m.desc });
     } catch {
-      rep.killedByScenarios++; // crashes count as detected
+      kill('killedByScenarios'); // crashes count as detected
     }
   }
   return rep;
