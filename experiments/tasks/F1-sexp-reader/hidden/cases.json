@@ -1,0 +1,3863 @@
+{
+ "entry": "read-sexp",
+ "cases": [
+  {
+   "name": "single atom",
+   "args": {
+    "src": "hello"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 0,
+       "end": 5,
+       "arity": 0,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "atom with surrounding whitespace",
+   "args": {
+    "src": "  \t hello \n"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 9,
+       "arity": 0,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "empty form",
+   "args": {
+    "src": "()"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 2,
+       "arity": 0,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "nested empty forms",
+   "args": {
+    "src": "(()())"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Form",
+       "start": 1,
+       "end": 3,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 3,
+       "end": 5,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 6,
+       "arity": 2,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "form with atoms",
+   "args": {
+    "src": "(a b c)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 3,
+       "end": 4,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 6,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 7,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "nested forms",
+   "args": {
+    "src": "(add 1 (mul 2 3))"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 4,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 6,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 8,
+       "end": 11,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 12,
+       "end": 13,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 14,
+       "end": 15,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 7,
+       "end": 16,
+       "arity": 3,
+       "parent": 6
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 17,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "deeply nested",
+   "args": {
+    "src": "((((a))))"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 5,
+       "arity": 0,
+       "parent": 1
+      },
+      {
+       "kind": "Form",
+       "start": 3,
+       "end": 6,
+       "arity": 1,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 2,
+       "end": 7,
+       "arity": 1,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 1,
+       "end": 8,
+       "arity": 1,
+       "parent": 4
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 9,
+       "arity": 1,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "text node",
+   "args": {
+    "src": "\"a (b) ; c\""
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 0,
+       "end": 11,
+       "arity": 0,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "text with newline",
+   "args": {
+    "src": "(\"a\nb\" c)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 1,
+       "end": 6,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 8,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 9,
+       "arity": 2,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "empty text",
+   "args": {
+    "src": "\"\""
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 0,
+       "end": 2,
+       "arity": 0,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "comment inside form",
+   "args": {
+    "src": "(a ; c)\n b)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 9,
+       "end": 10,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 11,
+       "arity": 2,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "comment at end of line then close",
+   "args": {
+    "src": "(a ;x\n)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 1
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 7,
+       "arity": 1,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "atom stops at quote",
+   "args": {
+    "src": "(a\"b\"c)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Text",
+       "start": 2,
+       "end": 5,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 6,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 7,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "atom stops at paren",
+   "args": {
+    "src": "(ab(cd)ef)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 3,
+       "arity": 0,
+       "parent": 4
+      },
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 6,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 3,
+       "end": 7,
+       "arity": 1,
+       "parent": 4
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 9,
+       "arity": 0,
+       "parent": 4
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 10,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "semicolon ends atom",
+   "args": {
+    "src": "(ab;cd\nef)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 3,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 9,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 10,
+       "arity": 2,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unicode atoms count characters",
+   "args": {
+    "src": "(héllo wörld)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 6,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 12,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 13,
+       "arity": 2,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unicode in text",
+   "args": {
+    "src": "(\"日本語\" x)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 1,
+       "end": 6,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 8,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 9,
+       "arity": 2,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "tab and newline separators",
+   "args": {
+    "src": "(a\tb\nc)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 3,
+       "end": 4,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 6,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 7,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "only comment",
+   "args": {
+    "src": "; nothing"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Empty"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "empty source",
+   "args": {
+    "src": ""
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Empty"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "only spaces",
+   "args": {
+    "src": "   "
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Empty"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "stray close at start",
+   "args": {
+    "src": ")"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Stray"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "stray close after form",
+   "args": {
+    "src": "(a))"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Stray"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "trailing atom after form",
+   "args": {
+    "src": "(a) b"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Trailing"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "trailing form after atom",
+   "args": {
+    "src": "a (b)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Trailing"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "two atoms",
+   "args": {
+    "src": "a b"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Trailing"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "trailing text",
+   "args": {
+    "src": "(a) \"x\""
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Trailing"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unclosed simple",
+   "args": {
+    "src": "(a"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Unclosed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unclosed nested",
+   "args": {
+    "src": "(a (b)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Unclosed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unclosed with comment",
+   "args": {
+    "src": "(a ; ) \n"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Unclosed"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unterminated text",
+   "args": {
+    "src": "\"abc"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "UnterminatedText"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unterminated text inside form",
+   "args": {
+    "src": "(a \"b)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "UnterminatedText"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "stray before unterminated",
+   "args": {
+    "src": ") \"x"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Stray"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "trailing before unclosed",
+   "args": {
+    "src": "a (b"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Trailing"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "unterminated before trailing check",
+   "args": {
+    "src": "(a) \"x"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "Trailing"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "exactly 60 nodes",
+   "args": {
+    "src": "(a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 3,
+       "end": 4,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 6,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 8,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 9,
+       "end": 10,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 11,
+       "end": 12,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 13,
+       "end": 14,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 15,
+       "end": 16,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 17,
+       "end": 18,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 19,
+       "end": 20,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 21,
+       "end": 22,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 23,
+       "end": 24,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 25,
+       "end": 26,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 27,
+       "end": 28,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 29,
+       "end": 30,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 31,
+       "end": 32,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 33,
+       "end": 34,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 35,
+       "end": 36,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 37,
+       "end": 38,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 39,
+       "end": 40,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 41,
+       "end": 42,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 43,
+       "end": 44,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 45,
+       "end": 46,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 47,
+       "end": 48,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 49,
+       "end": 50,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 51,
+       "end": 52,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 53,
+       "end": 54,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 55,
+       "end": 56,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 57,
+       "end": 58,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 59,
+       "end": 60,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 61,
+       "end": 62,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 63,
+       "end": 64,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 65,
+       "end": 66,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 67,
+       "end": 68,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 69,
+       "end": 70,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 71,
+       "end": 72,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 73,
+       "end": 74,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 75,
+       "end": 76,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 77,
+       "end": 78,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 79,
+       "end": 80,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 81,
+       "end": 82,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 83,
+       "end": 84,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 85,
+       "end": 86,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 87,
+       "end": 88,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 89,
+       "end": 90,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 91,
+       "end": 92,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 93,
+       "end": 94,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 95,
+       "end": 96,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 97,
+       "end": 98,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 99,
+       "end": 100,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 101,
+       "end": 102,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 103,
+       "end": 104,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 105,
+       "end": 106,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 107,
+       "end": 108,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 109,
+       "end": 110,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 111,
+       "end": 112,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 113,
+       "end": 114,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 115,
+       "end": 116,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 117,
+       "end": 118,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 120,
+       "arity": 59,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "61 nodes is TooBig",
+   "args": {
+    "src": "(a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "TooBig"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "60 nested atoms inside two forms",
+   "args": {
+    "src": "(a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a (b))"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 3,
+       "end": 4,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 6,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 8,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 9,
+       "end": 10,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 11,
+       "end": 12,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 13,
+       "end": 14,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 15,
+       "end": 16,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 17,
+       "end": 18,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 19,
+       "end": 20,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 21,
+       "end": 22,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 23,
+       "end": 24,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 25,
+       "end": 26,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 27,
+       "end": 28,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 29,
+       "end": 30,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 31,
+       "end": 32,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 33,
+       "end": 34,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 35,
+       "end": 36,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 37,
+       "end": 38,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 39,
+       "end": 40,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 41,
+       "end": 42,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 43,
+       "end": 44,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 45,
+       "end": 46,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 47,
+       "end": 48,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 49,
+       "end": 50,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 51,
+       "end": 52,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 53,
+       "end": 54,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 55,
+       "end": 56,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 57,
+       "end": 58,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 59,
+       "end": 60,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 61,
+       "end": 62,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 63,
+       "end": 64,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 65,
+       "end": 66,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 67,
+       "end": 68,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 69,
+       "end": 70,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 71,
+       "end": 72,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 73,
+       "end": 74,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 75,
+       "end": 76,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 77,
+       "end": 78,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 79,
+       "end": 80,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 81,
+       "end": 82,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 83,
+       "end": 84,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 85,
+       "end": 86,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 87,
+       "end": 88,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 89,
+       "end": 90,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 91,
+       "end": 92,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 93,
+       "end": 94,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 95,
+       "end": 96,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 97,
+       "end": 98,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 99,
+       "end": 100,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 101,
+       "end": 102,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 103,
+       "end": 104,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 105,
+       "end": 106,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 107,
+       "end": 108,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 109,
+       "end": 110,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 111,
+       "end": 112,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 113,
+       "end": 114,
+       "arity": 0,
+       "parent": 59
+      },
+      {
+       "kind": "Atom",
+       "start": 116,
+       "end": 117,
+       "arity": 0,
+       "parent": 58
+      },
+      {
+       "kind": "Form",
+       "start": 115,
+       "end": 118,
+       "arity": 1,
+       "parent": 59
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 119,
+       "arity": 58,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "TooBig reported before a later Stray",
+   "args": {
+    "src": "(a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a ))"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "TooBig"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "TooBig reported before Unclosed",
+   "args": {
+    "src": "(a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a "
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "err": "TooBig"
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "120 characters exactly",
+   "args": {
+    "src": "(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 119,
+       "arity": 0,
+       "parent": 1
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 120,
+       "arity": 1,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "wide siblings parent indexes",
+   "args": {
+    "src": "(a (b c) (d (e f)) g)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 5,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 6,
+       "end": 7,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 3,
+       "end": 8,
+       "arity": 2,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 10,
+       "end": 11,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 13,
+       "end": 14,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 15,
+       "end": 16,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Form",
+       "start": 12,
+       "end": 17,
+       "arity": 2,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 9,
+       "end": 18,
+       "arity": 2,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 19,
+       "end": 20,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 21,
+       "arity": 4,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "arity counts only direct children",
+   "args": {
+    "src": "((a b) (c d e) f)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 2,
+       "end": 3,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 5,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 1,
+       "end": 6,
+       "arity": 2,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 8,
+       "end": 9,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 10,
+       "end": 11,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 12,
+       "end": 13,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Form",
+       "start": 7,
+       "end": 14,
+       "arity": 3,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 15,
+       "end": 16,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 17,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 0",
+   "args": {
+    "src": "(a\t (a)aa\"te st\"\n\"te st\" \"te st\")"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 6,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 4,
+       "end": 7,
+       "arity": 1,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 7,
+       "end": 9,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Text",
+       "start": 9,
+       "end": 16,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Text",
+       "start": 17,
+       "end": 24,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Text",
+       "start": 25,
+       "end": 32,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 33,
+       "arity": 6,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 1",
+   "args": {
+    "src": "(\t () \n x-y (a)(a b) ; c\n \"t\"; c\n )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Form",
+       "start": 3,
+       "end": 5,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 8,
+       "end": 11,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 13,
+       "end": 14,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 12,
+       "end": 15,
+       "arity": 1,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 16,
+       "end": 17,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 18,
+       "end": 19,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Form",
+       "start": 15,
+       "end": 20,
+       "arity": 2,
+       "parent": 8
+      },
+      {
+       "kind": "Text",
+       "start": 26,
+       "end": 29,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 35,
+       "arity": 5,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 2",
+   "args": {
+    "src": "((a b)\"te st\"bb\"t\"1 \tx-y   (a b)(a b))"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 2,
+       "end": 3,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 5,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 1,
+       "end": 6,
+       "arity": 2,
+       "parent": 14
+      },
+      {
+       "kind": "Text",
+       "start": 6,
+       "end": 13,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 13,
+       "end": 15,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Text",
+       "start": 15,
+       "end": 18,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 18,
+       "end": 19,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 21,
+       "end": 24,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 28,
+       "end": 29,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 30,
+       "end": 31,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Form",
+       "start": 27,
+       "end": 32,
+       "arity": 2,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 33,
+       "end": 34,
+       "arity": 0,
+       "parent": 13
+      },
+      {
+       "kind": "Atom",
+       "start": 35,
+       "end": 36,
+       "arity": 0,
+       "parent": 13
+      },
+      {
+       "kind": "Form",
+       "start": 32,
+       "end": 37,
+       "arity": 2,
+       "parent": 14
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 38,
+       "arity": 8,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 3",
+   "args": {
+    "src": "(  (a) \t  1 \"te st\"bb(a) \"te st\"  )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 5,
+       "arity": 0,
+       "parent": 1
+      },
+      {
+       "kind": "Form",
+       "start": 3,
+       "end": 6,
+       "arity": 1,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 10,
+       "end": 11,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Text",
+       "start": 12,
+       "end": 19,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 19,
+       "end": 21,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 22,
+       "end": 23,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Form",
+       "start": 21,
+       "end": 24,
+       "arity": 1,
+       "parent": 8
+      },
+      {
+       "kind": "Text",
+       "start": 25,
+       "end": 32,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 35,
+       "arity": 6,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 4",
+   "args": {
+    "src": "(a ()x-y \t (a) \n\"te st\" \"t\" \"t\" (a b) bb (a))"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Form",
+       "start": 3,
+       "end": 5,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 8,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 12,
+       "end": 13,
+       "arity": 0,
+       "parent": 4
+      },
+      {
+       "kind": "Form",
+       "start": 11,
+       "end": 14,
+       "arity": 1,
+       "parent": 14
+      },
+      {
+       "kind": "Text",
+       "start": 16,
+       "end": 23,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Text",
+       "start": 24,
+       "end": 27,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Text",
+       "start": 28,
+       "end": 31,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 33,
+       "end": 34,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 35,
+       "end": 36,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Form",
+       "start": 32,
+       "end": 37,
+       "arity": 2,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 38,
+       "end": 40,
+       "arity": 0,
+       "parent": 14
+      },
+      {
+       "kind": "Atom",
+       "start": 42,
+       "end": 43,
+       "arity": 0,
+       "parent": 13
+      },
+      {
+       "kind": "Form",
+       "start": 41,
+       "end": 44,
+       "arity": 1,
+       "parent": 14
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 45,
+       "arity": 10,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 5",
+   "args": {
+    "src": "((a) bb (a) \t bb a   )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 2,
+       "end": 3,
+       "arity": 0,
+       "parent": 1
+      },
+      {
+       "kind": "Form",
+       "start": 1,
+       "end": 4,
+       "arity": 1,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 5,
+       "end": 7,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 9,
+       "end": 10,
+       "arity": 0,
+       "parent": 4
+      },
+      {
+       "kind": "Form",
+       "start": 8,
+       "end": 11,
+       "arity": 1,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 14,
+       "end": 16,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 17,
+       "end": 18,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 22,
+       "arity": 5,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 6",
+   "args": {
+    "src": "((a) ; c\n (a) a x-y\"te st\"bbbb \t(a) )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 2,
+       "end": 3,
+       "arity": 0,
+       "parent": 1
+      },
+      {
+       "kind": "Form",
+       "start": 1,
+       "end": 4,
+       "arity": 1,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 11,
+       "end": 12,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 10,
+       "end": 13,
+       "arity": 1,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 14,
+       "end": 15,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 16,
+       "end": 19,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Text",
+       "start": 19,
+       "end": 26,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 26,
+       "end": 30,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 33,
+       "end": 34,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Form",
+       "start": 32,
+       "end": 35,
+       "arity": 1,
+       "parent": 10
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 37,
+       "arity": 7,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 7",
+   "args": {
+    "src": "(; c\n\"t\" \n \n\"t\" (a b)\n a)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 5,
+       "end": 8,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Text",
+       "start": 12,
+       "end": 15,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 17,
+       "end": 18,
+       "arity": 0,
+       "parent": 4
+      },
+      {
+       "kind": "Atom",
+       "start": 19,
+       "end": 20,
+       "arity": 0,
+       "parent": 4
+      },
+      {
+       "kind": "Form",
+       "start": 16,
+       "end": 21,
+       "arity": 2,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 23,
+       "end": 24,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 25,
+       "arity": 4,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 8",
+   "args": {
+    "src": "(bb\t ; c\n1\"t\"; c\n\"t\"; c\n \"t\" )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 3,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 9,
+       "end": 10,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Text",
+       "start": 10,
+       "end": 13,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Text",
+       "start": 17,
+       "end": 20,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Text",
+       "start": 25,
+       "end": 28,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 30,
+       "arity": 5,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 9",
+   "args": {
+    "src": "(1x-y\t \tbb \"te st\"(a b) \"te st\" a \"t\" \t )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 5,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 8,
+       "end": 10,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Text",
+       "start": 11,
+       "end": 18,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 19,
+       "end": 20,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 21,
+       "end": 22,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 18,
+       "end": 23,
+       "arity": 2,
+       "parent": 9
+      },
+      {
+       "kind": "Text",
+       "start": 24,
+       "end": 31,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 32,
+       "end": 33,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Text",
+       "start": 34,
+       "end": 37,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 41,
+       "arity": 7,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 10",
+   "args": {
+    "src": "(; c\n ; c\n bb 1   1 )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 11,
+       "end": 13,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 14,
+       "end": 15,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 18,
+       "end": 19,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 21,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 11",
+   "args": {
+    "src": "(\t \"te st\" (a b) 1 \t \"te st\"(a b)(a)aa)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 3,
+       "end": 10,
+       "arity": 0,
+       "parent": 12
+      },
+      {
+       "kind": "Atom",
+       "start": 12,
+       "end": 13,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 14,
+       "end": 15,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 11,
+       "end": 16,
+       "arity": 2,
+       "parent": 12
+      },
+      {
+       "kind": "Atom",
+       "start": 17,
+       "end": 18,
+       "arity": 0,
+       "parent": 12
+      },
+      {
+       "kind": "Text",
+       "start": 21,
+       "end": 28,
+       "arity": 0,
+       "parent": 12
+      },
+      {
+       "kind": "Atom",
+       "start": 29,
+       "end": 30,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 31,
+       "end": 32,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 28,
+       "end": 33,
+       "arity": 2,
+       "parent": 12
+      },
+      {
+       "kind": "Atom",
+       "start": 34,
+       "end": 35,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Form",
+       "start": 33,
+       "end": 36,
+       "arity": 1,
+       "parent": 12
+      },
+      {
+       "kind": "Atom",
+       "start": 36,
+       "end": 38,
+       "arity": 0,
+       "parent": 12
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 39,
+       "arity": 7,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 12",
+   "args": {
+    "src": "(\"te st\"      ax-y11 a\tbb a a)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 1,
+       "end": 8,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 14,
+       "end": 20,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 21,
+       "end": 22,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 23,
+       "end": 25,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 26,
+       "end": 27,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 28,
+       "end": 29,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 30,
+       "arity": 6,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 13",
+   "args": {
+    "src": "( \t1 () 1(a b) \"t\"  ())"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 3,
+       "end": 4,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 5,
+       "end": 7,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 8,
+       "end": 9,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Atom",
+       "start": 10,
+       "end": 11,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 12,
+       "end": 13,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 9,
+       "end": 14,
+       "arity": 2,
+       "parent": 8
+      },
+      {
+       "kind": "Text",
+       "start": 15,
+       "end": 18,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 20,
+       "end": 22,
+       "arity": 0,
+       "parent": 8
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 23,
+       "arity": 6,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 14",
+   "args": {
+    "src": "(; c\n\n \t (a)x-y x-y \n \n a; c\n(a b)\"te st\" )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 10,
+       "end": 11,
+       "arity": 0,
+       "parent": 1
+      },
+      {
+       "kind": "Form",
+       "start": 9,
+       "end": 12,
+       "arity": 1,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 12,
+       "end": 15,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 16,
+       "end": 19,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 24,
+       "end": 25,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 30,
+       "end": 31,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 32,
+       "end": 33,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Form",
+       "start": 29,
+       "end": 34,
+       "arity": 2,
+       "parent": 9
+      },
+      {
+       "kind": "Text",
+       "start": 34,
+       "end": 41,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 43,
+       "arity": 6,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 15",
+   "args": {
+    "src": "(a bba; c\n; c\n 1\"te st\" x-y)"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 1,
+       "end": 2,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 3,
+       "end": 6,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 15,
+       "end": 16,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Text",
+       "start": 16,
+       "end": 23,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 24,
+       "end": 27,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 28,
+       "arity": 5,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 16",
+   "args": {
+    "src": "(\"te st\"\"t\" \"te st\"(a b) 1(a b)  )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Text",
+       "start": 1,
+       "end": 8,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Text",
+       "start": 8,
+       "end": 11,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Text",
+       "start": 12,
+       "end": 19,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 20,
+       "end": 21,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 22,
+       "end": 23,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 19,
+       "end": 24,
+       "arity": 2,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 25,
+       "end": 26,
+       "arity": 0,
+       "parent": 10
+      },
+      {
+       "kind": "Atom",
+       "start": 27,
+       "end": 28,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Atom",
+       "start": 29,
+       "end": 30,
+       "arity": 0,
+       "parent": 9
+      },
+      {
+       "kind": "Form",
+       "start": 26,
+       "end": 31,
+       "arity": 2,
+       "parent": 10
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 34,
+       "arity": 6,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 17",
+   "args": {
+    "src": "(; c\n x-ybb (a b)1 \t ; c\n )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 6,
+       "end": 11,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 13,
+       "end": 14,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Atom",
+       "start": 15,
+       "end": 16,
+       "arity": 0,
+       "parent": 3
+      },
+      {
+       "kind": "Form",
+       "start": 12,
+       "end": 17,
+       "arity": 2,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 17,
+       "end": 18,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 27,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 18",
+   "args": {
+    "src": "(\t  a     \n 1\"te st\"1a \n (a b) )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 4,
+       "end": 5,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 12,
+       "end": 13,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Text",
+       "start": 13,
+       "end": 20,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 20,
+       "end": 22,
+       "arity": 0,
+       "parent": 7
+      },
+      {
+       "kind": "Atom",
+       "start": 26,
+       "end": 27,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Atom",
+       "start": 28,
+       "end": 29,
+       "arity": 0,
+       "parent": 6
+      },
+      {
+       "kind": "Form",
+       "start": 25,
+       "end": 30,
+       "arity": 2,
+       "parent": 7
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 32,
+       "arity": 5,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  },
+  {
+   "name": "random form 19",
+   "args": {
+    "src": "(  \t (a b) a1bb\"te st\"; c\n )"
+   },
+   "host": {
+    "seed": 1
+   },
+   "expect": {
+    "result": {
+     "ok": [
+      {
+       "kind": "Atom",
+       "start": 6,
+       "end": 7,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Atom",
+       "start": 8,
+       "end": 9,
+       "arity": 0,
+       "parent": 2
+      },
+      {
+       "kind": "Form",
+       "start": 5,
+       "end": 10,
+       "arity": 2,
+       "parent": 5
+      },
+      {
+       "kind": "Atom",
+       "start": 11,
+       "end": 15,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Text",
+       "start": 15,
+       "end": 22,
+       "arity": 0,
+       "parent": 5
+      },
+      {
+       "kind": "Form",
+       "start": 0,
+       "end": 28,
+       "arity": 3,
+       "parent": -1
+      }
+     ]
+    },
+    "effects": {
+     "stored": [],
+     "sent": [],
+     "emitted": []
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+You are writing the TEST SET for an existing, correct TypeScript program (solution.ts in this workspace). Work only inside this directory; do not read other directories.
+
+Context: the same task can be solved in a language (Sigil) whose toolchain automatically gives assurance in four ways: (1) every Example in intent.feature is run; (2) every `always` property in glossary.sigil is checked over ~500 generated inputs; (3) every `privacy` rule is checked (the named source data must never reach anything but the allowed sinks, over ~100 generated inputs); (4) declared integer ranges are proved never to overflow. Your job is to write the SMALLEST vitest test set for the TypeScript program that gives equivalent assurance, so TypeScript and Sigil can be compared at the same level of assurance.
+
+Rules:
+- Write exactly one file: tests.test.ts (vitest; use makeHost from host.ts; effects() lists successful host calls; read README.md for the entry point, types and JSON conventions; intent.feature and glossary.sigil say what must hold; glossary.sigil is Sigil syntax: read it as a specification of the properties and privacy rules, do not port its syntax).
+- Cover: every Example (compactly, table-driven), every always property (as a property-style test over deterministic pseudo-random inputs within the declared type ranges, a few hundred cases, with a small seeded PRNG you define inline), every privacy rule (inspect all audit events and stored values per the policy), and boundary values of declared integer ranges (min, max, and one past where the type allows an out-of-range call to be meaningful) for arithmetic that could overflow or underflow.
+- Be minimal: no redundant tests, no comments beyond a short header, no helper abstractions that are not used twice. Do not test things neither the spec nor the ranges demand.
+- It must pass against solution.ts (run ./check.sh; fix your tests, never solution.ts). check.sh also runs strict tsc and eslint: keep the test file clean.
+- Budget: at most 10 tool calls. Finish with one line: how many tests and what you did not cover.

@@ -1,0 +1,3 @@
+; Human-owned policy for F1: the parser is a pure function and asks for no capability.
+
+(policy)
