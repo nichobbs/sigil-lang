@@ -78,7 +78,7 @@ For each added, changed or removed entry:
 ## What this does not do (read before relying on it)
 
 - **It does not authenticate people.** The names in `spec.approvals` are claims. Real identity must come from the host: put `spec.owners`, `spec.approvals`, `spec.history` and `glossary.sigil` under CODEOWNERS with the owner (and reviewers) as required reviewers, require signed commits, and run `sigil spec check` in CI. Without that, anyone with write access can forge an approval line.
-- **Effects are structural, not semantic.** The review lists what is built and observed; it does not yet join that with data labels. A reviewer is told the audit event gains `(digit-sum payment.card)`; the tool does not yet say "this is derived from a pii field and the audit sink accepts only internal". That join (effects against `policy.sigil` and field labels) is the obvious next step and would have made the D4 case self-explanatory.
+- **Effects are structural, not semantic.** The review lists what is built and observed, joins sinks with `policy.sigil` (which labels each sink accepts) and lists edits inside entries (changed constants, removed checks) without judging whether they weaken anything. It still does not tell a reviewer that a derived value comes from a pii field unless the field name makes that visible. Experiments X2 and X4 found no measurable benefit over a raw diff with Sonnet reviewers (both saturated), so the review is a convenience and an approval gate, not a demonstrated improvement in catch rate.
 - **It does not check that an `always` formalisation matches its English.** That is the hardest translation to review. Ideas not built: require the author agent to supply a few positive and negative examples per property, which the tool runs against the formal version; vacuity checks (property holds because its precondition is never met); mutation of the formal property to see whether the reference scenarios notice.
 - **Types are still agent-defined.** Placeholder types in glossary phrases (`Role`, `Payment`, `ReasonCode`) come from `app.sigil`, which the implementation agent writes. The data model is part of the spec and should be human-owned too (a `types.sigil` or a vocabulary section generated from the feature). For the experiments the task README fixes the names.
 - **`policy.sigil` is not covered yet.** It is the same shape of problem (human-owned, hard to write by hand) and could use the same propose, review, promote flow with tags such as `new-sink` and `widened-sink`.
@@ -88,10 +88,10 @@ For each added, changed or removed entry:
 
 - `src/spec.ts`: parse entries, effects, tags, diff, coverage, owners, approvals, gate, review rendering (pure).
 - `src/spec-cli.ts`: `sigil spec init|review|approve|promote|check DIR`.
-- `test/spec-authoring.test.ts`: 19 tests, including an end-to-end run where a proposal that adds a card-derived audit field is blocked until the owner and a privacy reviewer have both signed, and a direct edit of `glossary.sigil` fails `check`.
+- `test/spec-authoring.test.ts`: 25 tests, including an end-to-end run where a proposal that adds a card-derived audit field is blocked until the owner and a privacy reviewer have both signed, and a direct edit of `glossary.sigil` fails `check`.
 
 ## Suggested next steps
 
-1. Join effects with labels from `policy.sigil` so the review states the sensitivity of what a change exposes.
+1. Done in part: sinks are joined with policy. Remaining: join field labels so the review states the sensitivity of a derived value.
 2. A spec-author agent prompt and an experiment arm: does an agent-proposed glossary plus effect review catch an injected weakening (a proposal that quietly drops a property or widens an audit record) more reliably than a diff of S-expressions? That is testable with the harness we have.
 3. Human-owned data model, then policy proposals.
