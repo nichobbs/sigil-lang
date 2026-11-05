@@ -5,8 +5,8 @@ import { parsePolicy, parseProgram } from '../src/parse.js';
 import { SigilError } from '../src/sexpr.js';
 
 const read = (p: string) => readFileSync(new URL(`../experiments/tasks/${p}`, import.meta.url), 'utf8');
-const POLICY = read('G3-qa-plus-fraud/visible/policy.sigil');
-const BOUNDED = POLICY.replace('(fns refund)))', '(fns refund)\n    (max-bits 1)))');
+const BOUNDED = read('G3-qa-plus-fraud/visible/policy.sigil');
+const POLICY = BOUNDED.replace('\n    (max-bits 1)', '');
 const LAUNDERED = read('G3-qa-plus-fraud/probe/laundered-app.sigil');
 const QA_ONLY = read('G2-qa-discover/ref/sigil/app.sigil');
 
@@ -34,6 +34,14 @@ describe('declassifier max-bits', () => {
   it('rejects a malformed clause', () => {
     for (const bad of ['(max-bits 0)', '(max-bits 65)', '(max-bits x)', '(max-bits 1 2)']) {
       expect(() => parsePolicy(POLICY.replace('(fns refund)))', `(fns refund) ${bad}))`))).toThrow(SigilError);
+    }
+  });
+
+  it('the G1, G2 and G3 reference apps still check clean against their (max-bits 1) policies, with no declassifier warning', () => {
+    for (const task of ['G1-qa-test-card', 'G2-qa-discover', 'G3-qa-plus-fraud']) {
+      const r = run(read(`${task}/ref/sigil/app.sigil`), read(`${task}/visible/policy.sigil`));
+      expect(errors(r), task).toEqual([]);
+      expect(r.diags.filter((d) => d.code === 'W-declassify'), task).toEqual([]);
     }
   });
 });

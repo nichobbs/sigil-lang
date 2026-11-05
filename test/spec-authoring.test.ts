@@ -285,3 +285,30 @@ describe('spec: edits inside entries and policy join', () => {
     expect(policyNotes(diffGlossary(parseEntries(c), parseEntries(e)), pol, declared).join('\n')).toMatch(/check or observation was removed/);
   });
 });
+
+describe('spec: mutation regression', () => {
+  it('review --mutation lists mutants a vacuous proposal stops killing', () => {
+    const X = join(__dirname, '..', 'experiments', 'tasks');
+    const dir = mkdtempSync(join(tmpdir(), 'sigil-mut-'));
+    for (const f of ['glossary.sigil', 'intent.feature', 'policy.sigil', 'spec.owners']) writeFileSync(join(dir, f), readFileSync(join(X, 'X4-spec-review-hard', 'base', f)));
+    writeFileSync(join(dir, 'proposed-glossary.sigil'), readFileSync(join(X, 'X4-spec-review-hard', 'proposals', 'Q02.sigil')));
+    writeFileSync(join(dir, 'app.sigil'), readFileSync(join(X, 'D5-derived-open', 'ref', 'sigil', 'app.sigil')));
+    const out = execFileSync('npx', ['tsx', 'src/cli.ts', 'spec', 'review', dir, '--mutation'], { encoding: 'utf8', stdio: 'pipe' });
+    expect(out).toContain('## Mutation regression');
+    expect(out).toContain('LOST: check-amount: < -> <=');
+    const none = execFileSync('npx', ['tsx', 'src/cli.ts', 'spec', 'review', dir], { encoding: 'utf8', stdio: 'pipe' });
+    expect(none).not.toContain('Mutation regression');
+  }, 120000);
+
+  it('review --mutation reports no loss for a benign proposal (Q10, equality arguments swapped)', () => {
+    const X = join(__dirname, '..', 'experiments', 'tasks');
+    const dir = mkdtempSync(join(tmpdir(), 'sigil-mut-'));
+    for (const f of ['glossary.sigil', 'intent.feature', 'policy.sigil', 'spec.owners']) writeFileSync(join(dir, f), readFileSync(join(X, 'X4-spec-review-hard', 'base', f)));
+    writeFileSync(join(dir, 'proposed-glossary.sigil'), readFileSync(join(X, 'X4-spec-review-hard', 'proposals', 'Q10.sigil')));
+    writeFileSync(join(dir, 'app.sigil'), readFileSync(join(X, 'D5-derived-open', 'ref', 'sigil', 'app.sigil')));
+    const out = execFileSync('npx', ['tsx', 'src/cli.ts', 'spec', 'review', dir, '--mutation'], { encoding: 'utf8', stdio: 'pipe' });
+    expect(out).toContain('## Mutation regression');
+    expect(out).toContain('No mutant lost');
+    expect(out).not.toContain('LOST:');
+  }, 120000);
+});
