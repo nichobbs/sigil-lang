@@ -110,22 +110,22 @@ function where(chain: string[]): string {
   return chain.slice(i).map((x) => clip(x, 120)).join(' > ');
 }
 
-export function treeDiff(a: SExp, b: SExp, anc: string[] = [], top = true): string[] {
+export type Edit = { kind: 'changed' | 'replaced' | 'removed' | 'added'; where: string; text: string };
+
+export const renderEdit = (e: Edit): string => (e.kind === 'removed' || e.kind === 'added' ? `in ${e.where}: ${e.kind} ${e.text}` : e.kind === 'replaced' ? `in ${e.where}: replaced ${e.text}` : `in ${e.where}: ${e.text}`);
+
+export function treeEdits(a: SExp, b: SExp, anc: string[] = [], top = true): Edit[] {
   const chain = top ? [] : [...anc, sexpToString(a)];
   const here = where(chain);
   if (!isList(a) || !isList(b)) {
     if (sexpToString(a) === sexpToString(b)) return [];
-    if (isList(a) || isList(b)) return [`in ${here}: replaced ${show(a)} with ${show(b)}`];
-    return [`in ${here}: ${show(a)} changed to ${show(b)}`];
+    if (isList(a) || isList(b)) return [{ kind: 'replaced', where: here, text: `${show(a)} with ${show(b)}` }];
+    return [{ kind: 'changed', where: here, text: `${show(a)} changed to ${show(b)}` }];
   }
-  if (a.items.length === b.items.length) {
-    const out: string[] = [];
-    a.items.forEach((x, i) => out.push(...treeDiff(x, b.items[i], chain, false)));
-    return out;
-  }
+  if (a.items.length === b.items.length) return a.items.flatMap((x, i) => treeEdits(x, b.items[i], chain, false));
   const ak = a.items.map(sexpToString);
   const bk = b.items.map(sexpToString);
-  const out: string[] = [];
+  const out: Edit[] = [];
   const bAvail = [...bk];
   const removed: SExp[] = [];
   a.items.forEach((x, i) => {
@@ -140,10 +140,12 @@ export function treeDiff(a: SExp, b: SExp, anc: string[] = [], top = true): stri
     if (j >= 0) aAvail.splice(j, 1);
     else added.push(x);
   });
-  for (const x of removed) out.push(`in ${here}: removed ${show(x)}`);
-  for (const x of added) out.push(`in ${here}: added ${show(x)}`);
+  for (const x of removed) out.push({ kind: 'removed', where: here, text: show(x) });
+  for (const x of added) out.push({ kind: 'added', where: here, text: show(x) });
   return out;
 }
+
+export const treeDiff = (a: SExp, b: SExp, anc: string[] = [], top = true): string[] => treeEdits(a, b, anc, top).map(renderEdit);
 
 // ---------------------------------------------------------------------------
 // Diff
@@ -164,10 +166,11 @@ export function diffGlossary(base: Entry[], proposed: Entry[]): Change[] {
     const b = bm.get(p.key);
     if (!b) out.push({ kind: 'added', after: p, tags: tags(p), effectDelta: delta([], effects(p)) });
     else if (b.src !== p.src) {
-      const detail = treeDiff(b.sexp, p.sexp);
+      const edits = treeEdits(b.sexp, p.sexp);
+      const detail = edits.map(renderEdit); // never empty: src is the canonical print, so a differing src means a differing tree
       const tg = new Set([...tags(b), ...tags(p)]);
-      if (detail.some((d) => / changed to /.test(d))) tg.add('constant-change');
-      if (detail.some((d) => /: removed /.test(d))) tg.add('check-removed');
+      if (edits.some((d) => d.kind === 'changed')) tg.add('constant-change');
+      if (edits.some((d) => d.kind === 'removed')) tg.add('check-removed');
       out.push({ kind: 'changed', before: b, after: p, tags: [...tg].sort(), effectDelta: delta(effects(b), effects(p)), detail });
     }
   }
@@ -322,10 +325,22 @@ export function sinkPolicy(policySrc: string): Map<string, string[]> {
   return out;
 }
 
-export function policyNotes(changes: Change[], policy: Map<string, string[]>): string[] {
+export function declaredDeclassifiers(policySrc: string): Set<string> {
+  const root = readAll(policySrc)[0];
+  const out = new Set<string>();
+  if (!root || !isList(root)) return out;
+  for (const f of root.items.slice(1)) if (isList(f) && isSym(f.items[0], 'declassify') && isSym(f.items[1])) out.add(f.items[1].v);
+  return out;
+}
+
+export function policyNotes(changes: Change[], policy: Map<string, string[]>, declared?: Set<string>): string[] {
   const notes = new Set<string>();
   for (const c of changes) {
     for (const x of c.effectDelta) {
+      if (x.startsWith('-')) {
+        notes.add(`A check or observation was removed (${x.slice(2)}). The tool does not judge whether the remaining checks still cover the spec sentence.`);
+        continue;
+      }
       if (!x.startsWith('+')) continue;
       const m = /(?:allows sink\(s\) |(?:emitted|stored|sent|count of emitted|field \S+ of emitted) )(\S+)/.exec(x) ?? /allows sink\(s\) (\S+)/.exec(x);
       const sink = m?.[1];
@@ -334,6 +349,10 @@ export function policyNotes(changes: Change[], policy: Map<string, string[]>): s
       if (x.includes('allows sink')) {
         if (!acc.includes('pii')) notes.add(`WARNING: policy.sigil limits sink ${sink} to ${acc.join(' ') || 'nothing'}; this proposal lets the protected source reach it.`);
       } else notes.add(`sink ${sink} accepts: ${acc.join(' ') || 'nothing'} (policy.sigil)`);
+    }
+    for (const x of c.effectDelta) {
+      const m = declared && /^\+ exempts declassifier\(s\) (.+) from the privacy check$/.exec(x);
+      if (m) for (const n of m[1].split(/\s+/)) if (!declared!.has(n)) notes.add(`WARNING: declassifier ${n} is not declared in policy.sigil. It would need a human-approved policy entry before this exemption means anything.`);
     }
     if (c.effectDelta.some((x) => x.startsWith('+ exempts'))) notes.add('A declassifier exemption removes that flow from the privacy check. Confirm policy.sigil declares the declassifier and a privacy reviewer approves what it releases.');
   }
@@ -344,8 +363,8 @@ export function policyNotes(changes: Change[], policy: Map<string, string[]>): s
 // Review packet
 // ---------------------------------------------------------------------------
 
-export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Gate; hash: string; owners: Owners; policy?: Map<string, string[]> }): string {
-  const { changes, cov, gate: g, hash, owners, policy } = opts;
+export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Gate; hash: string; owners: Owners; policy?: Map<string, string[]>; declared?: Set<string> }): string {
+  const { changes, cov, gate: g, hash, owners, policy, declared } = opts;
   const L: string[] = [];
   L.push(`# Glossary proposal ${hash.slice(0, 12)}`, '');
   if (!changes.length) {
@@ -362,7 +381,7 @@ export function renderReview(opts: { changes: Change[]; cov?: Coverage; gate: Ga
   if (!fx.length) L.push(inner.length ? 'No new or removed observations by structure. See the edits inside entries below: this tool does not judge whether they weaken a check.' : 'No change to observable effects (fixtures only).');
   for (const x of [...new Set(fx)]) L.push(`- ${x}`);
   L.push('');
-  const notes = policy ? policyNotes(changes, policy) : [];
+  const notes = policy ? policyNotes(changes, policy, declared) : [];
   if (notes.length) {
     L.push('## Policy notes', '');
     for (const x of notes) L.push(`- ${x}`);
