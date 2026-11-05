@@ -8,7 +8,7 @@
 
 import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Approval, approvalLine, coverage, diffGlossary, gate, parseApprovals, parseEntries, parseOwners, proposalHash, renderReview, sha256, sinkPolicy, declaredDeclassifiers } from './spec.js';
+import { Approval, approvalLine, coverage, diffGlossary, gate, parseApprovals, parseEntries, parseOwners, proposalHash, renderReview, sha256, MutationRegression, sinkPolicy, declaredDeclassifiers } from './spec.js';
 import { parsePolicy, parseProgram } from './parse.js';
 import { parseFeature, parseGlossary } from './scenario.js';
 import { runMutation } from './mutate.js';
@@ -65,7 +65,7 @@ export function specMain(args: string[]): number {
         const approvals = has('spec.approvals') ? parseApprovals(read('spec.approvals')) : [];
         const feat = readdirSync(dir).find((f) => f.endsWith('.feature'));
         const cov = feat ? coverage(read(feat), entries) : undefined;
-        let mutation;
+        let mutation: MutationRegression | undefined;
         if (args.includes('--mutation')) {
           if (!has('app.sigil') || !has('policy.sigil') || !feat) throw new SigilError('spec review --mutation needs app.sigil, policy.sigil and a .feature file in DIR');
           const prog = parseProgram(read('app.sigil'));

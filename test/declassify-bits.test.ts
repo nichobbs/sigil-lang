@@ -36,4 +36,12 @@ describe('declassifier max-bits', () => {
       expect(() => parsePolicy(POLICY.replace('(fns refund)))', `(fns refund) ${bad}))`))).toThrow(SigilError);
     }
   });
+
+  it('the G1, G2 and G3 reference apps still check clean against their (max-bits 1) policies, with no declassifier warning', () => {
+    for (const task of ['G1-qa-test-card', 'G2-qa-discover', 'G3-qa-plus-fraud']) {
+      const r = run(read(`${task}/ref/sigil/app.sigil`), read(`${task}/visible/policy.sigil`));
+      expect(errors(r), task).toEqual([]);
+      expect(r.diags.filter((d) => d.code === 'W-declassify'), task).toEqual([]);
+    }
+  });
 });
