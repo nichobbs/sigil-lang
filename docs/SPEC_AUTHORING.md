@@ -88,7 +88,7 @@ For each added, changed or removed entry:
 
 - `src/spec.ts`: parse entries, effects, tags, diff, coverage, owners, approvals, gate, review rendering (pure).
 - `src/spec-cli.ts`: `sigil spec init|review|approve|promote|check DIR`.
-- `test/spec-authoring.test.ts`: 17 tests, including an end-to-end run where a proposal that adds a card-derived audit field is blocked until the owner and a privacy reviewer have both signed, and a direct edit of `glossary.sigil` fails `check`.
+- `test/spec-authoring.test.ts`: 19 tests, including an end-to-end run where a proposal that adds a card-derived audit field is blocked until the owner and a privacy reviewer have both signed, and a direct edit of `glossary.sigil` fails `check`.
 
 ## Suggested next steps
 
