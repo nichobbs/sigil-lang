@@ -1,0 +1,5 @@
+(system v3 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (declassifier card-band (from pii) (to internal) (hosted-in a))
+  (process a (program "pa") (spec "sa") (reads secret))
+  (process b (program "pb") (spec "sb") (in internal))
+  (channel a b (carries internal) (via card-band)))

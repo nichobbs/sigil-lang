@@ -1,0 +1,5 @@
+(system s3 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (declassifier card-band (from pii) (to internal) (hosted-in a))
+  (process a (program "pa") (spec "sa") (reads pii) (sink vault pii))
+  (process b (program "pb") (spec "sb") (in internal) (sink audit internal))
+  (channel a b (carries internal) (via card-band)))

@@ -1,0 +1,5 @@
+(system v5 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  ; a was upgraded to read pii and its channel relabelled; b still accepts only internal
+  (process a (program "pa") (spec "sa") (reads pii) (sink vault pii))
+  (process b (program "pb") (spec "sb") (in internal) (sink audit internal))
+  (channel a b (carries pii)))
