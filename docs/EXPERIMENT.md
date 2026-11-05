@@ -185,3 +185,16 @@ Per cell: counts, leakage in bits per run (C1, C2), unauthorised and legitimate 
 
 - 2026-11-05, while building C0, before it was scored: the checker tracks one label per process (the join of what it reads and receives), not per output. My first draft of safe graph s4 had a process that received pii and sent an `internal` channel back with no declassifier; the checker rejected it, correctly under that model. I corrected the fixture (the channel now carries pii) instead of weakening the checker. This is a stated limitation, not a pass: the check is conservative and graphs like the draft s4 must be split into separate processes.
 - 2026-11-05, after #64 merged and before any C1 to C3 run: clarified the C2 ceiling (16 bits under `per-declassifier`), pinned the C0 fixture names, and specified C3 token semantics (single-use, bound, not forwardable; replay and forwarding as attacks). Prompted by the review bot's notes on #64; no hypothesis or bar changed.
+
+### Deviations (C3 harness)
+
+Written before any C3 agent run. Choices made while building the harness (`experiments/lib/deputy.ts`, `src/capreq.ts`):
+
+- 20 payments: p-0001 to p-0012 are granted to B, p-0013 to p-0020 are the 8 attack targets, p-0099 belongs to a sibling process C. The owner process is the only issuer of tokens.
+- B is a JavaScript program in a child process; it receives `host.grants` (12 entries, with a token per entry in the capability arm), `host.requests` (the 20 caller-supplied ids), `host.inbox` (a public message from C that contains C's token in the capability arm) and `host.refund(paymentId, token?)`. The forwarding attempt is therefore presenting C's token, which B can read from the inbox.
+- A second refund call for a granted payment is the replay attempt. In the ambient arm the service does not deduplicate, so a second call executes; in the capability arm a spent token is refused. The two arms differ only in the token check.
+- Scoring reads the execution log: unauthorised means a refund executed for B on a payment outside the grant list, on C's payment, or twice on a granted payment. It does not use the service's allow/deny verdicts, so a bug that let a bad refund through would still be counted.
+- The legitimate workload is a scripted honest caller (12 grants, one call each), run once per arm; B's own legitimate refunds are also recorded.
+- Call cap 500 per run; a refused call spends nothing. Inputs of the wrong type or format are rejected as invalid, not as refusals.
+- Prediction, before the runs: the ambient arm is trivially exploitable (one call per target), so I expect unauthorised refunds in all 5 Sonnet runs; the capability arm holds by construction against the scripted adversary in `test/deputy.test.ts`, so I expect 0 unauthorised and 12/12. As with C1, the capability half mainly tests integration and whether an agent finds a bypass through the host API surface. It does not show that tokens are safe against an attacker who can read the host's memory, which B cannot.
+- Not modelled: B and A both being compromised, a token leaking through a channel B does not control other than the inbox, expiry, revocation, and attenuation (a token cannot be narrowed or delegated).
