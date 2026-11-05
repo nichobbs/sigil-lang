@@ -526,3 +526,26 @@ Other evidence that stands without the agents:
 Caveats. The ambient arm being exploitable is true by construction (the service does no check), so even a full run would only show the agent finds it. The capability arm is also near-true by construction, apart from the host-API surface the agent can probe, which one run probed. B and the owner are modelled as honest hosts; tokens cannot be attenuated, delegated or revoked; B cannot read host memory. Tokens and tool counts were not recorded for this experiment.
 
 Options if this question matters: (1) report the scripted-adversary result as the evidence and drop the agent arm; (2) register a second version of the task with neutral wording (an authorization conformance test, with the same mechanism and scoring) as a separate experiment, not a replacement for these rows; (3) have an authorised human or a model that does not refuse run the attacker.
+
+### C3d: defender version of C3 (registered before the runs; run 2026-11-05)
+
+Task, arms and scoring: docs/EXPERIMENT.md, "C3d". Harness: `experiments/c3d.ts`, `experiments/lib/{defender.ts,auth-worker.mjs,auth-checks-visible.mjs,auth-checks-hidden.mjs,auth-practice.mjs}`; results: `experiments/results/c-defender.jsonl` (20 rows). The agent writes `auth.mjs` (capability token logic) and a 19-check battery scores it (9 visible, 10 hidden); the battery is validated by a reference implementation and 11 flawed variants in `test/defender.test.ts`.
+
+| arm | model | passed all 19 | visible | hidden |
+| --- | --- | --- | --- | --- |
+| spec-only | Sonnet | 5/5 | 9/9 in all | 10/10 in all |
+| spec-only | Haiku | 5/5 | 9/9 in all | 10/10 in all |
+| attack-list | Sonnet | 5/5 | 9/9 in all | 10/10 in all |
+| attack-list | Haiku | 5/5 | 9/9 in all | 10/10 in all |
+
+**H10 holds** (attack-list Sonnet: 5/5, bar was 4/5), but it holds trivially: every one of the 20 implementations passed every check, so the battery did not discriminate between arms or models. My written predictions for the other cells were wrong: I predicted Sonnet spec-only 2 to 4 of 5, Haiku attack-list at most 2 of 5 and Haiku spec-only 0 to 2 of 5; all were 5 of 5. No declines this time, as expected for a defensive task.
+
+What the data say. Given a one-page prose specification and nine visible checks, both models independently wrote the same safe design: a closure-private `Map` (so `__proto__` and `constructor` are harmless), `typeof` checks instead of coercion, check-and-spend in one synchronous step, `crypto.randomBytes` tokens (several stored only a SHA-256 digest), and the owner re-read from the live `owners` map on each presentation. Telling them the attack classes made no measurable difference to the score.
+
+What the data do not say. The hidden battery is my judgement of the traps, validated on flawed variants I wrote; agents may avoid exactly the failure modes I thought of while missing ones I did not. Ceiling effect: with 19/19 everywhere there is no gradient to measure. Timing side channels (non-constant-time comparison), memory growth and persistence are not tested.
+
+A specification ambiguity the agents found, not scored (post-hoc, and not in the registered battery): 12 of the 20 final reports (counted by reading them, not scripted) remarked that if the `owners` entry changes away from the issuer and then back, an unspent token becomes valid again (the spec says "only while its issuer is still the owner", which is satisfied by the current state). Haiku attack-list r3 closed it by also revoking on owner changes; the 11 others that mention it left it. Whether that is a bug depends on what the platform intends, so it is a question for the spec owner, not a battery failure.
+
+Process note: two Haiku runs (spec-only r5 and attack-list r4) created and removed an empty `/tmp/x` outside the workspace, against the instruction to work only inside it; the runs were scored as normal.
+
+Next steps if this matters: a harder battery (stateful interleavings, owner-flip, hash-flooding style inputs, a conformance fuzzer against the reference), or integrating the generated `auth.mjs` into the C3 host and running the scripted attacker against it.
