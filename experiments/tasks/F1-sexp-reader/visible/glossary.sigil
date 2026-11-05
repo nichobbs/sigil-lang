@@ -28,6 +28,13 @@
                       (and (= nd.kind k) (= nd.start s) (= nd.end e) (= nd.parent p) (= nd.arity a))))
               (err e false))))
 
+
+  (then "node {i:Int} is an {k:NodeKind} from {s:Int} to {e:Int} with parent {p:Int} and {a:Int} children"
+    (expect (match result
+              (ok t (let [nd (at t i (Node Atom 0 0 -1 0))]
+                      (and (= nd.kind k) (= nd.start s) (= nd.end e) (= nd.parent p) (= nd.arity a))))
+              (err e false))))
+
   (then "reading fails with {why:ReadError}"
     (expect (= result (err why))))
 

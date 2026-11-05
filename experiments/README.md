@@ -280,3 +280,23 @@ Size (o200k_base tokens, reference programs, comments stripped; geometric mean o
 The fixed test sets are large (about 2,700 tokens on average, 4.7 times the solution), because they enumerate the examples and properties explicitly. The like-for-like line is the last one: Sigil's assurance artifacts are the human-written glossary, which the TS arm replaces with these tests. On that basis Sigil's total is about two thirds of TS's, and its detection on the hard defects is lower (12 of 16 against 15 of 16).
 
 Caveats: one writer per task and one model; the glossary was written by a human for Sigil and the tests by an agent for TS, so authoring effort is not compared, only size; A and B tasks only; the earlier agent-written-test figure (0.42) used much smaller tests that were not validated against defects.
+
+## Self-hosting probes F1 and F2 (Sonnet, one run per cell)
+
+F1 is an s-expression reader (flat post-order tree, parent patching, 63 hidden cases). F2 is a Wasm module emitter (exact bytes, minimal LEB128, 45 hidden cases). Both are the kind of program a Sigil toolchain would itself contain.
+
+| Task | TS | Sigil |
+|---|---|---|
+| F1 | 63/63 | 63/63 (r2, after fixing the task) |
+| F2 | 45/45 | 45/45 (r2, verify clean) |
+
+The r1 Sigil runs were polluted by my task errors (wrong hand-computed example numbers, a Source max of 120 that made the TooBig cases invalid, a glossary phrase "is a" vs "is an"); r2 follows the fixes. Treat n=1 per cell as feasibility evidence only: Sigil can express a parser and a binary emitter with all ranges proved.
+
+Language gaps the agents reported:
+- No list concat (wrote `cat` via fold + append), no variable-length prefix beyond `take`, `if` branches must share one list type (pad and trim).
+- No mod or bit operations (LEB128 done with `div-floor` plus clamping so ranges prove).
+- No random-access update: parent links patched with `map` at form close.
+- Lists that may be empty cannot prove a `List T 1 n` result without an `append (take (len-1)) last` rebuild.
+- No integer `match`: state machines are Int codes in `if` chains.
+
+Loops vs recursion: `fold` over a bounded list carried both probes, so no general loop or recursion was needed. Candidates, in priority order: `mod`, `concat`, `fold` with index, `zip`, an early-exit fold (`find`/`any`/`all`), sum types with payload. Recursion would cost totality and range proofs; prefer flat post-order arrays plus fold, and add fuel-bounded recursion only if a task needs real trees.
