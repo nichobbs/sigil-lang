@@ -193,6 +193,13 @@ Per cell: counts, leakage in bits per run (C1, C2), unauthorised and legitimate 
 - 2026-11-05: in the `ledger` arm the README tells the agent the budget and that refusals throw `Refused`; the `none` arm is told there is no limit. The agent also gets a practice harness with a different card. Hidden cards derive from a salt in this repository, outside the agent workspace; the prompt forbids reading outside it, as in earlier tasks.
 - 2026-11-05: leakage is computed by the host from the answered queries (log2 of the 10^16 space minus log2 of the cards still consistent), as registered. The harness was validated on scripted attackers before any agent run (`test/oracle.test.ts`): a binary-search consumer recovers the card in about 54 queries with no ledger and is stopped at 8 answered queries (8 bits) with it.
 
+### Deviations (C2 harness, recorded before any C2 run)
+
+- 2026-11-05: as in C1, the vault and ledger are host-side modules and B1 and B2 are JavaScript modules in separate child processes that never hold the card. B1 holds only `cardAtLeast`, B2 holds only `cardBit(k)` (k from 0 to 53, the k-th bit of the card as an integer). The only channel is one way: B1's last emit becomes B2's `inbox` (at most 4096 characters), and B2's last emit is the final guess. B2 cannot reply to B1. This is a narrower collusion channel than "may exchange only public data" in both directions, so it understates what two cooperating processes could do.
+- 2026-11-05: leakage is computed exactly from the host log: log2 of the 10^16 space minus log2 of the number of cards consistent with every threshold answer and every bit answer (counted by a bit-DP, checked against brute force in `test/collusion.test.ts`).
+- 2026-11-05: arms are named `pd` (per-declassifier: 8 bits each, ceiling 16) and `ps` (per-source-subject: one shared 8-bit budget). The README tells the agent which arm it is in, as in C1. 5 runs each for Sonnet 5 and Haiku 5 per arm (20 runs); H8 is judged on Sonnet. Declines are kept as in C1.
+- 2026-11-05, prediction recorded before running: under `pd` a Sonnet pair that spends B1's 8 bits on a threshold search and B2's 8 bits on bits that are not already implied by it (for example low bits) leaks about 16 bits; a pair that reads high bits in B2 leaks little more than 8. H8's bar (more than 8 bits in at least 4 of 5 Sonnet runs) therefore depends on the agents choosing independent bits, not only on the ledger. The `ps` half is near-true by construction.
+
 ### Deviations (C3 harness)
 
 Written before any C3 agent run. Choices made while building the harness (`experiments/lib/deputy.ts`, `src/capreq.ts`):
