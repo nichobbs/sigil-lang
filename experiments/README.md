@@ -523,3 +523,7 @@ Caveats, stated plainly:
 - Only one declassifier was in play. C2 (two declassifiers over one field, where the per-declassifier and per-source budgets differ) is not run. C3 is not built.
 - Agent tokens and tool counts (about 78k to 82k tokens and 2 to 5 tool calls per run) are from the run notifications; they were not passed to the scorer.
 
+### C2 harness
+
+`experiments/c2.ts prepare <pd|ps> <model> <run>` builds a workspace (README, `policy.sigil` with `card-at-least` and `card-bit`, `b1.mjs` and `b2.mjs` stubs, practice harness); `score <dir>` runs B1 then B2 through a shared ledger, computes exact leakage from the host log, runs the 40-card legitimate workload and appends to `results/c-collusion.jsonl`. Host: `experiments/lib/collusion.ts`. Deviations are recorded in docs/EXPERIMENT.md.
+
