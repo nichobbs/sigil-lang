@@ -1,0 +1,31 @@
+; Glossary for F2: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and function named in README.md (Op, ENode, Expr, Module, EmitError, emit-module),
+; so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "the node {op:Op} {v:Int}"
+    (default nodes (list))
+    (append nodes (ENode op v)))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "the module is emitted"
+    (call result emit-module nodes))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the module has {n:Int} bytes"
+    (expect (match result (ok m (= (len m) n)) (err e false))))
+
+  (then "byte {i:Int} is {b:Int}"
+    (expect (match result (ok m (= (at m i 0) b)) (err e false))))
+
+  (then "emitting fails with {why:EmitError}"
+    (expect (= result (err why))))
+
+  ; ---- Properties ---------------------------------------------------------------
+  (always "The module is the fixed header, a type section, a function section, an export section naming the function \"f\", and a code section whose body holds the instructions of the nodes in order, each section carrying its length as an unsigned LEB128 and each constant written as a signed LEB128 of minimal length."
+    (forall ((e Expr))
+      (match (emit-module e)
+        (ok m (and (= (at m 0 1) 0) (= (at m 1 0) 97) (= (at m 2 0) 115) (= (at m 3 0) 109) (= (at m 4 0) 1)))
+        (err x true)))))

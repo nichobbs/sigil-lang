@@ -1,0 +1,45 @@
+; Glossary for F1: binds the business phrases in intent.feature to typed fixtures and assertions.
+; It uses the types and function named in README.md (Source, NodeKind, ReadError, Node, Tree, read-sexp),
+; so those names are fixed.
+
+(glossary
+
+  ; ---- Given ------------------------------------------------------------------
+  (given "the source {s:Str}"
+    (set src s))
+
+  (given "the source {a:Str} then the text {t:Str} then {b:Str}"
+    (set src (text a "\"" t "\"" b)))
+
+  (given "the source {a:Str} then an unclosed quote and {b:Str}"
+    (set src (text a "\"" b)))
+
+  ; ---- When -------------------------------------------------------------------
+  (when "the source is read"
+    (call result read-sexp src))
+
+  ; ---- Then -------------------------------------------------------------------
+  (then "the tree has {n:Int} nodes"
+    (expect (match result (ok t (= (len t) n)) (err e false))))
+
+  (then "node {i:Int} is a {k:NodeKind} from {s:Int} to {e:Int} with parent {p:Int} and {a:Int} children"
+    (expect (match result
+              (ok t (let [nd (at t i (Node Atom 0 0 -1 0))]
+                      (and (= nd.kind k) (= nd.start s) (= nd.end e) (= nd.parent p) (= nd.arity a))))
+              (err e false))))
+
+  (then "reading fails with {why:ReadError}"
+    (expect (= result (err why))))
+
+  ; ---- Properties ---------------------------------------------------------------
+  (always "The source must hold exactly one top-level item. A second top-level item is refused as Trailing, no item at all as Empty."
+    (forall ((s Source))
+      (match (read-sexp s)
+        (ok t (= (len (filter t (fn (n) (= n.parent -1)))) 1))
+        (err e true))))
+
+  (always "The tree lists the nodes in post-order, children before their parent in source order, the top-level item last, which is the only node with parent -1. Each node records its kind, its start and end offsets in characters (end is just after the last character), the index of its parent and its number of direct children."
+    (forall ((s Source))
+      (match (read-sexp s)
+        (ok t (let [r (at t (sub (len t) 1) (Node Atom 0 0 0 0))] (= r.parent -1)))
+        (err e true)))))
