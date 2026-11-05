@@ -1,0 +1,3 @@
+(system v6 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (process a (program "pa") (spec "sa"))
+  (channel a ghost (carries public)))

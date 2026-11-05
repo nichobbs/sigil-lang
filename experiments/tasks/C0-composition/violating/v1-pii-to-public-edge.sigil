@@ -1,0 +1,4 @@
+(system v1 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (process a (program "pa") (spec "sa") (reads pii))
+  (process b (program "pb") (spec "sb") (sink web public))
+  (channel a b (carries public)))

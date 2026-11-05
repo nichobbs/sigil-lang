@@ -1,0 +1,7 @@
+(system s4 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (process a (program "pa") (spec "sa") (reads pii) (sink vault pii))
+  (process b (program "pb") (spec "sb") (reads internal) (in pii) (sink vault pii))
+  (process c (program "pc") (spec "sc") (in pii) (sink vault secret))
+  (channel a c (carries pii))
+  (channel b c (carries pii))
+  (channel c b (carries pii)))

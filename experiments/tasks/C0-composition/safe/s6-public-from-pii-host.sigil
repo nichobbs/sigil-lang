@@ -1,0 +1,7 @@
+(system s6 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (declassifier is-valid (from pii) (to public) (hosted-in a))
+  (process a (program "pa") (spec "sa") (reads pii))
+  (process b (program "pb") (spec "sb") (sink web public))
+  (process c (program "pc") (spec "sc") (sink web public))
+  (channel a b (carries public) (via is-valid))
+  (channel b c (carries public)))

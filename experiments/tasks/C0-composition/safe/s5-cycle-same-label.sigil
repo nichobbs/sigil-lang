@@ -1,0 +1,5 @@
+(system s5 (approved "pa" "sa") (approved "pb" "sb") (approved "pc" "sc")
+  (process a (program "pa") (spec "sa") (in internal) (sink log internal))
+  (process b (program "pb") (spec "sb") (in internal) (sink log internal))
+  (channel a b (carries internal))
+  (channel b a (carries internal)))
