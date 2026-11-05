@@ -1,0 +1,6 @@
+; Human-owned policy for the refund service (Extension 4, C3). Refunds write to the payments store; the owner process
+; (not the caller) decides which payments a caller may refund, by minting a token for (caller, payment).
+(policy
+  (allow store:payments)
+  (allow audit)
+  (sink audit (accepts internal)))
