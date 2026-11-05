@@ -43,6 +43,10 @@ Language: Sigil. Your deliverable is the single file task/app.sigil. Read LANGUA
 `;
 }
 
+const GUARD_NOTE = `
+Data-classification guard (human-owned, read only: host.ts, types.ts, guard.check.ts, eslint.config.mjs): the argument types are in types.ts and your default export must be declared \`run(args: RefundArgs, host: Host)\`, importing both types (guard.check.ts enforces this). A value typed Pii (such as payment.card) cannot be passed to host.audit.emit or host.net.post: the type checker rejects it, and the lint config bans type assertions, any, ts-comments, JSON.parse and inline eslint directives so that the check cannot be bypassed. Use type aliases (not interfaces) for audit events and payloads. \`./check.sh\` runs all of this. If the spec seems to need a Pii value to reach a sink, report it instead of working around it.
+`;
+
 function tsPrompt(task: string): string {
   return `${common(task, 'ts')}
 Language: TypeScript (Node, ES modules). Your deliverable is the single file solution.ts with \`export default async function run(args, host)\`, self-contained (only Node built-ins). \`args\` is one object with the task README's parameter names as properties. \`host\` is the interface in host.ts (store.put/get, net.post, audit.emit, rand.fresh; use the handle names the README or intent spec give, in the form "kind:name" such as "store:quotes"). Never ignore a failed host call. The returned value must be plain JSON, encoded like this: ${ENCODING}
@@ -53,6 +57,7 @@ Tooling: \`./check.sh\` runs strict tsc, eslint with the security plugin, and vi
 export function prepare(task: string, lang: Lang, model: string, run: number): { dir: string; prompt: string } {
   const td = taskDir(task);
   if (!existsSync(td)) throw new Error(`no task ${task}`);
+  const guard = (lang as string) === 'tsg';
   const id = `${basename(td).split('-')[0]}-${lang}-${model}-r${run}`;
   const dir = join(WORK, id);
   rmSync(dir, { recursive: true, force: true });
@@ -70,6 +75,13 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
   } else {
     symlinkSync(join(TOOLS, 'node_modules'), join(dir, 'node_modules'));
     for (const f of readdirSync(join(REPO, 'experiments/ts-kit'))) copyFileSync(join(REPO, 'experiments/ts-kit', f), join(dir, f));
+    // 'tsg' arm: TypeScript with a human-owned data-classification guard (typed Pii brand on host.audit/net, lint bans on casts).
+    if (guard) {
+      const gk = join(REPO, 'experiments/ts-guard-kit');
+      for (const f of readdirSync(gk)) copyFileSync(join(gk, f), join(dir, f));
+      const gt = join(td, 'ts-guard');
+      for (const f of readdirSync(gt)) copyFileSync(join(gt, f), join(dir, f));
+    }
     for (const f of ['README.md', 'intent.feature']) copyFileSync(join(vis, f), join(dir, f));
     writeFileSync(join(dir, 'package.json'), '{"name":"work","private":true,"type":"module"}\n');
     // SCENARIO_TESTS=1: the TS arm also gets the visible examples as ready-made vitest cases (the Sigil arm gets them through the glossary).
@@ -78,7 +90,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
       writeFileSync(join(dir, 'scenarios.json'), JSON.stringify(sc.cases, null, 1));
       writeFileSync(join(dir, 'scenarios.test.ts'), TEST_FILE);
     }
-    writeFileSync(join(dir, 'PROMPT.md'), tsPrompt(basename(td)));
+    writeFileSync(join(dir, 'PROMPT.md'), tsPrompt(basename(td)) + (guard ? GUARD_NOTE : ''));
   }
   // Change-request tasks (E series): the previous program is the starting point, already in place as the deliverable.
   const startFile = lang === 'sigil' ? join(td, 'start/sigil/app.sigil') : join(td, 'start/ts/solution.ts');
@@ -102,6 +114,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
     brief += fence('WORKFLOW.md', rd('WORKFLOW.md')) + fence('LANGUAGE.md (language spec)', rd('LANGUAGE.md'));
   } else {
     brief += fence('README.md (task)', rd('README.md')) + fence('intent.feature', rd('intent.feature')) + fence('host.ts (read only)', rd('host.ts'));
+    if (guard) brief += fence('types.ts (read only)', rd('types.ts')) + fence('eslint.config.mjs (read only)', rd('eslint.config.mjs'));
   }
   if (isChange) brief += fence(lang === 'sigil' ? 'task/app.sigil (current program, to be changed)' : 'solution.ts (current program, to be changed)', readFileSync(deliverable, 'utf8'));
   writeFileSync(join(dir, 'BRIEF.md'), brief);
@@ -111,7 +124,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
 export async function score(dir: string, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
   const [task, lang, model, r] = basename(dir).split('-');
   const sol = lang === 'sigil' ? join(dir, 'task', 'app.sigil') : join(dir, 'solution.ts');
-  const s = await runTask(task, lang as Lang, sol);
+  const s = await runTask(task, (lang === 'tsg' ? 'ts' : lang) as Lang, sol);
   let verify: string | undefined;
   if (lang === 'sigil' && existsSync(sol)) {
     try {
