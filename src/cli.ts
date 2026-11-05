@@ -2,6 +2,7 @@
 // sigil check   <dir>   static checks: ranges, capabilities, information flow
 // sigil verify  <dir> [--fast]  check + scenarios + properties + privacy + mutation adequacy (--fast skips mutation)
 // sigil fix     <dir>   mechanical edits for open findings (clamps, take, max 1, needs); suggestions only, never writes
+// sigil spec   <init|review|approve|promote|check> <dir>   glossary proposals, sign-off and promotion (docs/SPEC_AUTHORING.md)
 // sigil compare <dir>   token-cost comparison of alternative surface syntaxes
 
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -15,6 +16,7 @@ import { SigilError } from './sexpr.js';
 import { showInterval } from './interval.js';
 import { Program } from './ast.js';
 import { proveEnsures, SmtResult } from './smt.js';
+import { specMain } from './spec-cli.js';
 import { compareSyntaxes, fragilityExperiment, formatComparison, formatFragility } from './compare.js';
 
 function load(dir: string) {
@@ -119,6 +121,7 @@ async function openEnsures(prog: Program, res: CheckResult): Promise<SmtResult[]
 
 async function main() {
   const argv = process.argv.slice(2);
+  if (argv[0] === 'spec') process.exit(specMain(argv.slice(1)));
   const fast = argv.includes('--fast'); // verify --fast: check + scenarios, no mutation testing
   const [cmd, dir = 'examples/invoicing', outFile] = argv.filter((a) => a !== '--fast');
   try {

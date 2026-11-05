@@ -34,6 +34,7 @@ npx tsx src/cli.ts wasm examples/invoicing [out.wasm]   # which functions compil
 - Reference interpreter with a mock host (effect log, failure injection, seeded PRNG) and runtime contracts.
 - Scenario compiler: Gherkin-style feature files bound to actions through a glossary; decision-table exhaustiveness; property tests; privacy scenarios (static flow matrix plus dynamic two-run noninterference with a vacuity check); open questions surfaced to humans.
 - Mutation testing to measure whether the human-reviewable spec actually constrains the implementation.
+- Spec authoring prototype (`sigil spec review|approve|promote|check`): an agent proposes glossary changes, the tool renders their effects, named owner and reviewers sign off, and only `promote` changes `glossary.sigil` (see `docs/SPEC_AUTHORING.md`, including what it does not do).
 - Five surface syntaxes for the same AST, with a token comparison and a fragility experiment.
 
 ## Wasm backend (numeric core, lists, records, Results, strings, effects, entry points)
