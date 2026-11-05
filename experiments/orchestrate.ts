@@ -57,7 +57,8 @@ Tooling: \`./check.sh\` runs strict tsc, eslint with the security plugin, and vi
 export function prepare(task: string, lang: Lang, model: string, run: number): { dir: string; prompt: string } {
   const td = taskDir(task);
   if (!existsSync(td)) throw new Error(`no task ${task}`);
-  const guard = (lang as string) === 'tsg';
+  const guard = (lang as string) === 'tsg' || (lang as string) === 'tsb';
+  const brand = (lang as string) === 'tsb';
   const id = `${basename(td).split('-')[0]}-${lang}-${model}-r${run}`;
   const dir = join(WORK, id);
   rmSync(dir, { recursive: true, force: true });
@@ -79,7 +80,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
     if (guard) {
       const gk = join(REPO, 'experiments/ts-guard-kit');
       for (const f of readdirSync(gk)) copyFileSync(join(gk, f), join(dir, f));
-      const gt = join(td, 'ts-guard');
+      const gt = join(td, brand ? 'ts-guard-brand' : 'ts-guard');
       for (const f of readdirSync(gt)) copyFileSync(join(gt, f), join(dir, f));
     }
     for (const f of ['README.md', 'intent.feature']) copyFileSync(join(vis, f), join(dir, f));
@@ -90,7 +91,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
       writeFileSync(join(dir, 'scenarios.json'), JSON.stringify(sc.cases, null, 1));
       writeFileSync(join(dir, 'scenarios.test.ts'), TEST_FILE);
     }
-    writeFileSync(join(dir, 'PROMPT.md'), tsPrompt(basename(td)) + (guard ? GUARD_NOTE : ''));
+    writeFileSync(join(dir, 'PROMPT.md'), tsPrompt(basename(td)) + (guard ? (brand ? GUARD_NOTE.replace('opaque', 'branded') : GUARD_NOTE) : ''));
   }
   // Change-request tasks (E series): the previous program is the starting point, already in place as the deliverable.
   const startFile = lang === 'sigil' ? join(td, 'start/sigil/app.sigil') : join(td, 'start/ts/solution.ts');
@@ -124,7 +125,7 @@ export function prepare(task: string, lang: Lang, model: string, run: number): {
 export async function score(dir: string, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
   const [task, lang, model, r] = basename(dir).split('-');
   const sol = lang === 'sigil' ? join(dir, 'task', 'app.sigil') : join(dir, 'solution.ts');
-  const s = await runTask(task, (lang === 'tsg' ? 'ts' : lang) as Lang, sol);
+  const s = await runTask(task, (lang === 'tsg' || lang === 'tsb' ? 'ts' : lang) as Lang, sol);
   let verify: string | undefined;
   if (lang === 'sigil' && existsSync(sol)) {
     try {
