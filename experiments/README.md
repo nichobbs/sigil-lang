@@ -262,3 +262,21 @@ The size figures above (Sigil about 1.36x TS) counted only `solution.ts` and `ap
 Geometric mean Sigil/TS size over the 10 tasks (o200k_base tokens, scored m1 runs): 1.36 code only, **0.42 with the TS agents' own tests** (Sonnet 1.47 to 0.66, Haiku 1.27 to 0.35). Per task the ratio with tests ranges from 0.22 to 1.20 (only C2 is above 1).
 
 Caveats: the agent-written tests are uneven (Haiku wrote much more than Sonnet) and are not verified to enforce everything the Sigil checker enforces, so 0.42 is more likely an overstatement of Sigil's advantage than an exact figure; the true like-for-like number needs a fixed minimum test set (for instance the harness scenarios, about 2.8-3.0k tokens on E1/E2 as generated JSON plus a runner, which is verbose and not representative of hand-written tests). The whole-run token totals in the E1 and E2 tables (Sigil about 15% more) are dominated by the language spec in the brief and exclude all of this; they measure the cost of producing the program, not the size of what is delivered. Both views should be read together.
+
+## Fixed minimum TS test set (post-v1, 2026-11-05)
+
+To compare size at equal assurance, eight blind Sonnet agents (A1 to A4, B1 to B4) each wrote the smallest vitest set for the reference TS program that matches what Sigil's tooling gives for free: every Example, every `always` property over generated inputs, every privacy rule, and range boundaries (brief and tests in `experiments/min-tests/`). The writers saw the intent spec and the glossary (Sigil syntax, as the specification of the properties) and not the defects. Each set passes on the reference. Kill rate was then measured on the 16 seeded defects of the M6 rounds (`m6/killrate.sh`).
+
+Detection: the sets kill 15 of 16 seeded defects (the survivor is one hard B2 defect, a fallback-channel rule). For comparison Sigil's `verify --fast` caught 8 of 8 simple and 4 of 8 hard defects (12 of 16, M6 above).
+
+Size (o200k_base tokens, reference programs, comments stripped; geometric mean over 8 tasks):
+
+| Comparison | Sigil / TS |
+|---|---|
+| `app.sigil` vs `solution.ts` (code only) | 1.32 |
+| `app.sigil` vs `solution.ts` + fixed test set | 0.23 |
+| `app.sigil` + `glossary.sigil` vs `solution.ts` + fixed test set | **0.67** |
+
+The fixed test sets are large (about 2,700 tokens on average, 4.7 times the solution), because they enumerate the examples and properties explicitly. The like-for-like line is the last one: Sigil's assurance artifacts are the human-written glossary, which the TS arm replaces with these tests. On that basis Sigil's total is about two thirds of TS's, and its detection on the hard defects is lower (12 of 16 against 15 of 16).
+
+Caveats: one writer per task and one model; the glossary was written by a human for Sigil and the tests by an agent for TS, so authoring effort is not compared, only size; A and B tasks only; the earlier agent-written-test figure (0.42) used much smaller tests that were not validated against defects.
