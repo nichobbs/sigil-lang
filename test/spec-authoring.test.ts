@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { coverage, diffGlossary, effects, gate, parseApprovals, parseEntries, parseOwners, proposalHash, requiredRoles, tags } from '../src/spec.js';
 
@@ -172,5 +173,41 @@ describe('spec: CLI end to end', () => {
   it('editing glossary.sigil directly fails check', () => {
     writeFileSync(join(dir, 'glossary.sigil'), `${readFileSync(join(dir, 'glossary.sigil'), 'utf8')}\n; sneaky`);
     expect(cli('check', dir).code).toBe(1);
+  });
+});
+
+describe('spec: promote edge cases', () => {
+  const cli = (...a: string[]) => {
+    const r = spawnSync('npx', ['tsx', 'src/cli.ts', 'spec', ...a], { encoding: 'utf8' });
+    return { code: r.status ?? 1, out: `${r.stdout}${r.stderr}` };
+  };
+  const fresh = () => {
+    const d = mkdtempSync(join(tmpdir(), 'sigil-spec-edge-'));
+    writeFileSync(join(d, 'glossary.sigil'), BASE);
+    writeFileSync(join(d, 'spec.owners'), OWNERS);
+    // A fixture-only change: only the owner has to sign.
+    writeFileSync(join(d, 'proposed-glossary.sigil'), BASE.replace('(set actor (Actor id role))', '(set actor (Actor id role))\n    (default x 1)'));
+    return d;
+  };
+
+  it('promote without spec.history still works but warns that there is no tamper check', () => {
+    const d = fresh();
+    expect(cli('approve', d, '--as', 'nic', '--role', 'owner').code).toBe(0);
+    const r = cli('promote', d);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/no spec\.history.*no tamper check/);
+    expect(existsSync(join(d, 'spec.history'))).toBe(true); // promote starts the history
+    expect(cli('check', d).code).toBe(0);
+  });
+
+  it('a promote that dies after recording history but before writing the glossary is flagged by check', () => {
+    const d = fresh();
+    expect(cli('init', d, '--as', 'nic').code).toBe(0);
+    // Simulate the crash window: the history line for the new glossary exists, glossary.sigil is still the old one.
+    const proposed = readFileSync(join(d, 'proposed-glossary.sigil'), 'utf8');
+    appendFileSync(join(d, 'spec.history'), `(promoted (glossary-sha "${createHash('sha256').update(proposed).digest('hex')}") (proposal "x") (by nic) (at "t"))\n`);
+    const r = cli('check', d);
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/differs from the last promoted version/);
   });
 });
