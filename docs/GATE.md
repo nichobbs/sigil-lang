@@ -53,4 +53,5 @@ Exit codes: 0 accepted, 1 rejected, 2 malformed or bad usage.
 - The unit approver is not yet tied to the spec owners in `spec.owners`; any listed approver counts.
 - Approval is per pair, not per system, so a safe unit can be re-wired by an agent in a new system. The composition check is the control for that, and it is conservative, not complete.
 - No runtime isolation: a process started from `loadUnit` bytes is only as contained as the host that starts it. Capability mediation at runtime is the C3 experiment (docs/EXPERIMENT.md).
+- Registry writes are not atomic (read, append, rewrite) and a release record is overwritten silently, so concurrent writers can lose entries. Fine for a single-writer prototype; a real registry needs an append-only store.
 - Dynamic code is not supported: new code is a new unit and goes through attest, approve and admit.

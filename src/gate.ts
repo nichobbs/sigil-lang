@@ -163,6 +163,7 @@ export function admit(systemSrc: string, reg: Registry, trust: Trust, request: S
   let sys: ReturnType<typeof parseSystem> | undefined;
   try {
     sys = parseSystem(systemSrc);
+    if (!sys.processes.length) bad('G-malformed', 'system declares no processes; there is nothing to admit');
     for (const d of checkSystem(sys)) bad(d.code, d.msg);
   } catch (e) {
     bad('G-malformed', e instanceof SigilError ? e.message : String(e));
@@ -199,7 +200,10 @@ export function admit(systemSrc: string, reg: Registry, trust: Trust, request: S
     if (deployer && [...approvers].some((a) => trust.approvers[a] === request.by)) bad('G-role-conflict', `${tag}: the deploying key also approved this unit (approval and deploy must be different principals)`);
     if (best && approvers.size) units.push({ process: p.name, program: h.program, spec: h.spec, evidence: sha256(stable(best)), approvedBy: [...approvers].sort() });
   }
-  for (const k of Object.values(trust.attesters)) if (Object.values(trust.approvers).includes(k) || Object.values(trust.agents).includes(k)) bad('G-role-conflict', 'trust file lists one key in more than one role (attester, approver, agent)');
+  const roles: [string, Record<string, string>][] = [['attester', trust.attesters], ['approver', trust.approvers], ['agent', trust.agents]];
+  for (let i = 0; i < roles.length; i++)
+    for (let j = i + 1; j < roles.length; j++)
+      if (Object.values(roles[i][1]).some((k) => Object.values(roles[j][1]).includes(k))) bad('G-role-conflict', `trust file lists one key as both ${roles[i][0]} and ${roles[j][0]}`);
 
   const ok = diags.length === 0;
   const release = ok && sys ? { name: sys.name, system: sysHash, deployedBy: deployer!, units } : undefined;
