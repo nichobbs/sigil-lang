@@ -27,6 +27,9 @@ const SWAP: Record<string, string> = {
   min: 'max',
   max: 'min',
   'div-floor': 'mul',
+  mod: 'div-floor',
+  any: 'all',
+  all: 'any',
 };
 
 function children(e: Expr): Expr[] {

@@ -3,7 +3,7 @@
 // so every run is deterministic and its effect trace is observable.
 
 import { Expr, FnDef, Program, Type, resolveType } from './ast.js';
-import { CAP_OPS } from './caps.js';
+import { CAP_OPS, RANGE_MAX } from './caps.js';
 import { printExpr } from './print/sexp.js';
 
 export type Val =
@@ -420,6 +420,19 @@ export class Interp {
       };
       return name === 'map' ? xs.map(run) : xs.filter((x) => run(x) === true);
     }
+    if (name === 'any' || name === 'all') {
+      // short-circuit: stops at the first element that decides the answer
+      const xs = this.eval(e.args[0], env);
+      if (!Array.isArray(xs)) throw new RuntimeFault(`${name}: expected a list`);
+      const c = this.lambda(e.args[1], env);
+      const want = name === 'any';
+      for (const x of xs) {
+        const env2 = new Map(c.env);
+        env2.set(c.params[0], x);
+        if ((this.eval(c.body, env2) === true) === want) return want;
+      }
+      return !want;
+    }
     if (name === 'sort') {
       // (sort xs (fn (a b) before)): stable merge sort; before(a, b) true means a goes strictly before b.
       const xs = this.eval(e.args[0], env);
@@ -454,7 +467,7 @@ export class Interp {
       const xs = this.eval(xsE, env);
       if (!Array.isArray(xs)) throw new RuntimeFault('fold: expected a list');
       const c = this.lambda(fE, env);
-      if (c.params.length !== 2) throw new RuntimeFault('fold: lambda needs two parameters (acc x)');
+      if (c.params.length !== 2 && c.params.length !== 3) throw new RuntimeFault('fold: lambda needs parameters (acc x) or (acc x i)');
       const T: Type = { k: 'named', name: tE.name };
       let acc = this.eval(initE, env);
       this.checkType(acc, T, 'fold initial value');
@@ -462,6 +475,7 @@ export class Interp {
         const env2 = new Map(c.env);
         env2.set(c.params[0], acc);
         env2.set(c.params[1], x);
+        if (c.params.length === 3) env2.set(c.params[2], BigInt(i));
         acc = this.eval(c.body, env2);
         this.checkType(acc, T, `fold step ${i}`);
       });
@@ -491,6 +505,13 @@ export class Interp {
         const q = x / y;
         return x % y !== 0n && x % y < 0n !== y < 0n ? q - 1n : q;
       }
+      case 'mod': {
+        const x = this.num(a[0], 'mod');
+        const y = this.num(a[1], 'mod');
+        if (y === 0n) throw new RuntimeFault('division by zero');
+        const r = x % y;
+        return r !== 0n && r < 0n !== y < 0n ? r + y : r;
+      }
       case 'neg':
         return -this.num(a[0], 'neg');
       case 'min':
@@ -518,6 +539,14 @@ export class Interp {
       case 'append':
         if (!Array.isArray(a[0])) throw new RuntimeFault('append: expected a list');
         return [...a[0], a[1]];
+      case 'concat':
+        if (!Array.isArray(a[0]) || !Array.isArray(a[1])) throw new RuntimeFault('concat: expected two lists');
+        return [...a[0], ...a[1]];
+      case 'range': {
+        const n = this.num(a[0], 'range');
+        if (n > BigInt(RANGE_MAX)) throw new RuntimeFault(`range: ${n} exceeds the cap of ${RANGE_MAX}`);
+        return Array.from({ length: n > 0n ? Number(n) : 0 }, (_, i) => BigInt(i));
+      }
       case 'take':
       case 'drop': {
         if (!Array.isArray(a[0])) throw new RuntimeFault(`${name}: expected a list`);

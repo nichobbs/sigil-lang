@@ -1,7 +1,7 @@
 // SMT discharge of relational `ensures` that intervals cannot prove.
 //
-// Fragment: integer arithmetic, comparisons, booleans, if, let, match on enums, record field reads and
-// construction, and bounded lists (`len`, `sum`, `map`, `filter`, `list`).
+// Fragment: integer arithmetic (div-floor and mod by a positive literal), comparisons, booleans, if, let, match on
+// enums, record field reads and construction, and bounded lists (`len`, `sum`, `map`, `filter`, `any`, `all`, `list`).
 //
 // Lists: a (List T min max) with max <= maxList (default 6) is encoded exactly as a length variable in
 // [min, max] plus one symbolic element per slot; slots at index >= len are never observed. `sum` is the
@@ -252,6 +252,25 @@ async function proveOne(z3: Z3, prog: Program, f: FnDef, index: number, maxList:
         const d = a[1];
         if (d.k !== 'int' || d.v <= 0n) throw new Unsupported('divisor must be a positive literal');
         return num(a[0], env).div(Int.val(d.v));
+      }
+      case 'mod': {
+        need(2);
+        // SMT-LIB mod is non-negative; it equals floor modulo only for a positive divisor: require a positive literal.
+        const d = a[1];
+        if (d.k !== 'int' || d.v <= 0n) throw new Unsupported('divisor must be a positive literal');
+        return num(a[0], env).mod(Int.val(d.v));
+      }
+      case 'any':
+      case 'all': {
+        need(2);
+        const l = listOf(tr(a[0], env), `${e.fn} argument`);
+        if (!l.elems) throw new Unsupported(`${e.fn} over a list longer than ${maxList} (elements not modelled)`);
+        const fn = lambda(a[1], env);
+        const parts = l.elems.map((x, i) => {
+          const p = bool(scalar(fn(x), `${e.fn} predicate`));
+          return e.fn === 'any' ? And(Int.val(i).lt(l.len), p) : Or(Int.val(i).ge(l.len), p);
+        });
+        return parts.length ? (e.fn === 'any' ? Or(...parts) : And(...parts)) : Bool.val(e.fn === 'all');
       }
       case 'neg': need(1); return Int.val(0).sub(num(a[0], env));
       case 'min': { need(2); const x = num(a[0], env), y = num(a[1], env); return If(x.le(y), x, y); }

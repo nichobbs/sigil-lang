@@ -5,7 +5,7 @@
 import { Expr, Field, FnDef, Program, Type } from '../ast.js';
 import { Arity, Sections, Syntax, arityTable, positionalArgs } from './common.js';
 
-const RENAME: Record<string, string> = { add: '+', sub: '-', mul: '*', 'div-floor': '/' };
+const RENAME: Record<string, string> = { add: '+', sub: '-', mul: '*', 'div-floor': '/', mod: '%' };
 
 function ty(t: Type): string {
   switch (t.k) {

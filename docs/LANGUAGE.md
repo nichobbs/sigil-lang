@@ -56,7 +56,7 @@ Clauses in order: `in`, `out`, then optional `needs`, `declassifies`, `requires`
 | `(do e1 e2)` | evaluate in order, value of last |
 | `(if c a b)` | `c` must be Bool; both branches required |
 | `(match e (Case body)... )` | on an enum: one arm per case. On a Result: `(ok v body)` and `(err e body)`, both required. Binder is optional for enum arms |
-| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map` or `filter`. `fold` takes a two-parameter lambda `(fn (acc x) body)`, `sort` a two-parameter comparator `(fn (a b) before)` |
+| `(fn (x) body)` | one-parameter lambda; only as the 2nd argument of `map`, `filter`, `any` or `all`. `fold` takes `(fn (acc x) body)` or `(fn (acc x i) body)` (`i` is the 0-based index), `sort` a two-parameter comparator `(fn (a b) before)` |
 | `(try e :on-err Case)` | `e` is a Result: Ok gives its value, Err returns `(err Case)` from the whole function (function must return a Result with enum Err containing `Case`) |
 | `(ok e)` `(err e)` | build a Result |
 
@@ -65,13 +65,14 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | name | args | result |
 |---|---|---|
 | `add sub mul min max` | 2 | Int |
-| `div-floor` | 2 | Int, floor division; divisor range must exclude 0 |
+| `div-floor` `mod` | 2 | Int, floor division / floor modulo (sign of the divisor: `(mod -7 3)` is 2, `(mod 7 -3)` is -2); divisor range must exclude 0. `(mod x 7)` is in 0..6 |
 | `neg` | 1 | Int |
 | `sum` | 1 list of Int | Int |
 | `len` | 1 list | Int |
 | `map` `filter` | list, lambda | list (`filter` length becomes 0..max) |
+| `any` `all` | list, `(fn (x) cond)` | Bool: some / every element satisfies `cond`. Empty list: `any` false, `all` true. Stops at the first deciding element |
 | `sort` | list, `(fn (a b) before)` | the same list, reordered. `before` is true when `a` must come strictly before `b`; the sort is stable (ties keep their input order), so break ties inside `before`, e.g. `(or (< a.price b.price) (and (= a.price b.price) (< a.id b.id)))`. Same length bound and element facts; labels of the comparator flow into the result. About n log n comparisons: use it instead of counting ranks by hand (which is quadratic and can run out of fuel). Compiled to Wasm (differentially tested against the interpreter) |
-| `fold` | list, Type, init, `(fn (acc x) body)` | a value of Type. Loops over the list in order; `Type` (a declared type name, e.g. `Cents` or a record) is the accumulator's invariant: `init` and every step result must fit it (checked as obligations and at run time), and inside the body `acc` is assumed to be any value of Type. Clamp with `min`/`max` so each step provably fits. Compiled to Wasm (differentially tested against the interpreter) |
+| `fold` | list, Type, init, `(fn (acc x) body)` or `(fn (acc x i) body)` | a value of Type. Loops over the list in order (`i`: index, an Int in 0..max-1); `Type` (a declared type name, e.g. `Cents` or a record) is the accumulator's invariant: `init` and every step result must fit it (checked as obligations and at run time), and inside the body `acc` is assumed to be any value of Type. Clamp with `min`/`max` so each step provably fits. Compiled to Wasm (differentially tested against the interpreter) |
 | `list` | n | list of exactly n elements: `(list)` is the empty list, `(list 0)` is a list holding one 0 (not an empty list) |
 | `=` | 2 | Bool, structural equality on any values |
 | `< <= > >=` | 2 or more | Bool, chained: `(<= 0 x 100)` |
@@ -82,6 +83,8 @@ Builtins (`E-arity` on a wrong count for fixed arities):
 | `chars` | 1 Str with `:max N` | list of code points, `(List (Int 0 1114111) 0 N)`. Counts characters, not UTF-16 units. A Str without `:max` is `E-type` |
 | `from-chars` | 1 list of code points | Str (each element must be 0..1114111; unproved if its range is wider) |
 | `append` | list, element | the list with the element at the end (length grows by 1: wrap in `take` to fit a declared max) |
+| `concat` | list, list | both lists in order (length ranges add: wrap in `take` to fit a declared max) |
+| `range` | n | the list 0..n-1, `(List (Int 0 n-1) 0 n)`; n below 0 counts as 0. n must be provably at most 10000 (`E-type`): `(range (min n 10000))`. Index loops: `(all (range (sub (len xs) 1)) (fn (i) (<= (at xs i 0) (at xs (add i 1) 0))))` |
 | `take` `drop` | list, n | first n elements, or all but the first n; n below 0 counts as 0, above the length as the length |
 | `at` | list, index, default | the element at a 0-based index, or the default when the index is out of range (total, never fails) |
 | `ok err` | 1 | Result |
@@ -104,7 +107,7 @@ Ranges are interval-based and path-insensitive: `if` conditions do not narrow ra
 (fn clamp-sub (in (a Cents) (b Cents)) (out Cents) (max 0 (sub a b)))
 ```
 
-Patterns. There is no mutable state: pass state in as parameters and return updated values by building a new record. Authorization is a `match` on a role enum returning `Err`. Counting and totalling use `filter`, `map`, `len`, `sum`; anything stateful across a list (running totals, caps on a running balance, first match) uses `fold`, with a record type as the accumulator when you need several values: `(fold xs Acc (Acc 0 0) (fn (a x) (Acc (min (add a.sum x) 1000000000000000) (min (add a.n 1) 1000))))`.
+Patterns. There is no mutable state: pass state in as parameters and return updated values by building a new record. Authorization is a `match` on a role enum returning `Err`. Counting and totalling use `filter`, `map`, `len`, `sum`; existence checks use `any`/`all`; anything stateful across a list (running totals, caps on a running balance, first match) uses `fold`, with a record type as the accumulator when you need several values: `(fold xs Acc (Acc 0 0) (fn (a x) (Acc (min (add a.sum x) 1000000000000000) (min (add a.n 1) 1000))))`.
 
 ```sigil
 (type Role (var Admin Member))
@@ -279,13 +282,13 @@ Feature: Shop
 | E-name | unknown function, variable, type, or builtin | spell it as declared; validators are not callable |
 | E-field | no such field on a value or in a record constructor | use the declared field names |
 | E-arity | wrong argument count, missing record fields, mixed positional and keyword | match the signature or table above |
-| E-type | arithmetic on a non-number | pass an Int, e.g. `(len xs)` not `xs` |
+| E-type | arithmetic on a non-number; `range` n not provably at most 10000 | pass an Int, e.g. `(len xs)` not `xs`; clamp n with `min` |
 | E-cap | handle not in `needs`, no `bind`, wrong kind, or unknown kind | add it to `needs` (also for callees) and to `program` |
 | E-flow | data above a field's or sink's level | remove the data, or ask for a policy change or declassifier; never relabel |
 | E-integrity | untrusted data into a `:validated`/`:control` field | take a validated parameter type |
 | E-match | non-exhaustive match (warning if an arm can never match) | one arm per case |
 | E-try | `try` in a function not returning Result, or `:on-err` not an Err case | return a Result with enum Err |
-| E-lambda | lambda outside `map`/`filter`/`fold`/`sort`, or wrong parameter count (1, or 2 for `fold` and `sort`) | inline it |
+| E-lambda | lambda outside `map`/`filter`/`any`/`all`/`fold`/`sort`, or wrong parameter count (1; 2 for `sort`; 2 or 3 for `fold`) | inline it |
 | E-target | capability kind unavailable on a declared target | change targets or kind |
 | E-policy | bind exceeds `allow`, or declassifier undeclared or out of scope | lower the bind, or ask a human to change the policy |
 | (crash) `unknown type X` | a type name is not declared; the checker aborts with a stack trace | declare the type |
@@ -293,4 +296,4 @@ Feature: Shop
 
 ## Not supported
 
-No recursion, loops (other than `fold` over a bounded list), mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money`, `=` and taking a bounded Str apart with `chars` / putting one back with `from-chars` (no split, regex match, case change, formatting widths: build them with `chars` and `fold`; digits to a number is `(sub code 48)` in a fold), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no `concat`, `zip` or `reverse` (build them with `fold` and `append`), no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`sum`/`len`/`fold`, or report the gap instead of faking it.
+No recursion, loops (other than `fold` over a bounded list), mutation, closures as values, user-defined generics, higher-kinded types, floats, maps, sets, tuples, optionals or null, string operations beyond `text`, `money`, `=` and taking a bounded Str apart with `chars` / putting one back with `from-chars` (no split, regex match, case change, formatting widths: build them with `chars` and `fold`; digits to a number is `(sub code 48)` in a fold), no date or time, no random or I/O other than `put post emit fresh`, no imports or modules (one `app.sigil`), no unbounded `Int` or `List`, no `zip` or `reverse` (build them with `fold` and `append`, or `range` and `at`), no user-callable validators, and no Wasm or syntax choices on your side. If the task needs something here, model it with bounded integers, enums, lists processed by `map`/`filter`/`any`/`all`/`sum`/`len`/`fold`, or report the gap instead of faking it.

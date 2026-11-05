@@ -11,7 +11,7 @@
 // declassifiers only as human-declared policy entries, no covert channels, capability rows must be declared rather than inferred.
 
 import { Expr, FnDef, Policy, Program, Type, asDeclassify, resolveType } from './ast.js';
-import { BUILTIN_ARITY, CAP_OPS, KIND_TARGETS, isBuiltin, kindOfHandle } from './caps.js';
+import { BUILTIN_ARITY, CAP_OPS, KIND_TARGETS, RANGE_MAX, isBuiltin, kindOfHandle } from './caps.js';
 import * as I from './interval.js';
 import { Interval } from './interval.js';
 import * as L from './labels.js';
@@ -67,6 +67,11 @@ export interface CheckResult {
   evidence: Map<string, FnEvidence>;
   flows: FlowEdge[];
   manifest: { fn: string; needs: string[]; declassifies: { name: string; reason: string }[] }[];
+  /**
+   * For each `(range n)` call node: the largest n the analysis allows (over every evaluation of that node). The Wasm
+   * backend sizes the list's scratch memory from it. Absent for a node whose n is unbounded or above RANGE_MAX.
+   */
+  rangeHi?: Map<Expr, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +190,7 @@ interface Ctx {
     seen: Set<string>;
     declUsed: Set<string>; // declassifiers applied lexically in the root function
     n: number;
+    rangeHi: Map<Expr, number>;
   };
 }
 
@@ -354,7 +360,7 @@ function evalExpr(e: Expr, env: Env, ctx: Ctx): AV {
     case 'match':
       return evalMatch(e, env, ctx);
     case 'lam':
-      diag(ctx, 'error', 'E-lambda', 'lambda is only allowed as an argument of map/filter');
+      diag(ctx, 'error', 'E-lambda', 'lambda is only allowed as an argument of map/filter/any/all/fold/sort');
       return topAV();
     case 'call':
       return evalCall(e, env, ctx);
@@ -458,20 +464,25 @@ const ALIASES: Record<string, string> = {
   length: 'len works on lists: (len xs); for a string (len (chars s))',
   'string-length': '(len (chars s))',
   split: 'there is no split: scan with fold over (chars s)',
-  concat: 'there is no concat: fold with append',
   push: 'append: (append xs x)',
   head: 'at: (at xs 0 default)',
   first: 'at: (at xs 0 default)',
   nth: 'at: (at xs i default)',
   get: 'get is not runnable; use at for lists',
-  reduce: 'fold: (fold xs Type init (fn (acc x) body))',
-  foldl: 'fold: (fold xs Type init (fn (acc x) body))',
+  reduce: 'fold: (fold xs Type init (fn (acc x) body)), or (fn (acc x i) body) with the index i',
+  foldl: 'fold: (fold xs Type init (fn (acc x) body)), or (fn (acc x i) body) with the index i',
   'parse-int': 'no parse-int: fold over chars, (sub code 48) per digit',
   'to-int': 'no parse-int: fold over chars, (sub code 48) per digit',
   'string-append': 'text concatenates: (text a b)',
   concatenate: 'text concatenates strings: (text a b)',
   abs: '(max x (neg x))',
-  mod: 'no modulo: (sub a (mul (div-floor a b) b))',
+  rem: 'mod is floor modulo (sign of the divisor): (mod a b)',
+  modulo: '(mod a b)',
+  '%': '(mod a b)',
+  'list-concat': '(concat xs ys)',
+  iota: '(range n) is 0..n-1',
+  some: '(any xs (fn (x) cond))',
+  every: '(all xs (fn (x) cond))',
   'not-equal': '(not (= a b))',
   '!=': '(not (= a b))',
   '==': '(= a b)',
@@ -700,7 +711,7 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
   };
   const labOf = (xs: AV[]) => L.joinAll(xs.map(flatten));
   // Evaluate arguments first so one arity slip does not hide every other mistake in the call.
-  const higherOrder = name === 'map' || name === 'filter' || name === 'fold' || name === 'sort';
+  const higherOrder = name === 'map' || name === 'filter' || name === 'fold' || name === 'sort' || name === 'any' || name === 'all';
   const xs: AV[] = higherOrder ? [] : e.args.map((a) => evalExpr(a, env, ctx));
 
   switch (name) {
@@ -708,6 +719,7 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
     case 'sub':
     case 'mul':
     case 'div-floor':
+    case 'mod':
     case 'min':
     case 'max': {
       if (!ar(2)) return topAV();
@@ -737,11 +749,13 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
           r = I.imax(x, y);
           break;
         default: {
+          // div-floor and mod share the divisor rule
           const nz = !I.containsZero(y);
           const dv = e.args[1];
-          const divFix: Fix | undefined = !nz && y !== 'top' && y.lo >= 0n ? { old: printExpr(e), new: `(div-floor ${printExpr(e.args[0])} (max 1 ${printExpr(dv)}))`, why: 'a zero divisor becomes 1, so the result is the numerator itself. Use only if the spec says what a zero divisor means.' } : undefined;
+          const why = name === 'mod' ? 'a zero divisor becomes 1, so the result is 0.' : 'a zero divisor becomes 1, so the result is the numerator itself.';
+          const divFix: Fix | undefined = !nz && y !== 'top' && y.lo >= 0n ? { old: printExpr(e), new: `(${name} ${printExpr(e.args[0])} (max 1 ${printExpr(dv)}))`, why: `${why} Use only if the spec says what a zero divisor means.` } : undefined;
           oblige(ctx, 'div', `divisor ${printExpr(dv)} is non-zero`, nz ? 'proved' : 'unproved', `divisor ${I.showInterval(y)}`, divFix);
-          r = nz ? I.divFloor(x, y) : I.TOP;
+          r = !nz ? I.TOP : name === 'mod' ? I.mod(x, y) : I.divFloor(x, y);
         }
       }
       return mk({ num: track(ctx, r), lab: labOf([a, b]) });
@@ -778,6 +792,24 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       const hi = l.len === undefined || l.len === 'top' ? I.TOP : I.range(0n, l.len.hi);
       return mk({ len: hi, elem: l.elem, lab: L.join(l.lab, flatten(r)) });
     }
+    case 'any':
+    case 'all': {
+      // (any xs (fn (x) cond)) / (all xs (fn (x) cond)): Bool. Evaluation stops at the first deciding element, so whether
+      // the lambda runs for element k depends on the length and on earlier results: both join into the pc of the body.
+      if (!ar(2)) return topAV();
+      const l = evalExpr(e.args[0], env, ctx);
+      const f = e.args[1];
+      if (f.k !== 'lam' || f.params.length !== 1) {
+        diag(ctx, 'error', 'E-lambda', `${name} needs a one-parameter lambda (fn (x) cond) as second argument`);
+        return topAV();
+      }
+      const env2 = new Map(env);
+      env2.set(f.params[0], l.elem ?? topAV());
+      const pc0 = L.join(ctx.pc, l.lab);
+      const r0 = evalExpr(f.body, env2, { ...ctx, pc: pc0, report: false });
+      const r = evalExpr(f.body, env2, { ...ctx, pc: L.join(pc0, flatten(r0)) });
+      return mk({ lab: L.join(l.lab, L.join(flatten(r0), flatten(r))) });
+    }
     case 'sort': {
       // (sort xs (fn (a b) before)): stable merge sort; (before a b) true means a goes strictly before b. The result is a
       // permutation of xs: same length, same element facts. Labels of the comparator flow into the order, so they join in.
@@ -803,8 +835,8 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
         diag(ctx, 'error', 'E-type', `fold: second argument must be the name of a declared type for the accumulator, in ${printExpr(e)}`);
         return topAV();
       }
-      if (f.k !== 'lam' || f.params.length !== 2) {
-        diag(ctx, 'error', 'E-lambda', 'fold needs a two-parameter lambda (fn (acc x) body) as fourth argument');
+      if (f.k !== 'lam' || (f.params.length !== 2 && f.params.length !== 3)) {
+        diag(ctx, 'error', 'E-lambda', 'fold needs a lambda (fn (acc x) body), or (fn (acc x i) body) with the 0-based index i, as fourth argument');
         return topAV();
       }
       const l = evalExpr(xsE, env, ctx);
@@ -813,10 +845,13 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       conforms(ctx, init, T, `fold initial value (${tE.name})`, initE);
       const base = absOfType(ctx.prog, T, tE.name, 'fold accumulator');
       let lab = L.join(flatten(init), l.lab);
+      // the index of an element is below the list's maximum length; its label is the length's
+      const idx = l.len === undefined || l.len === 'top' ? I.TOP : I.range(0n, l.len.hi > 0n ? l.len.hi - 1n : 0n);
       const step = (c: Ctx): AV => {
         const env2 = new Map(env);
         env2.set(f.params[0], mapLabels(base, (x) => L.join(x, lab)));
         env2.set(f.params[1], l.elem ?? topAV());
+        if (f.params.length === 3) env2.set(f.params[2], mk({ num: track(c, idx), lab: l.lab }));
         return evalExpr(f.body, env2, c);
       };
       const quiet = { ...ctx, report: false };
@@ -847,6 +882,30 @@ function evalBuiltin(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV {
       if (!ar(2)) return topAV();
       const [l, x] = xs;
       return mk({ len: I.add(l.len ?? I.TOP, I.point(1n)), elem: l.elem ? joinAV(l.elem, x) : x, lab: L.join(l.lab, flatten(x)) });
+    }
+    case 'concat': {
+      if (!ar(2)) return topAV();
+      const [a, b] = xs;
+      for (const [v, i] of [[a, 0], [b, 1]] as const) {
+        if (v.len === undefined && (v.num !== undefined || v.fields !== undefined || v.tags !== undefined)) diag(ctx, 'error', 'E-type', `concat expects a list for argument ${i + 1}, in ${printExpr(e)}`);
+      }
+      const elem = a.elem && b.elem ? joinAV(a.elem, b.elem) : (a.elem ?? b.elem);
+      return mk({ len: I.add(a.len ?? I.TOP, b.len ?? I.TOP), elem, lab: L.join(a.lab, b.lab) });
+    }
+    case 'range': {
+      // (range n): the list 0..n-1 (empty for n <= 0). n must be provably at most RANGE_MAX so the length is bounded.
+      if (!ar(1)) return topAV();
+      const n = xs[0];
+      const nv = n.num;
+      if (nv === undefined || nv === 'top' || nv.hi > BigInt(RANGE_MAX)) {
+        diag(ctx, 'error', 'E-type', `range needs n provably at most ${RANGE_MAX}, but ${printExpr(e.args[0])} is ${nv === undefined ? 'not a number' : I.showInterval(nv)}; clamp it: (range (min ${printExpr(e.args[0])} ${RANGE_MAX}))`);
+        return topAV();
+      }
+      const hi = nv.hi > 0n ? nv.hi : 0n;
+      const prev = ctx.acc.rangeHi.get(e);
+      if (prev === undefined || Number(hi) > prev) ctx.acc.rangeHi.set(e, Number(hi));
+      const lab = flatten(n);
+      return mk({ len: I.range(nv.lo > 0n ? nv.lo : 0n, hi), elem: mk({ num: I.range(0n, hi > 0n ? hi - 1n : 0n), lab }), lab });
     }
     case 'take': {
       if (!ar(2)) return topAV();
@@ -943,7 +1002,8 @@ function trackAll(ctx: Ctx, av: AV | undefined, depth = 0): void {
 }
 
 export function checkFn(prog: Program, pol: Policy, f: FnDef, into: CheckResult): void {
-  const acc: Ctx['acc'] = { diags: into.diags, obs: [], flows: into.flows, maxAbs: 0n, seen: new Set(), declUsed: new Set(), n: 0 };
+  into.rangeHi ??= new Map();
+  const acc: Ctx['acc'] = { diags: into.diags, obs: [], flows: into.flows, maxAbs: 0n, seen: new Set(), declUsed: new Set(), n: 0, rangeHi: into.rangeHi };
   const ctx: Ctx = { prog, pol, root: f, cur: f, depth: 0, report: true, pc: L.bottom(), acc };
 
   for (const n of f.needs) {
@@ -1024,7 +1084,7 @@ function undeclaredTypes(prog: Program): [string, string][] {
 }
 
 export function check(prog: Program, pol: Policy): CheckResult {
-  const res: CheckResult = { diags: [], evidence: new Map(), flows: [], manifest: [] };
+  const res: CheckResult = { diags: [], evidence: new Map(), flows: [], manifest: [], rangeHi: new Map() };
   const wiring = (code: string, msg: string, level: Diag['level'] = 'error') => res.diags.push({ level, code, fn: '(program)', msg });
 
   // A reference to a type that is not declared would crash later analysis: report it as an ordinary error and stop.
