@@ -202,13 +202,13 @@ A function touches the outside world only through handles named in its `needs`. 
 
 ## Declassifiers
 
-Releasing labelled data is possible only through a declassifier declared in the policy; code names it in `declassifies` and applies `(declassify name expr)`. It lowers confidentiality from at most `from` to `to`; integrity is unchanged; data above `from` is `E-flow`. The policy's `fields` and `fns` restrict where it applies (`E-policy`). The checker does not check that `expr` really reduces information: write a coarse expression such as a band.
+Releasing labelled data is possible only through a declassifier declared in the policy; code names it in `declassifies` and applies `(declassify name expr)`. It lowers confidentiality from at most `from` to `to`; integrity is unchanged; data above `from` is `E-flow`. The policy's `fields` and `fns` restrict where it applies (`E-policy`). `(max-bits N)` bounds how much the released value can carry: 1 for a yes/no answer (a comparison or a Bool-returning function), otherwise the log2 of the value's range (an `(Int 0 36)` digit sum is 6 bits). A larger release is `E-policy`. Without `max-bits` the checker does not check that `expr` reduces information and warns (`W-declassify`): a declassifier scoped only by label, function and reason will release a checksum as readily as a yes/no flag.
 
 ```sigil-policy
 (policy
   (declassify salary-band (from pii) (to internal)
     (reason "Audit may record a salary only as a 10,000-wide band.")
-    (fields Applicant.salary) (fns screen)))
+    (fields Applicant.salary) (fns screen) (max-bits 20)))
 ```
 
 ```sigil

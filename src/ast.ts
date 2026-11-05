@@ -81,6 +81,7 @@ export interface Declassifier {
   reason: string;
   fields?: string[]; // restriction: only data whose labelled sources are among these (e.g. Customer.name)
   fns?: string[]; // restriction: only these functions may apply it
+  maxBits?: number; // restriction: the released value carries at most this many bits (1 = a yes/no answer)
 }
 
 export interface Policy {

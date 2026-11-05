@@ -341,7 +341,7 @@ export function parseProgram(src: string, into: Program = emptyProgram()): Progr
   return p;
 }
 
-const DECL_FORM = '(declassify name (from conf) (to conf) (reason "...") [(fields Type.field ...)] [(fns fn ...)])';
+const DECL_FORM = '(declassify name (from conf) (to conf) (reason "...") [(fields Type.field ...)] [(fns fn ...)] [(max-bits N)])';
 
 function parseDeclassifier(c: Extract<SExp, { t: 'list' }>): Declassifier | undefined {
   if (c.items.length < 2 || !isSym(c.items[1])) return fail(DECL_FORM, c);
@@ -356,6 +356,7 @@ function parseDeclassifier(c: Extract<SExp, { t: 'list' }>): Declassifier | unde
   let reason: string | undefined;
   let fields: string[] | undefined;
   let fns: string[] | undefined;
+  let maxBits: number | undefined;
   for (const cl of c.items.slice(2)) {
     if (!isList(cl) || !isSym(cl.items[0])) return fail(DECL_FORM, cl);
     const tag = (cl.items[0] as { v: string }).v;
@@ -367,12 +368,16 @@ function parseDeclassifier(c: Extract<SExp, { t: 'list' }>): Declassifier | unde
       reason = r.v;
     } else if (tag === 'fields') fields = cl.items.slice(1).map((x) => sym(x, 'Type.field', cl));
     else if (tag === 'fns') fns = cl.items.slice(1).map((x) => sym(x, 'function name', cl));
-    else return fail(`unknown declassify clause ${tag}`, cl);
+    else if (tag === 'max-bits') {
+      const n = cl.items[1];
+      if (cl.items.length !== 2 || !n || n.t !== 'int' || n.v < 1n || n.v > 64n) return fail('(max-bits N) with N an integer from 1 to 64', cl);
+      maxBits = Number(n.v);
+    } else return fail(`unknown declassify clause ${tag}`, cl);
   }
   if (!from || !to || reason === undefined) return fail(`declassifier ${name} needs (from ...), (to ...) and a (reason "...")`, c);
   if (CONFS.indexOf(to) >= CONFS.indexOf(from)) return fail(`declassifier ${name}: (to ${to}) must be strictly lower than (from ${from})`, c);
   if ((fields && !fields.length) || (fns && !fns.length)) return fail(`declassifier ${name}: empty restriction list`, c);
-  return { name, from, to, reason, fields, fns };
+  return { name, from, to, reason, fields, fns, ...(maxBits !== undefined ? { maxBits } : {}) };
 }
 
 export function parsePolicy(src: string): Policy {
