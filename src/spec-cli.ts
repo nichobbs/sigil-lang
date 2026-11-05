@@ -95,9 +95,11 @@ export function specMain(args: string[]): number {
           const want = lastPromotedSha(read('spec.history'));
           if (want && want !== sha256(base)) throw new SigilError('glossary.sigil does not match spec.history: it was edited outside promote; run spec check');
         }
+        if (!has('spec.history')) console.error('warning: no spec.history, so there is no tamper check; run spec init first');
+        // History first: if a later step fails, check flags the glossary instead of silently trusting an unrecorded edit.
+        appendFileSync(join(dir, 'spec.history'), historyLine(sha256(prop), hash, g.satisfied.map((s) => `${s.by}`).join('+')));
         writeFileSync(join(dir, GLOSSARY), prop);
         rmSync(join(dir, PROPOSAL));
-        appendFileSync(join(dir, 'spec.history'), historyLine(sha256(prop), hash, g.satisfied.map((s) => `${s.by}`).join('+')));
         console.log(`promoted ${hash.slice(0, 12)}: ${changes.length} change(s); approved by ${g.satisfied.map((s) => `${s.by} (${s.role})`).join(', ')}`);
         return 0;
       }
