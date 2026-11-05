@@ -5,8 +5,8 @@ import { parsePolicy, parseProgram } from '../src/parse.js';
 import { SigilError } from '../src/sexpr.js';
 
 const read = (p: string) => readFileSync(new URL(`../experiments/tasks/${p}`, import.meta.url), 'utf8');
-const POLICY = read('G3-qa-plus-fraud/visible/policy.sigil');
-const BOUNDED = POLICY.replace('(fns refund)))', '(fns refund)\n    (max-bits 1)))');
+const BOUNDED = read('G3-qa-plus-fraud/visible/policy.sigil');
+const POLICY = BOUNDED.replace('\n    (max-bits 1)', '');
 const LAUNDERED = read('G3-qa-plus-fraud/probe/laundered-app.sigil');
 const QA_ONLY = read('G2-qa-discover/ref/sigil/app.sigil');
 
