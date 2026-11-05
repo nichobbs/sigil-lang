@@ -2,7 +2,8 @@ name: agent-review
 # A reviewing agent that is not the author. Needs the CLAUDE_CODE_OAUTH_TOKEN repository secret
 # (create it with `claude setup-token`); the job runs only when the repository variable AGENT_REVIEW
 # is "on" and the PR comes from this repository (secrets are not available to fork PRs).
-# Review is advisory unless made a required check.
+# The job fails when the reviewer reports blocking findings (or posts no verdict), so making the `review`
+# check required in the repository ruleset makes REQUEST CHANGES block the merge.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -25,13 +26,31 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: |
             --max-turns 20
-            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Read,Grep,Glob"
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Read,Grep,Glob,Write"
           prompt: |
             Repository: ${{ github.repository }}  PR number: ${{ github.event.pull_request.number }}
-            Use `gh pr diff` and `gh pr view` to read the change. Post your review as one PR comment with
-            `gh pr comment ${{ github.event.pull_request.number }} --body ...`.
+            Use `gh pr diff` and `gh pr view` to read the change. Write your review to the file review.md in the
+            current directory (do not post it yourself; the workflow posts it). review.md is your only output.
             Review this pull request as an independent reviewer. You did not write it.
             Check: soundness of checker/SMT changes (no assumed obligations, no unsound abstractions),
             that no scenario was weakened or deleted, that Intent-layer files (*.feature, glossary, policy)
-            were not changed to make tests pass, and that new behaviour has tests. Reply with APPROVE or
-            REQUEST CHANGES and specific findings.
+            were not changed to make tests pass, and that new behaviour has tests.
+            The first line of review.md must be exactly `VERDICT: APPROVE` or `VERDICT: REQUEST CHANGES`.
+            Use REQUEST CHANGES only for blocking findings: an unsound or assumed obligation, a weakened or
+            deleted scenario, an Intent-layer file changed to make tests pass, new behaviour without tests, or
+            a real defect. Style points and nits go under a separate "Non-blocking" heading and never block.
+            Then list the findings.
+      - name: Post the review and fail on blocking findings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # No review file, or no verdict on its first line, is a failure (the gate fails closed).
+          if [ ! -s review.md ]; then echo "::error::The reviewer wrote no review.md."; exit 1; fi
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file review.md
+          first=$(head -n1 review.md | tr -d '\r' | sed 's/[[:space:]]*$//')
+          echo "verdict line: $first"
+          case "$first" in
+            "VERDICT: APPROVE") exit 0 ;;
+            "VERDICT: REQUEST CHANGES") echo "::error::The reviewer reported blocking findings."; exit 1 ;;
+            *) echo "::error::No verdict on the first line of review.md."; exit 1 ;;
+          esac
