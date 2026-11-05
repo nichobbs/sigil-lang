@@ -32,8 +32,8 @@ function field(f: Field): string {
   return `${f.name}: ${ty(f.type)}${flags}`;
 }
 
-const PREC: Record<string, number> = { '||': 1, '&&': 2, cmp: 3, '+': 4, '-': 4, '*': 5, '/': 5 };
-const INFIX: Record<string, string> = { add: '+', sub: '-', mul: '*', 'div-floor': '/' };
+const PREC: Record<string, number> = { '||': 1, '&&': 2, cmp: 3, '+': 4, '-': 4, '*': 5, '/': 5, '%': 5 };
+const INFIX: Record<string, string> = { add: '+', sub: '-', mul: '*', 'div-floor': '/', mod: '%' };
 const CMP: Record<string, string> = { '<=': '<=', '<': '<', '>=': '>=', '>': '>', '=': '==' };
 
 function paren(s: string, own: number, ctx: number): string {

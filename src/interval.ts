@@ -42,6 +42,29 @@ export function divFloor(a: Interval, b: Interval): Interval {
   const q = [floorDiv(a.lo, b.lo), floorDiv(a.lo, b.hi), floorDiv(a.hi, b.lo), floorDiv(a.hi, b.hi)];
   return range(min(...q), max(...q));
 }
+/** Floor modulo: a = b * floorDiv(a, b) + floorMod(a, b); the result has the divisor's sign. */
+export function floorMod(a: bigint, b: bigint): bigint {
+  const r = a % b;
+  return r !== 0n && r < 0n !== b < 0n ? r + b : r;
+}
+/**
+ * Floor modulo. Caller must have established that the divisor excludes zero. Bounded whenever the divisor is,
+ * even for an unbounded dividend: a positive divisor in [dl, dh] gives [0, dh - 1], a negative one [dl + 1, 0].
+ * Tightened when the dividend's sign is known (0 <= a gives a mod b <= a, a <= 0 gives a mod b >= a) and exact when
+ * the dividend already lies in [0, dl - 1] (or [dh + 1, 0]).
+ */
+export function mod(a: Interval, b: Interval): Interval {
+  if (b === 'top' || containsZero(b)) return TOP;
+  if (a !== 'top' && a.lo === a.hi && b.lo === b.hi) return point(floorMod(a.lo, b.lo));
+  if (b.lo > 0n) {
+    if (a !== 'top' && a.lo >= 0n && a.hi < b.lo) return a;
+    const hi = a !== 'top' && a.lo >= 0n ? min(a.hi, b.hi - 1n) : b.hi - 1n;
+    return range(0n, hi);
+  }
+  if (a !== 'top' && a.hi <= 0n && a.lo > b.hi) return a;
+  const lo = a !== 'top' && a.hi <= 0n ? max(a.lo, b.lo + 1n) : b.lo + 1n;
+  return range(lo, 0n);
+}
 export function imin(a: Interval, b: Interval): Interval {
   if (a === 'top' || b === 'top') return TOP;
   return range(min(a.lo, b.lo), min(a.hi, b.hi));

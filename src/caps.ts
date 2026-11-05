@@ -39,6 +39,7 @@ export const BUILTIN_ARITY: Record<string, number> = {
   sub: 2,
   mul: 2,
   'div-floor': 2,
+  mod: 2,
   neg: 1,
   min: 2,
   max: 2,
@@ -48,9 +49,13 @@ export const BUILTIN_ARITY: Record<string, number> = {
   filter: 2,
   fold: 4,
   sort: 2,
+  any: 2,
+  all: 2,
   chars: 1,
   'from-chars': 1,
   append: 2,
+  concat: 2,
+  range: 1,
   take: 2,
   drop: 2,
   at: 3,
@@ -68,6 +73,9 @@ export const BUILTIN_ARITY: Record<string, number> = {
   ok: 1,
   err: 1,
 };
+
+/** Largest n accepted by (range n): the checker rejects a larger possible n, so list bounds stay finite and small. */
+export const RANGE_MAX = 10000;
 
 // Query builtins available only to scenario glossaries (observations of the effect log).
 export const WORLD_BUILTINS = ['sent', 'stored', 'emitted'];

@@ -13,7 +13,8 @@
 //   types    : ranged Int, Bool, enum, Unit, records, Result, lists of scalars/records (no nested lists)
 //   body     : literals, variables and field reads, let/do, if, match on enums and Results, `try ... :on-err`,
 //              record construction, (ok e) (err e), calls to compiled functions, map filter sum len list,
-//              add sub mul div-floor neg min max, = < <= > >=, and or not (short-circuit, as in the interpreter)
+//              fold (with or without the index) sort take drop at append concat range any all (short-circuit),
+//              add sub mul div-floor mod neg min max, = < <= > >=, and or not (short-circuit, as in the interpreter)
 //   function must have: no `requires`, no checker errors, every non-`ensures` obligation proved by the interval
 //   analysis (so overflow and zero-divisor are excluded).
 //
@@ -67,10 +68,10 @@ export interface FnReport {
 }
 
 export interface CompileOptions {
-  /** Test hook for mutation testing the compiler itself: 'trunc' emits plain div_s (WRONG for negatives). */
+  /** Test hook for mutation testing the compiler itself: 'trunc' emits plain div_s / rem_s for div-floor / mod (WRONG for negatives). */
   divMode?: 'floor' | 'trunc';
   /** Test hook: deliberately miscompile one construct, so the differential tests can be shown to catch it. */
-  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-handle-swapped' | 'emit-dropped' | 'sort-inverted' | 'sort-left-tail-dropped' | 'fold-init-dropped';
+  mutation?: 'tag-flip' | 'try-fallthrough' | 'result-arms-swapped' | 'str-eq-true' | 'put-flag-inverted' | 'effect-handle-swapped' | 'emit-dropped' | 'sort-inverted' | 'sort-left-tail-dropped' | 'fold-init-dropped' | 'fold-index-shifted' | 'concat-second-dropped' | 'range-from-one' | 'any-all-swapped';
 }
 
 export interface CompileResult {
@@ -191,6 +192,8 @@ interface Ctx {
   types: TypeTable;
   reg: Registry;
   importBase: number;
+  /** The checker's largest n per `(range n)` node (CheckResult.rangeHi). */
+  rangeHi?: Map<Expr, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -419,8 +422,9 @@ class FnGen {
     return { c: sp.c, lv: { ptr: sp.locals[0], len: sp.locals[1], shape: g.shape } };
   }
 
-  protected lambda(e: Expr, n: number, what: string): Extract<Expr, { k: 'lam' }> {
-    if (e.k !== 'lam' || e.params.length !== n) return no(`${what} needs a ${n}-parameter lambda`);
+  protected lambda(e: Expr, n: number | number[], what: string): Extract<Expr, { k: 'lam' }> {
+    const ns = typeof n === 'number' ? [n] : n;
+    if (e.k !== 'lam' || !ns.includes(e.params.length)) return no(`${what} needs a ${ns.join(' or ')}-parameter lambda`);
     return e;
   }
 
@@ -786,6 +790,13 @@ class FnGen {
         return this.genSum(e);
       case 'sort':
         return this.genSort(e);
+      case 'any':
+      case 'all':
+        return this.genAnyAll(e);
+      case 'concat':
+        return this.genConcat(e);
+      case 'range':
+        return this.genRange(e);
       case 'fold':
         return this.genFold(e);
       case 'take':
@@ -833,6 +844,7 @@ class FnGen {
         return { c: [...R.const(0n), ...a, R.sub], shape: INT };
       }
       case 'div-floor':
+      case 'mod':
       case 'min':
       case 'max': {
         need(2);
@@ -845,6 +857,15 @@ class FnGen {
         const y = localGet(ty);
         if (name === 'min') return { c: [...prefix, ...x, ...y, ...x, ...y, R.ltS, OP.select], shape: INT };
         if (name === 'max') return { c: [...prefix, ...x, ...y, ...x, ...y, R.gtS, OP.select], shape: INT };
+        if (name === 'mod') {
+          // floor modulo: rem_s takes the dividend's sign; add the divisor when the remainder is non-zero and its sign
+          // differs from the divisor's. The divisor is proved non-zero; rem_s does not trap on INT_MIN % -1.
+          if (this.opts.divMode === 'trunc') return { c: [...prefix, ...x, ...y, R.remS], shape: INT };
+          const tm = this.alloc(R.vt);
+          const m = localGet(tm);
+          const fix = [...m, ...R.const(0n), R.ne, ...m, ...y, R.xor, ...R.const(0n), R.ltS, I32.and];
+          return { c: [...prefix, ...x, ...y, R.remS, ...localSet(tm), ...m, ...y, ...R.const(0n), ...fix, OP.select, R.add], shape: INT };
+        }
         // div-floor. The checker has proved the divisor is non-zero and |x| < 2^(w-1), so neither
         // the zero-divide trap nor the INT_MIN / -1 trap can occur. div_s truncates toward zero;
         // floor = trunc - 1 when the remainder is non-zero and its sign differs from the divisor's.
@@ -943,7 +964,7 @@ class FnGen {
     const tE = e.args[1];
     if (tE.k !== 'var' || tE.path.length || !this.prog.types.has(tE.name)) return no('fold: the second argument must be a declared type name');
     const src = this.listArg(e.args[0], 'fold');
-    const lam = this.lambda(e.args[3], 2, 'fold');
+    const lam = this.lambda(e.args[3], [2, 3], 'fold');
     const T = shapeOf(this.prog, { k: 'named', name: tE.name }, `fold accumulator ${tE.name}`, SHAPE_OPTS);
     if (listsOf(T).length) no('fold: the accumulator type holds a list');
     const init = this.gen(e.args[2], T);
@@ -951,15 +972,96 @@ class FnGen {
     const acc = this.allocLeaves(T);
     const i = this.alloc('i32');
     const { binding, load } = this.bindElem(src.lv, i);
-    const body = this.withScope(
-      new Map<string, Binding>([
-        [lam.params[0], { shape: T, locals: acc }],
-        [lam.params[1], binding],
-      ]),
-      () => this.gen(lam.body, T),
-    );
+    const scope = new Map<string, Binding>([
+      [lam.params[0], { shape: T, locals: acc }],
+      [lam.params[1], binding],
+    ]);
+    // (fn (acc x i) body): i is the 0-based index, a copy of the loop counter in the function's Int representation
+    const loadIdx: number[] = [];
+    if (lam.params.length === 3) {
+      const ix = this.alloc(this.R.vt);
+      loadIdx.push(...localGet(i), ...(this.opts.mutation === 'fold-index-shifted' ? [...I32.const(1n), I32.add] : []), ...(this.R.vt === 'i64' ? [OP.i64ExtendI32U] : []), ...localSet(ix));
+      scope.set(lam.params[2], { shape: { t: 'int' }, locals: [ix] });
+    }
+    const body = this.withScope(scope, () => this.gen(lam.body, T));
     if (!sameShape(body.shape, T)) no(`fold: the step is ${showShape(body.shape)} but the accumulator is ${showShape(T)}`);
-    return { c: [...src.c, ...(this.opts.mutation === 'fold-init-dropped' ? [...init.c, ...this.dropAll(T), ...this.zero(T)] : init.c), ...this.setAll(acc), ...this.loop(src.lv.len, i, [...load, ...body.c, ...this.setAll(acc)]), ...this.getAll(acc)], shape: T };
+    return { c: [...src.c, ...(this.opts.mutation === 'fold-init-dropped' ? [...init.c, ...this.dropAll(T), ...this.zero(T)] : init.c), ...this.setAll(acc), ...this.loop(src.lv.len, i, [...load, ...loadIdx, ...body.c, ...this.setAll(acc)]), ...this.getAll(acc)], shape: T };
+  }
+
+  /** `(any xs (fn (x) c))` / `(all xs (fn (x) c))`: a loop that exits at the first deciding element, as the interpreter does. */
+  protected genAnyAll(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 2 || e.kw.length) no(`${e.fn} expects (${e.fn} list (fn (x) cond))`);
+    const isAny = (e.fn === 'any') !== (this.opts.mutation === 'any-all-swapped');
+    const src = this.listArg(e.args[0], e.fn);
+    const lam = this.lambda(e.args[1], 1, e.fn);
+    const i = this.alloc('i32');
+    const r = this.alloc('i32');
+    const { binding, load } = this.bindElem(src.lv, i);
+    const body = this.withScope(new Map([[lam.params[0], binding]]), () => this.gen(lam.body));
+    if (body.shape.t !== 'bool') no(`${e.fn} lambda must return Bool, got ${showShape(body.shape)}`);
+    // block { loop { if i >= len break; load; cond; [all: eqz]; if { r = decided; br block } i++; continue } }
+    const c = [
+      ...src.c,
+      ...I32.const(isAny ? 0n : 1n), ...localSet(r),
+      ...I32.const(0n), ...localSet(i),
+      OP.block, OP.void, OP.loop, OP.void,
+      ...localGet(i), ...localGet(src.lv.len), I32.geS, OP.brIf, 1,
+      ...load, ...body.c, ...(isAny ? [] : [I32.eqz]),
+      OP.if, OP.void, ...I32.const(isAny ? 1n : 0n), ...localSet(r), OP.br, 2, OP.end,
+      ...localGet(i), ...I32.const(1n), I32.add, ...localSet(i),
+      OP.br, 0,
+      OP.end, OP.end,
+      ...localGet(r),
+    ];
+    return { c, shape: { t: 'bool' } };
+  }
+
+  /** `(concat xs ys)`: a fresh copy of xs followed by ys. */
+  protected genConcat(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 2 || e.kw.length) no('concat expects 2 arguments');
+    const a = this.listArg(e.args[0], 'concat');
+    const b = this.listArg(e.args[1], 'concat');
+    if (!sameShape(a.lv.shape, b.lv.shape)) no(`concat of ${showShape(a.lv.shape)} and ${showShape(b.lv.shape)}`);
+    const L = a.lv.shape.layout;
+    const max = a.lv.shape.max + b.lv.shape.max;
+    const off = this.allocScratch(max * L.stride * SLOT, 'concat');
+    const [p, q, i, da, sa] = [this.alloc('i32'), this.alloc('i32'), this.alloc('i32'), this.alloc('i32'), this.alloc('i32')];
+    const copyFrom = (lv: ListLocals, dst: number) => this.loop(lv.len, i, [...this.elemAddr(dst, i, L.stride), ...localSet(da), ...this.elemAddr(lv.ptr, i, L.stride), ...localSet(sa), ...this.copyElem(da, sa, L.stride)]);
+    const second = this.opts.mutation === 'concat-second-dropped';
+    const c = [
+      ...a.c, ...b.c, ...this.baseAddr(off), ...localSet(p),
+      ...copyFrom(a.lv, p),
+      // q = p + len(xs) * stride * 8: where ys starts
+      ...localGet(p), ...localGet(a.lv.len), ...I32.const(BigInt(L.stride * SLOT)), I32.mul, I32.add, ...localSet(q),
+      ...(second ? [] : copyFrom(b.lv, q)),
+      ...localGet(p), ...localGet(a.lv.len), ...(second ? [] : [...localGet(b.lv.len), I32.add]),
+    ];
+    return { c, shape: { t: 'list', layout: L, min: a.lv.shape.min + b.lv.shape.min, max } };
+  }
+
+  /** `(range n)`: 0..n-1 in scratch, sized from the checker's bound on n (and clamped to it, so memory stays in bounds). */
+  protected genRange(e: Extract<Expr, { k: 'call' }>): G {
+    if (e.args.length !== 1 || e.kw.length) no('range expects 1 argument');
+    const hi = this.ctx.rangeHi?.get(e);
+    if (hi === undefined) return no('range: no checker bound for n (check the same program before compiling)');
+    const R = this.R;
+    const n = this.int(this.gen(e.args[0]), 'range');
+    const nn = this.alloc(R.vt);
+    const k = this.alloc('i32');
+    const i = this.alloc('i32');
+    const p = this.alloc('i32');
+    const layout = layoutOf({ t: 'int', lo: 0n, hi: BigInt(Math.max(hi - 1, 0)) }, 'range element');
+    const off = this.allocScratch(hi * SLOT, 'range');
+    // k = clamp(n, 0, hi)
+    const clamp = [
+      ...n, ...localSet(nn),
+      ...localGet(nn), ...R.const(0n), R.ltS, OP.if, 0x7f, ...I32.const(0n), OP.else,
+      ...localGet(nn), ...R.const(BigInt(hi)), R.gtS, OP.if, 0x7f, ...I32.const(BigInt(hi)), OP.else, ...localGet(nn), ...(R.vt === 'i64' ? [OP.i32WrapI64] : []), OP.end, OP.end,
+      ...localSet(k),
+    ];
+    const shift = this.opts.mutation === 'range-from-one' ? [...I32.const(1n), I32.add] : [];
+    const store = [...this.elemAddr(p, i, 1), ...localGet(i), ...shift, OP.i64ExtendI32S, ...i64Store(0)];
+    return { c: [...clamp, ...this.baseAddr(off), ...localSet(p), ...this.loop(k, i, store), ...localGet(p), ...localGet(k)], shape: { t: 'list', layout, min: 0, max: hi } };
   }
 
   /** `block loop { if !cond break; body; continue }` */
@@ -1351,7 +1453,7 @@ interface Built {
 
 function buildOnce(prog: Program, res: CheckResult, opts: CompileOptions, reg: Registry, importBase: number): Built {
   const types = new TypeTable();
-  const ctx: Ctx = { types, reg, importBase };
+  const ctx: Ctx = { types, reg, importBase, rangeHi: res.rangeHi };
   const entrySet = new Set(prog.entries);
   const funcs: WasmFunc[] = [];
   const done = new Map<string, { report: FnReport; index?: number }>();
