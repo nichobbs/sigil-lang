@@ -325,12 +325,57 @@ export function parseGlossary(src: string, prog: Program): Glossary {
 // Generators (type-directed, seeded; boundary-biased for ranges)
 // ---------------------------------------------------------------------------
 
+// Integer literals (and their neighbours) that appear in the property under test. A boundary in the formal
+// text (for example a cap of 20000) is almost never hit by uniform sampling of a huge range, so ints are
+// sometimes drawn from these values. Set for the duration of a property run.
+let hintPool: bigint[] = [];
+
+function collectInts(e: Expr, out: Set<bigint>): void {
+  switch (e.k) {
+    case 'int':
+      out.add(e.v);
+      return;
+    case 'call':
+      e.args.forEach((a) => collectInts(a, out));
+      e.kw.forEach((k) => collectInts(k.value, out));
+      return;
+    case 'let':
+      e.binds.forEach((b) => collectInts(b.value, out));
+      e.body.forEach((b) => collectInts(b, out));
+      return;
+    case 'match':
+      collectInts(e.scrut, out);
+      e.arms.forEach((a) => collectInts(a.body, out));
+      return;
+    case 'if':
+      collectInts(e.cond, out);
+      collectInts(e.then, out);
+      collectInts(e.else, out);
+      return;
+    case 'lam':
+      collectInts(e.body, out);
+      return;
+    case 'do':
+      e.body.forEach((b) => collectInts(b, out));
+      return;
+    case 'try':
+      collectInts(e.expr, out);
+      return;
+    default:
+      return;
+  }
+}
+
 export function gen(prog: Program, t: Type, rnd: () => number): Val {
   const r = resolveType(prog, t);
   const pick = <T>(xs: T[]): T => xs[Math.floor(rnd() * xs.length)];
   switch (r.k) {
     case 'int': {
       const u = rnd();
+      if (hintPool.length && u > 0.8) {
+        const inRange = hintPool.filter((h) => h >= r.lo && h <= r.hi);
+        if (inRange.length) return pick(inRange);
+      }
       if (u < 0.15) return r.lo;
       if (u < 0.3) return r.hi;
       if (u < 0.35 && r.hi > r.lo) return r.lo + 1n;
@@ -541,16 +586,23 @@ function runAlways(prog: Program, g: Glossary, p: Para, n: number, o: SuiteOptio
   if (!bb) return { ...base, status: 'error', message: 'no glossary binding for this property' };
   const rnd = mulberry32(hash(p.text));
   const it = new Interp(prog, new Host(1), ic(o));
-  for (let i = 0; i < n; i++) {
-    const env = new Map<string, Val>(bb.vars.map((v) => [v.name, gen(prog, v.type, rnd)]));
-    try {
-      if (evalIn(it, bb.body, env) !== true) {
-        return { ...base, status: 'fail', cases: i + 1, message: `counterexample: ${[...env].map(([k, v]) => `${k}=${showVal(v)}`).join(' ').slice(0, 300)}` };
+  const lits = new Set<bigint>();
+  collectInts(bb.body, lits);
+  hintPool = [...lits].flatMap((l) => [l - 1n, l, l + 1n]);
+  try {
+    for (let i = 0; i < n; i++) {
+      const env = new Map<string, Val>(bb.vars.map((v) => [v.name, gen(prog, v.type, rnd)]));
+      try {
+        if (evalIn(it, bb.body, env) !== true) {
+          return { ...base, status: 'fail', cases: i + 1, message: `counterexample: ${[...env].map(([k, v]) => `${k}=${showVal(v)}`).join(' ').slice(0, 300)}` };
+        }
+      } catch (e) {
+        if (e instanceof ContractViolation || e instanceof RuntimeFault) return { ...base, status: 'fail', cases: i + 1, message: `${e.message}` };
+        throw e;
       }
-    } catch (e) {
-      if (e instanceof ContractViolation || e instanceof RuntimeFault) return { ...base, status: 'fail', cases: i + 1, message: `${e.message}` };
-      throw e;
     }
+  } finally {
+    hintPool = [];
   }
   collectEnsures(it, ensuresAcc);
   return base;

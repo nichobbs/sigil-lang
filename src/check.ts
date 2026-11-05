@@ -569,6 +569,19 @@ function evalDeclassify(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV
       diag(ctx, 'error', 'E-policy', `declassifier ${d.name} is restricted to ${decl.fields.join(', ')}, but ${printExpr(d.expr)} carries ${stray.join(', ')}`);
     }
   }
+  if (decl.maxBits !== undefined) {
+    const bits = releaseBits(d.expr, v, ctx);
+    if (bits > decl.maxBits) {
+      diag(
+        ctx,
+        'error',
+        'E-policy',
+        `declassifier ${d.name} releases at most ${decl.maxBits} bit(s), but ${printExpr(d.expr)} can carry ${Number.isFinite(bits) ? bits : 'an unbounded number of'} bits (a derived number such as a checksum or digit sum is a larger release than the policy approved)`,
+      );
+    }
+  } else if (ctx.depth === 0) {
+    diag(ctx, 'warn', 'W-declassify', `declassifier ${d.name} has no (max-bits N) in the policy, so it releases any value of the allowed labels (${decl.from} to ${decl.to}) from the allowed functions`);
+  }
   if (!L.confLE(fl.conf, decl.from)) {
     diag(
       ctx,
@@ -580,6 +593,38 @@ function evalDeclassify(e: Extract<Expr, { k: 'call' }>, env: Env, ctx: Ctx): AV
     return v; // not released
   }
   return mapLabels(v, (l) => L.declassifyLabel(l, decl.to, d.name, decl.from, (src) => sourceNeedsRelease(ctx.prog, src, decl.to)));
+}
+
+const COMPARISONS = new Set(['=', '!=', '<', '<=', '>', '>=', 'and', 'or', 'not']);
+
+function typeBits(ctx: Ctx, t: Type): number {
+  const r = resolveType(ctx.prog, t);
+  switch (r.k) {
+    case 'bool':
+      return 1;
+    case 'unit':
+      return 0;
+    case 'int':
+      return Math.ceil(Math.log2(Number(r.hi - r.lo) + 1));
+    case 'enum':
+      return Math.ceil(Math.log2(r.cases.length));
+    case 'rec':
+      return r.fields.reduce((n, f) => n + typeBits(ctx, f.type), 0);
+    default:
+      return Infinity;
+  }
+}
+
+/** Upper bound on how many bits the value of a released expression can carry. Infinity when unknown. */
+function releaseBits(e: Expr, v: AV, ctx: Ctx): number {
+  if (e.k === 'bool') return 1;
+  if (e.k === 'call') {
+    if (COMPARISONS.has(e.fn)) return 1;
+    const f = ctx.prog.fns.get(e.fn);
+    if (f) return typeBits(ctx, f.out);
+  }
+  if (v.num && v.num !== 'top') return Math.ceil(Math.log2(Number(v.num.hi - v.num.lo) + 1));
+  return Infinity;
 }
 
 function viaOf(ctx: Ctx, path: string[]): FlowEdge['via'] {

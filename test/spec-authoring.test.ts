@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { coverage, diffGlossary, effects, gate, parseApprovals, parseEntries, parseOwners, policyNotes, proposalHash, renderReview, requiredRoles, sinkPolicy, tags, treeDiff } from '../src/spec.js';
+import { coverage, diffGlossary, effects, gate, parseApprovals, parseEntries, parseOwners, policyNotes, proposalHash, renderReview, requiredRoles, sinkPolicy, tags, treeDiff, declaredDeclassifiers } from '../src/spec.js';
 
 const BASE = `(glossary
   (given "a {role:Role} actor {id:Int}" (set actor (Actor id role)))
@@ -264,5 +264,24 @@ describe('spec: edits inside entries and policy join', () => {
     const text = renderReview({ changes: ch, gate: gate(ch, owners, [], 'h'), hash: 'h', owners });
     expect(text).not.toContain('No change to observable effects');
     expect(text).toContain('## Edits inside entries');
+  });
+
+  it('a changed constant and a dropped conjunct are tagged from structured edits', () => {
+    const d1 = diffGlossary(parseEntries(G('(always "p" (> m 1))')), parseEntries(G('(always "p" (> m 2))')))[0];
+    expect(d1.tags).toContain('constant-change');
+    const d2 = diffGlossary(parseEntries(G('(always "p" (and a b))')), parseEntries(G('(always "p" (and a))')))[0];
+    expect(d2.tags).toContain('check-removed');
+  });
+
+  it('policy notes mention a removed check and an exempted declassifier that policy.sigil does not declare', () => {
+    const pol = sinkPolicy('(policy (sink audit (accepts internal)))');
+    const declared = declaredDeclassifiers('(policy (declassify qa-test-card (from pii) (to internal) (reason "r")))');
+    expect([...declared]).toEqual(['qa-test-card']);
+    const a = G('(privacy "p" (source Payment.card) (allow store:payments) (run refund))');
+    const b = G('(privacy "p" (source Payment.card) (allow store:payments) (declassified made-up) (run refund))');
+    expect(policyNotes(diffGlossary(parseEntries(a), parseEntries(b)), pol, declared).join('\n')).toMatch(/declassifier made-up is not declared in policy.sigil/);
+    const c = G('(then "x" (expect (= (len (emitted audit)) 1)) (expect (= (map (emitted audit) (fn (e) e.amount)) (list amount))))');
+    const e = G('(then "x" (expect (= (len (emitted audit)) 1)))');
+    expect(policyNotes(diffGlossary(parseEntries(c), parseEntries(e)), pol, declared).join('\n')).toMatch(/check or observation was removed/);
   });
 });

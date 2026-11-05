@@ -7,7 +7,7 @@
 
 import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Approval, approvalLine, coverage, diffGlossary, gate, parseApprovals, parseEntries, parseOwners, proposalHash, renderReview, sha256, sinkPolicy } from './spec.js';
+import { Approval, approvalLine, coverage, diffGlossary, gate, parseApprovals, parseEntries, parseOwners, proposalHash, renderReview, sha256, sinkPolicy, declaredDeclassifiers } from './spec.js';
 import { isList, isSym, readAll, SigilError } from './sexpr.js';
 
 const GLOSSARY = 'glossary.sigil';
@@ -61,7 +61,7 @@ export function specMain(args: string[]): number {
         const approvals = has('spec.approvals') ? parseApprovals(read('spec.approvals')) : [];
         const feat = readdirSync(dir).find((f) => f.endsWith('.feature'));
         const cov = feat ? coverage(read(feat), entries) : undefined;
-        console.log(renderReview({ changes, cov, gate: gate(changes, owners, approvals, hash), hash, owners, policy: has('policy.sigil') ? sinkPolicy(read('policy.sigil')) : undefined }));
+        console.log(renderReview({ changes, cov, gate: gate(changes, owners, approvals, hash), hash, owners, policy: has('policy.sigil') ? sinkPolicy(read('policy.sigil')) : undefined, declared: has('policy.sigil') ? declaredDeclassifiers(read('policy.sigil')) : undefined }));
         return 0;
       }
       case 'approve': {
